@@ -1,0 +1,138 @@
+machine language description
+
+Notes:
+  memory is little-endian and byte accessed (except for stack instructions, which are word accessed and word alligned)
+  instruction decoder only needs 5 bits of input from the instruction: the 4 important ones and one bit to say if the first 4 bits were 1111
+  have assembler take hex digit for reg number
+  when memory addresses are referred to, the form r1,r2 is often used. r1 is the less significant word, r2 is the more significant word
+  when registers are referred to using assembly notation (like this: %F ) then literally that register is being referred to, it is not an argument for that instruction
+  
+  
+
+format:
+
+
+    more significant bits                    less significant bits
+# -  15, 14, 13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0
+0 -   0,  0,s01,s00, i7, i6, i5, i4, i3, i2, i1, i0,r03,r02,r01,r00
+1 - s03,s02,s01,s00,r23,r22,r21,r20,r13,r12,r11,r10,r03,r02,r01,r00        *Note:  s03,s02 != 0,0   and  s03,s02,s01,s00 != 1,1,1,1
+2 -   1,  1,  1,  1,s03,s02,s01,s00,r13,r12,r11,r10,r03,r02,r01,r00
+
+
+
+
+
+instructions:
+
+0 -     0,0, - immediate -> r0[7:0] , 0 -> r0[F:8]
+0 -     0,1, - immediate -> r0[F:8] , r0[7:0] is unchanged
+0 -     1,0, - read  stack word at (%1+(2*immediate)) into r0
+0 -     1,1, - write stack word at (%1+(2*immediate)) with data in r0
+
+1 - 0,1,0,0, - r1  and r2 -> r0
+1 - 0,1,0,1, - r1  or  r2 -> r0
+1 - 0,1,1,0, - r1  xor r2 -> r0
+1 - 0,1,1,1, - do r0+r1+~r2 -> r1, with carry stored to ones bit of r0 (carry cannot extend past ones bit, if the sum would have a carry of '10', the behaviour is undefined. r0 is intended to only hold a value of 0 or 1, but could hold other values).
+1 - 1,0,0,0, - memory write the word in r0 at r1,r2  (must be aligned to word boundry)
+1 - 1,0,0,1, - memory read a  word into r0 at r1,r2  (must be aligned to word boundry)
+1 - 1,0,1,0, - r1 + r2 -> r0
+1 - 1,0,1,1, - r1 + r2 -> r0 , r1 + r2 (carry)-> %F  (%F gets the carry in the ones bit, 0 in all other bits)
+1 - 1,1,0,0, - r1 - r2 -> r0
+1 - 1,1,0,1, - r1 - r2 (carry)-> r0
+1 - 1,1,1,0, - conditional jump if(r2 == 0) to r0,r1 (must be aligned to word boundry)
+
+2 - 0,0,0,0, - push r0 to stack
+2 - 0,0,0,1, - push r0 then r1 to stack
+2 - 0,0,1,0, - pop stack to r0
+2 - 0,0,1,1, - pop stack to r0 then to r1
+2 - 0,1,0,0, - mov r1 to r0
+2 - 0,1,0,1, - swap bytes in r1, place result in r0 (r1 is not modified)
+2 - 0,1,1,0, - shift r1 down one bit towards lower bits and store in r0 (r1 is not modified)
+2 - 0,1,1,1, - r0 * r1 -> r0 (the upper word is not generated)
+2 - 1,0,0,0, - %E,%F * r0,r1 -> %E,%F  (32 bit multiplication, lower 32 bits are stored. %F is the upper word.)
+2 - 1,0,0,1, - r0 / r1 -> r0 , r0 % r1 -> r1   (% is the remainder of the division)
+2 - 1,0,1,0, - call to address at r0,r1
+2 - 1,0,1,1, - ret
+2 - 1,1,0,0, - memory read byte into lower byte of r0 at %E,r1
+2 - 1,1,0,1, - memory write byte in  lower byte of r0 at %E,r1
+2 - 1,1,1,0, - jump to r0,r1 (must be aligned to word boundry)
+2 - 1,1,1,1, - SP - r0 -> SP , then SP -> r0
+
+
+CALL and RET_ details
+
+  When CALL is executed, it pushes %0 to the stack, 
+  Then, it pushes %1 to the stack,
+  Then, it pushes the double word of the address the instruction counter should return to on function return. (The upper word is pushed first.)
+  Then the Stack_Pointer (which is pointing to the lower word of the return address) is put into %0
+  Then the instrution counter is set to the value in the argument registers.
+
+  When RET_ is executed, it sets Stack_Pointer to %0.
+  Then, it pops the next two words into the instruction counter ( first pop is the lower word ).
+  Then, it pops the next word into %1.
+  Then, it pops the next word into %0.
+  Then, it pops the next word into a temporary storage that will be called TempReg1
+  Then, it does [ Stack_Pointer + TempReg1 -> Stack_Pointer ]
+
+  Also, a trick for the microcode for CALL and RET would be to preserve the original Stack_Pointer for as long as possible to make the cache fault microcode simpler
+
+
+
+bootloading:
+  
+  when the CPU is turned on, there are 4 phases of turning on
+  the reset signals A and B start low and go high
+  the reset signal A must go high before reset signal B
+  the instruction with the most significant byte being 0 has a special property:
+    it contains the bootload microcode, and that is run when that instruction is not started at microcode state 0
+	(typically, all instructions start at microcode state 0)
+  
+  
+  
+  1: Vcc ramp - 
+        triggered when reset signals A and B are LOW
+        the output of the microcode flash is overrided to 0 on all bits (to avoid main bus contention)
+        the output of the memory flash has OE to FALSE, so the resistors control the output state (to avoid bus contention for memory)
+		the instruction register (most significant byte) is overrided to 0
+		the microcode's reset flag is ENABLED (is LOW)
+  2: prepare bootload - 
+        triggered when reset signal A is high and B is LOW
+        the output of the microcode flash is NOT overrided
+		the output of the memory flash has OE to TRUE, so the resisters do NOT control the output state
+		the instruction register (most significant byte) is overrided to 0
+		the microcode's reset flag is ENABLED (is LOW)
+		the microcode output, because of the reset flag, will be outputing these:
+		  microcode state 1
+		  main bus transfer: 1's register (with 1's in all bits) -> %0
+  3: perform bootload - 
+        triggered when reset signals A and B are high
+		the output of the microcode flash is NOT overrided
+		the output of the memory flash has OE to TRUE, so the resisters do NOT control the output state
+		the instruction register (most significant byte) is NOT overrided to 0 {however, the register's contents are still 0 after the override signal is removed}
+		the microcode's reset flag is DISABLED (is HIGH)
+		the microcode output will follow this pattern:
+		  01: trigger DRAM initialize
+		      wait for DRAM initialize to start (high->low)
+		  02: wait for DRAM initialize to finish (low->high)
+		  03: %0 -> ROM address
+		  04: %0 -> 0 tester register
+		  05: 0's register (with 0's in all bits) -> memory address upper word
+		  06: %0 -> memory address lower word
+		  07: ROM data -> memory data word [perform word write]
+		  08: 0's register (with 0's in all bits) -> adder in A
+		  09: 0's register (with 0's in all bits) -> adder in B
+		  0A: [perform addition with carry bit high] adder unshifted-out -> adder in B {the value will be 1}
+		  0B: %0 -> adder in A
+		  0C: [perform typical subtraction] adder unshifted-out -> %0
+		  0D: 0's register (with 0's in all bits) -> memory address lower word
+		  0E: set instruction counter to load {it will load a 0} 
+		  0F: if 0 tester register says that it's contents are 0, then continue to 10. otherwise, goto 3
+		  10: {the memory controller shall now be on read word state} 
+		      read word at current memory address into instruction register, 
+			  then proceed to execute that instruction with microcode state 0
+			  {do not change instruction counter}
+  4: execute ROM - 
+        triggered when "perform bootload" loop terminates
+		in this phase, the CPU behaves normally, and the ROM's contents (which are now in RAM) are executed starting at address 0
+
+

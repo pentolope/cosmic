@@ -1,0 +1,604 @@
+--Assembly description for compiler (this is a sort of higher level kind of assembly that the compiler spits out and optimizes)
+
+
+--All statements follow the following grammar:
+
+[arg-prefix] <- %
+[arg-prefix] <- $
+[arg-prefix] <- #
+[arg-prefix] <- !
+[arg-prefix] <- @
+[arg-prefix] <- :
+
+[arg-list] <- [arg-list] [arg-prefix][arg]
+[arg-list] <- 
+
+[statement] <- [opt-code] [arg-list]
+
+
+
+
+
+
+--Additionally, note the following, where 'H' is a hexadecimal character:
+--The following are a description on what the [arg] is expected to be, which is a constant number of characters for each type of prefix
+
+%H 
+$HH
+#HHHH
+!HHHHHHHH
+@HHHHHHHH
+:HHHHHHHH
+
+
+% is for register number
+$ is for byte number
+# is for word number
+! is for double word number
+@ is for refering to labels
+: is for making labels
+
+
+--the following are the letters used for prefixes inside the C code:
+
+% - B
+$ - B
+# - W
+! - D
+@ - D
+: - D
+
+
+--list of opt-codes and their argument prefixes:
+
+
+NOP_
+
+PU1_ %
+PU2_ % %
+PUA1 %
+PUA2 % %
+POP1 %
+POP2 % %
+
+BL1_ % $
+RL1_ % #
+RL2_ % % !
+
+CALL % %
+RET_
+
+STPA % #
+STPS % #
+STWN % $
+STRN % $
+STWV % $
+STRV % $
+
+ALOC
+ALCR % #
+STOF % % #
+
+AJMP % %
+CJMP % % %
+
+JJMP % % :
+JTEN @
+JEND
+
+MOV_ % %
+
+AND_ % % %
+OR__ % % %
+XOR_ % % %
+SSUB % % %
+
+ADDN % % %
+ADDC % % %
+SUBN % % %
+SUBC % % %
+
+MULS % %
+MULL % %
+DIVM % %
+
+SHFT % %
+BSWP % %
+
+MWWN % % %
+MRWN % % %
+MWWV % % %
+MRWV % % %
+MWBN % %
+MRBN % %
+MWBV % %
+MRBV % %
+
+D32U
+R32U
+D32S
+R32S
+
+LABL :
+PHIS
+PHIE
+
+FCST $ # :
+FCEN
+
+SYRB %
+SYRW %
+SYRD % %
+SYRE
+
+NSPB !
+NSPW !
+ZNXB !
+ZNXW !
+
+BYTE $
+WORD #
+DWRD !
+
+SYDB
+SYDW
+SYDD
+SYDE
+
+SYCB $
+SYCW #
+SYCD !
+SYCL @
+
+SYC0
+SYC1
+SYC2
+SYC3
+SYC4
+SYC5
+SYC6
+SYC7
+SYC8
+SYC9
+
+SYCZ
+SYCS
+SYCT
+
+
+
+--list of opt-codes by argument types
+
+
+NOP_
+FCEN
+RET_
+ALOC
+D32U
+R32U
+D32S
+R32S
+JEND
+PHIS
+PHIE
+SYRE
+SYDB
+SYDW
+SYDD
+SYDE
+SYC0
+SYC1
+SYC2
+SYC3
+SYC4
+SYC5
+SYC6
+SYC7
+SYC8
+SYC9
+SYCZ
+SYCS
+SYCT
+
+PU1_ %
+PUA1 %
+POP1 %
+SYRB %
+SYRW %
+
+BYTE $
+SYCB $
+
+PU2_ % %
+PUA2 % %
+POP2 % %
+CALL % %
+AJMP % %
+MULS % %
+MULL % %
+DIVM % %
+SHFT % %
+BSWP % %
+MWBN % %
+MRBN % %
+MWBV % %
+MRBV % %
+MOV_ % %
+SYRD % %
+
+AND_ % % %
+OR__ % % %
+XOR_ % % %
+SSUB % % %
+ADDN % % %
+ADDC % % %
+SUBN % % %
+SUBC % % %
+MWWN % % %
+MRWN % % %
+MWWV % % %
+MRWV % % %
+CJMP % % %
+
+BL1_ % $
+STWN % $
+STRN % $
+STWV % $
+STRV % $
+
+WORD #
+SYCW #
+
+RL1_ % #
+ALCR % #
+STPA % #
+STPS % #
+
+STOF % % #
+
+RL2_ % % !
+
+JJMP % % :
+
+LABL :
+
+FCST $ # :
+
+DWRD !
+SYCD !
+
+JTEN @
+SYCL @
+
+
+
+
+
+--list of opt-codes and their description:
+
+
+NOP_ - no operation / no data. Used inside the optimizer as a temporary placeholder. 
+PU1_ - push one register to stack
+PU2_ - push two registers to stack (First_Reg is pushed first)
+PUA1 - push one register to stack for argument to a function
+PUA2 - push two registers to stack for argument to a function (First_Reg is pushed first)
+POP1 - pop one register to stack
+POP2 - pop two registers to stack (First_Reg is popped to first)
+BL1_ - lower byte load to register
+RL1_ - load word to register
+RL2_ - load double word to two registers, Second_Reg gets upper word
+RLL_ - load two registers with the address of the label, Second_Reg gets upper word
+CALL - call to location at registers, Second_Reg is upper word. (see CALL/RET_ description at bottom)
+RET_ - return to calling function  (see CALL/RET_ description at bottom)
+STPA - transform stack offset into real address using [ %1 + ( Stack_Size - # ) -> First_Reg ]
+			this instruction, when combined with others, may often by optimized into STWN , STRN , STWV , STRV
+STPS - identical to STPA, however it is verified that ( ( Stack_Size - # ) <= 0x00FF ) is true, so the backend can use 1 less instruction (and ~2x less cycles) [this might not be needed because I might do the convertion and then put it back into the optimizer]
+
+STWN - write memory ( word access, non-volatile ) at [ ( %1 + ( 2 * $ ) ) , 0 ] with data in First_Reg
+STRN - read  memory ( word access, non-volatile ) at [ ( %1 + ( 2 * $ ) ) , 0 ] into First_Reg
+STWV - write memory ( word access, volatile     ) at [ ( %1 + ( 2 * $ ) ) , 0 ] with data in First_Reg
+STRV - read  memory ( word access, volatile     ) at [ ( %1 + ( 2 * $ ) ) , 0 ] into First_Reg
+
+ALOC - move stack pointer using [ Stack_Pointer - ( Stack_Size - Initial_Stack_Size ) -> Stack_Pointer ] then [ Stack_Pointer -> %1 ]  (used when function starts, Stack_Size and Initial_Stack_Size value is held in the InstructionBuffer)
+ALCR - move stack pointer using [ # -> First_Reg ] then [ Stack_Pointer - First_Reg -> Stack_Pointer ] then [ Stack_Pointer -> First_Reg ]  (used when allocating space for return value for a CALL)
+STOF - get stack with offset using [ Stack_Pointer -> Second_Reg ] then [ # -> First_Reg ] then [ First_Reg + Second_Reg -> First_Reg ]  (used when getting return value for a CALL, in which case First_Reg is the desired output)
+		Note that in initial compiler output (do not rely on it), ALCR and STOF would probably be enclosing the parameters that go to the function call
+		however, primarily because not every function returns non-void, not every function call has a ALCR and STOF pair
+		also, STOF can be optimized out if the First_Reg from ALCR can be kept in a register while the arguments are being pushed
+		also, ALCR (and possibly STOF) can be optimized out if there is a way to calculate an address on stack to where the return value could go to avoid it getting stack space allocated by ALCR
+
+
+AJMP - always absolute jump to address in registers, Second_Reg is upper word
+CJMP - conditionally jump to address in first and second registers if third register is zero, Second_Reg is upper word of address
+
+JJMP - always absolute jump to address in registers, Second_Reg is upper word. This jump is for jump tables.
+		It also acts as a LABL instruction for it's label number, which points to the 'instruction' after this one.
+		Instruction slots after this one (until a JEND) will be JTEN 'instructions' (it is data, and should not be executed, so they are not actually instructions)
+JTEN - inserts the location of the label at this location (as a dword) for a jump table. Must be between JJMP and JEND
+JEND - see JJMP. This 'instruction' does not translate to an instruction on the backend.
+
+MOV_ - move word in Second_Reg to First_Reg
+
+AND_ - bitwise and  of second and third register into first register
+OR__ - bitwise  or  of second and third register into first register
+XOR_ - bitwise xor  of second and third register into first register
+SSUB - do First_Reg+Second_Reg+~Third_Reg -> Second_Reg, with carry stored to ones bit of First_Reg 
+		In general, carry should not extend past ones bit.
+		If the sum would have a carry greater then 1, First_Reg will still get 1.
+		First_Reg (as the input) is intended to only hold a value of 0 or 1, but could hold other values.
+		Note: the '~' is a bitwise invert on Third_Reg
+ADDN - add      second and third register into first register
+ADDC - add      second and third register into first register, and place carry into ones bit in %F (all other bits get 0)
+SUBN - subtract second and third register into first register
+SUBC - subtract second and third register then place carry into ones bit in first register (all other bits get 0)
+
+MULS - multiply first and second register then place result into first register (upper word is not generated)
+MULL - multiply double word of [%E,%F] and double word of [First_Reg,Second_Reg] then place result into double word of [%E,%F]
+DIVM - do first register divided by second register, as well as first register modulus second register, then place results into first and second register (first gets division, second gets modulus)
+
+SHFT - shift bits in second register down (to lower bits) by 1 bit, then store into first register (second register is not modified, the most significant bit of first register will be 0)
+BSWP - take word in second register, swap the byte order, then place result into first register (second register is not modified)
+
+MWWN - memory write word non-volatile - read  word   at [Second_Reg,Third_Reg] and place in First_Reg
+MRWN - memory read  word non-volatile - write word into [Second_Reg,Third_Reg] with word in First_Reg
+MWWV - memory write word volatile     - read  word   at [Second_Reg,Third_Reg] and place in First_Reg
+MRWV - memory read  word volatile     - write word into [Second_Reg,Third_Reg] with word in First_Reg
+MWBN - memory write byte non-volatile - read  byte   at [%E,Second_Reg] and place in lower byte of First_Reg
+MRBN - memory read  byte non-volatile - write byte into [%E,Second_Reg] with byte in lower byte of First_Reg
+MWBV - memory write byte volatile     - read  byte   at [%E,Second_Reg] and place in lower byte of First_Reg
+MRBV - memory read  byte volatile     - write byte into [%E,Second_Reg] with byte in lower byte of First_Reg
+
+LABL - marks a location. It points to whatever instruction is directly after it. This 'instruction' does not translate to an instruction on the backend.
+
+D32U - performs a 32 bit division operation for unsigned inputs. 
+		it expects the inputs to be:
+			left_lower  -> %2
+			left_upper  -> %3
+			right_lower -> %4
+			right_lower -> %5
+			
+			all other registers are ignored
+			
+		outputs division result to:
+			out_lower -> %8
+			out_upper -> %9
+			
+			all other registers are assumed to hold indeterminate values when this instruction completes
+			
+		internally, this pushes a zero to the stack, 
+		then it will load the address of label 00000001,
+		then CALL to the address
+
+R32U - performs a 32 bit remainder operation for unsigned inputs. 
+		it expects the inputs to be:
+			left_lower  -> %2
+			left_upper  -> %3
+			right_lower -> %4
+			right_lower -> %5
+			
+			all other registers are ignored
+			
+		outputs division result to:
+			out_lower -> %6
+			out_upper -> %7
+			
+			all other registers are assumed to hold indeterminate values when this instruction completes
+			
+		internally, this pushes a zero to the stack, 
+		then it will load the address of label 00000002,
+		then CALL to the address
+
+D32S - performs a 32 bit division operation for signed inputs. 
+		it expects the inputs to be:
+			left_lower  -> %2
+			left_upper  -> %3
+			right_lower -> %4
+			right_lower -> %5
+			
+			all other registers are ignored
+			
+		outputs division result to:
+			out_lower -> %8
+			out_upper -> %9
+			
+			all other registers are assumed to hold indeterminate values when this instruction completes
+			
+		internally, this pushes a zero to the stack, 
+		then it will load the address of label 00000003,
+		then CALL to the address
+
+
+R32S - performs a 32 bit remainder operation for signed inputs. 
+		it expects the inputs to be:
+			left_lower  -> %2
+			left_upper  -> %3
+			right_lower -> %4
+			right_lower -> %5
+			
+			all other registers are ignored
+			
+		outputs division result to:
+			out_lower -> %6
+			out_upper -> %7
+			
+			all other registers are assumed to hold indeterminate values when this instruction completes
+			
+		internally, this pushes a zero to the stack, 
+		then it will load the address of label 00000004,
+		then CALL to the address
+
+
+FCST - indicates the start of a function is next. also acts as a LABL instruction.
+		The word attached is the Stack_Size
+		The byte attached is the Initial_Stack_Size
+		This 'instruction' does not translate to an instruction on the backend.
+FCEN - indicates the end of a function is here (the instruction above is the last instruction to be considered included in the function most recently indicated)
+		FCST and FCEN may NOT be nested
+		This 'instruction' does not translate to an instruction on the backend.
+
+
+
+-- the following opt-codes are for symbolic constant data being loaded into registers, and may appear in code segments but not data segments
+
+
+SYRB - performs a BL1_ using the symbolic calculation that follows
+SYRW - performs a RL1_ using the symbolic calculation that follows
+SYRD - performs a RL2_ using the symbolic calculation that follows
+SYRE - ends the symbolic calculation for SYRB,SYRW,SYRD
+
+
+-- the following opt-codes are for symbolic constant data in data segments, and may appear in data segments but not code segments
+
+
+NSPB - the indicated number of bytes that are next cannot be split up
+NSPW - the indicated number of words that are next cannot be split up
+ZNXB - places the indicated number of 0 bytes at location
+ZNXW - places the indicated number of 0 words at location
+
+BYTE - places the given byte at location. No allignment is enforced.
+WORD - places the given word at location. Word allignment is enforced (will be padded with zeros on backend).
+DWRD - places the given double word at location. Word allignment is enforced.
+
+SYDB - places the result of the symbolic calculation that follows as a byte
+SYDW - places the result of the symbolic calculation that follows as a word
+SYDD - places the result of the symbolic calculation that follows as a double word
+SYDE - ends the symbolic calculation for SYDB,SYDW,SYDD
+
+
+-- the following opt-codes are for symbolic calculations, and may appear in data and code segments. they are not runtime instructions.
+
+
+SYCB - push constant byte as word (to symbolic stack)
+SYCW - push constant word (to symbolic stack)
+SYCD - push constant dword (to symbolic stack)
+SYCL - push location of label (to symbolic stack)
+
+SYC0 - word addition
+SYC1 - dword addition
+SYC2 - word subtraction
+SYC3 - dword subtraction
+SYC4 - word multiplication
+SYC5 - dword multiplication
+SYC6 - word division
+SYC7 - dword division
+SYC8 - word remainder
+SYC9 - dword remainder
+
+SYCZ - zero extend word to dword
+SYCS - sign extend word to dword
+SYCT - trim dword to word
+
+
+
+
+-- Using CALL/RET_ :
+
+There are some technicalities which make things a little complicated, but easier.
+
+The register %0 is used as a reference point for function calls and returns. 
+The register %1 is used as a reference point for the stack frame.
+	Generally, %0 and %1 should not be modified by other instructions, however it can be, so be careful.
+	ALOC is intended to use these registers, and should always be run at the start of every function.
+
+
+--Using CALL :
+
+All function calls push arguments last to first, and they use the PUA1 or PUA2 instructions instead of the normal PU1_ and PU2_ instructions
+
+As always, values with more then one word are pushed as the upper word first, for a little endian representation.
+
+First, if and only if the function does not return void, extend stack for return value by ALCR
+
+Then, push arguments.
+
+Then, if applicable, the location of label of function is put into registers (by default, %A and %B) using RLL_ .
+If the function is being used as a pointer to function, then the location is put into registers from some other operation.
+
+If and only if the function does not return void, an extra argument gets pushed ( by PUA1 ) after all other arguments so far mentioned, and this argument's size is included in Arg_Size
+  this possible extra argument contains the address on stack (which if interpreted as a memory address would be the same except that the upper word is zero) that the return value is to be written to
+
+The sizes of all arguments (size is calculated as size on stack) must be calculated from the actual arguments being pushed and then manually pushed by PUA1 after all other arguments so far mentioned.
+	The size is in number of bytes, but should always be word alliged. This size is known as Arg_Size, and is not included in Arg_Size.
+
+Then the instruction CALL is done, with it's registers being the location of the function in memory. This transfers control over to the function, which will return to the next instruction when it is completed
+
+When the function returns to the next instruction, all of the arguments to the function have already been popped off the stack, and %0 and %1 holds the same value as it did before CALL
+
+
+
+--Internal information for CALL:
+
+When CALL is executed, 
+	it pushes %0 to the stack, 
+	then pushes %1 to the stack,
+	then pushes the double word of the address the instruction counter should return to on function return. 
+		The upper word is pushed first.
+
+Then the Stack_Pointer (which is pointing to the lower word of the return address) is put into %0
+
+Then the instrution counter is set to the value in the argument registers.
+
+
+
+--Using RET_ :
+
+using RET_ is quite easy. Just don't modify %0 or %1 anywhere in the program.
+
+when the current function desires to return to it's caller, it may use the RET_ instruction. The next instruction is never executed (unless it gets jumped to, of course). The Stack_Pointer may have any value, so it doesn't matter if push/pop pairs are balanced or not.
+
+
+--Internal information for RET_:
+
+When RET_ is executed, it sets Stack_Pointer to %0.
+
+Then, it pops the next two words into the instruction pointer ( first pop is the lower word ).
+
+Then, it pops the next word into %1.
+
+Then, it pops the next word into %0.
+
+Then, it pops the next word into a temporary storage that will be called TempReg1
+
+Then, it does [ Stack_Pointer + TempReg1 -> Stack_Pointer ]
+
+
+
+
+--Jump Table Example [todo: update]
+
+The following pattern would exist for a jump table (with the value in %6 being the value to jump by, expected to be in range 0-3):
+		BL1_ %3 $0A    ; The $0A here is a constant. It is the size of RLL_+AJMP on the backend
+		MULS %3 %6
+		RLL_ %4 %5 @00000111
+		ADDC %4 %4 %3
+		ADDN %5 %5 %F
+		AJMP %4 %5
+		LABL :00000111
+		JTEP
+		RLL_ %2 %3 @00001000
+		AJMP %2 %3
+		JTEP
+		RLL_ %2 %3 @00001001
+		AJMP %2 %3
+		JTEP
+		RLL_ %2 %3 @00001010
+		AJMP %2 %3
+		JTEP
+		RLL_ %2 %3 @00001011
+		AJMP %2 %3
+		LABL :00001000  ; case 0
+		LABL :00001001  ; case 1
+		LABL :00001010  ; case 2
+		LABL :00001011  ; case 3
+
+
+
+
+
+
+
+
+
+
+
+

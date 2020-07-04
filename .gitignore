@@ -18,6 +18,24 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+
+# other
+*.bat
+*.sh
+input.c
+input*.c
+*.exe
+linux
+*.ilk
+*.pdb
+callgrind.out.*
+out.txt
+out*.txt
+trimOut.py
+optTesting.py
+
+
+
 # =========================
 # Operating System Files
 # =========================

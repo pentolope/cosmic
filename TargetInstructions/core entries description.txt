@@ -1,0 +1,266 @@
+
+/*
+This was originally in the C source, but was removed because the enum is unused.
+*/
+
+
+enum InstructionBufferCoreEntryType{
+	IB_stack_dupe_word, // duplicate the top word on the stack
+	IB_stack_dupe_dword, // duplicate the top double word on the stack
+	
+	// the formats are [pushed first and popped last, pushed last and popped first]
+	IB_stack_swp_11, // [ word_0, word_1] -> [ word_1, word_0]
+	IB_stack_swp_12, // [ word_0,dword_1] -> [dword_1, word_0]
+	IB_stack_swp_21, // [dword_0, word_1] -> [ word_1,dword_0]
+	IB_stack_swp_22, // [dword_0,dword_1] -> [dword_1,dword_0]
+	
+	IB_CJMP_list_item, // this used for switch statements when a jump table is not used. The value for the switch should be placed in register %3
+	
+	IB_i_16add, // int add 16 bits wide, sign doesn't matter
+	IB_i_32add, // int add 32 bits wide, sign doesn't matter
+	IB_i_16sub, // int subtract 16 bits wide, sign doesn't matter (left side should be pushed first, as always)
+	IB_i_32sub, // int subtract 32 bits wide, sign doesn't matter
+	IB_i_16mul, // int multiply 16 bits wide, I don't think sign will matter
+	IB_i_32mul, // int multiply 32 bits wide, I don't think sign will matter
+	
+	IB_i_16div_u_u, // int divide  16 bits wide, both unsigned (left side should be pushed first, as always)
+	IB_i_16mod_u_u, // int modulus 16 bits wide, both unsigned
+	IB_i_16div_s_s, // int divide  16 bits wide, both signed
+	IB_i_16mod_s_s, // int modulus 16 bits wide, both signed
+	
+	IB_i_32div_u_u, // int divide  32 bits wide, both unsigned
+	IB_i_32mod_u_u, // int modulus 32 bits wide, both unsigned
+	IB_i_32div_s_s, // int divide  32 bits wide, both signed
+	IB_i_32mod_s_s, // int modulus 32 bits wide, both signed
+	
+	// float, double, and long double would make sense to go here as things like "IB_f_add" for 'float add' and "IB_ld_mul" for 'long double multiply'
+	// we would also need conversions between float, double, and long double
+	
+	// sign does not matter for equality
+	IB_comp_eq_int,   // int  == int
+	IB_comp_eq_long,  // long == long
+	IB_comp_neq_int,  // int  != int
+	IB_comp_neq_long, // long != long
+	
+	// signed comparisons
+	IB_comp_geq_int_s,  // int  >= int
+	IB_comp_geq_long_s, // long >= long
+	IB_comp_g_int_s,    // int  >  int
+	IB_comp_g_long_s,   // long >  long
+	IB_comp_leq_int_s,  // int  <= int
+	IB_comp_leq_long_s, // long <= long
+	IB_comp_l_int_s,    // int  <  int
+	IB_comp_l_long_s,   // long <  long
+	
+	// unsigned comparisons
+	IB_comp_geq_int_u,  // int  >= int
+	IB_comp_geq_long_u, // long >= long
+	IB_comp_g_int_u,    // int  >  int
+	IB_comp_g_long_u,   // long >  long
+	IB_comp_leq_int_u,  // int  <= int
+	IB_comp_leq_long_u, // long <= long
+	IB_comp_l_int_u,    // int  <  int
+	IB_comp_l_long_u,   // long <  long
+	
+	// sign doesn't matter for bitwise operations
+	IB_b_and_int,  // bitwise and of int
+	IB_b_and_long, // bitwise and of long
+	IB_b_or_int,   // bitwise or  of int
+	IB_b_or_long,  // bitwise or  of long
+	IB_b_xor_int,  // bitwise xor of int
+	IB_b_xor_long, // bitwise xor of long
+	IB_b_not_int,  // bitwise not of int
+	IB_b_not_long, // bitwise not of long
+	
+	// logical operations with a jump must be initialized because they require labels
+	IB_logic_and_with_jmp, // logical and with short circuited jump
+	IB_logic_or_with_jmp,  // logical or  with short circuited jump
+	
+	/*
+	Currently, logical operations without a jump are unused.
+	logical operations without a jump do not need initialization
+	logical operations without a jump are only to be used in situations where evaluating the right operand has the following constraints:
+	 1. evaluation requires a small amount of calculation
+	 2. evaluation produces no side effects (such as function calls)
+	 3.	evaluation only accesses local variables (no memory read/write except for memory reads only inside the local stack space)
+	*/
+	IB_logic_and_no_jmp, // logical and without the short circuited jump
+	IB_logic_or_no_jmp,  // logical or  without the short circuited jump
+	
+	
+	IB_char_s_TO_int_s, // convert signed char to signed int
+	IB_int_s_TO_long_s, // convert signed int to signed long
+	IB_int_u_TO_long, // convert unsigned int to long (sign doesn't matter for the long, it can be interpreted as either)
+	
+	IB_long_TO_int, // convert long to int (sign doesn't matter)
+	
+	IB_long_TO_bool, // convert long to bool (sign doesn't matter)
+	IB_int_TO_bool, // convert int or char to bool (sign doesn't matter)
+	
+	IB_address_label, // push memory address of label
+	
+	/*
+	for memory byte operations, they take from and put into the lower byte of the word
+	for memory write operations, memory address should be pushed after the word(s) of data
+	for all memory operations (except copy), the address is destroyed and the data word(s) are pushed back
+	the size of "sbyte" is only for reads and is for reading a byte then sign extending it to a word
+	*/
+	IB_mem_byte_write_n,
+	IB_mem_byte_write_v,
+	IB_mem_word_write_n,
+	IB_mem_word_write_v,
+	IB_mem_dword_write_n,
+	IB_mem_dword_write_v,
+	
+	IB_mem_byte_read_n,
+	IB_mem_byte_read_v,
+	IB_mem_sbyte_read_n,
+	IB_mem_sbyte_read_v,
+	IB_mem_word_read_n,
+	IB_mem_word_read_v,
+	IB_mem_dword_read_n,
+	IB_mem_dword_read_v,
+	
+	/*
+	copy takes two double word addresses that are pushed in the order ['to','from']
+	copy will add two to both addresses and push them back (addresses should be word alligned)
+	copy will read from the address of 'from' and write the data there to the address of 'to'
+	n_v is read non-volatile and write volatile
+	v_n is read volatile and write non-volatile
+	*/
+	IB_mem_word_copy_n_n,
+	IB_mem_word_copy_n_v,
+	IB_mem_word_copy_v_n,
+	IB_mem_word_copy_v_v,
+	
+	/*
+	apply_to_self operations are for 
+	 - assignments such as +=
+	   (in which case rvalue_after should be used)
+	 - prefix and postfix -- ++
+	   (in which case either rvalue_before or lvalue should be used depending on prefix or postfix)
+	
+	this should be inserted after both operands are pushed.
+	the first operand that should be pushed is an rvalue (with the size indicated in the type)
+	the second operand that should be pushed is an lvalue (which points to a size indicated in the type)
+	
+	if a byte operation is desired, 
+	  use a byte operation for the memory read and write insertions, just make sure to use the sign extention if applicable.
+	  use a word arithmetic operation, as the value would be promoted as such for that operation anyway
+	
+	insert0 is the arithmetic operation.
+	insert1 is the memory read operation.
+	insert2 is the memory write operation.
+	
+	there are 3 different types, those types refer to what is pushed back
+	 - rvalue_after
+	 - rvalue_before
+	 - lvalue
+	*/
+	IB_apply_to_self_word_rvalue_after,
+	IB_apply_to_self_dword_rvalue_after,
+	IB_apply_to_self_word_rvalue_before,
+	IB_apply_to_self_dword_rvalue_before,
+	IB_apply_to_self_word_lvalue,
+	IB_apply_to_self_dword_lvalue,
+	
+	
+	IB_load_byte, // push a literal byte value, the upper byte of the word will be 0
+	IB_load_word, // push a 16 bit literal value (words are 16 bit)
+	IB_load_dword, // push a literal 32 bit value by pushing two 16 bit values, it pushes the upper word first.
+	
+	// all statements below require initialization because of labels for jumps. The following 5 are given a description in a comment after this enum
+	IB_statement_if,
+	IB_statement_if_else,
+	IB_statement_for,
+	IB_statement_while,
+	IB_statement_do_while,
+	
+	IB_stack_extend, // for when a function begins. it pops a word
+	
+	IB_direct_jump, // IB_direct_jump gets it's address from the stack
+	
+	IB_raw_label, // inserts the given label at that location
+	
+	
+	// they will take the left operand pushed first, and the size indicated is the size of the left operand. The right operand is always 1 word (2 bytes)
+	IB_Lshift16,
+	IB_Rshift16,
+	IB_Lshift32,
+	IB_Rshift32
+	
+	
+};
+
+
+/*
+
+-- IB_statement_if        - 
+
+insert 0 = the conditional
+	stack delta = push a bool
+intert 1 = the body
+	stack delta = none
+
+label 1 = label to jump to in order to skip the body. This is only used internally.
+
+
+-- IB_statement_if_else   - 
+
+insert 0 = the conditional
+	stack delta = push a bool
+insert 1 = the first body ('if' body)
+	stack delta = none
+insert 2 = the second body ('else' body)
+	stack delta = none
+
+label 0 = label to jump to in order to skip the 'if' body and execute the 'else' body. This is only used internally.
+
+label 1 = label to jump to in order to execute the 'if' body and skip the 'else' body. This is only used internally.
+
+
+-- IB_statement_for       - 
+
+insert 0 = the initialization expression
+	stack delta = none
+insert 1 = the continue conditional expression
+	stack delta = push a bool
+insert 2 = the iteration expression
+	stack delta = none
+insert 3 = the loop body
+	stack delta = none
+
+label 0 = the beginning of the loop, also is the label to jump to for the 'continue' keyword
+
+label 1 = the end of the loop, also is the label to jump to for the 'break' keyword
+
+label 2 = the location to jump to when starting the loop (to skip the iteration expression on the first iteration). This is only used internally.
+
+
+-- IB_statement_while     - 
+
+insert 0 = the continue conditional expression
+	stack delta = push a bool
+insert 1 = the loop body
+	stack delta = none
+
+label 0 = the beginning of the loop, also is the label to jump to for the 'continue' keyword
+
+label 1 = the end of the loop, also is the label to jump to for the 'break' keyword
+
+
+-- IB_statement_do_while  - 
+
+insert 0 = the continue conditional expression
+	stack delta = push a bool
+insert 1 = the loop body
+	stack delta = none
+
+label 0 = the beginning of the loop
+
+label 1 = the end of the loop, also is the label to jump to for the 'break' keyword
+
+label 2 = the label to jump to for the 'continue' keyword
+
+*/
+
