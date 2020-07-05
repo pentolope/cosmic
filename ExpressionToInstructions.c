@@ -147,7 +147,7 @@ void applyConvertToRvalue(ExpressionTreeNode* thisNode){
 		exit(1);
 	}
 	if (thisNode->ib.numberOfSlotsAllocated!=0){
-		InstructionBuffer* ibMem;
+		const InstructionBuffer* ibMem;
 		bool applySignedCharConvert=false;
 		if (size==1){
 			if (doStringsMatch(thisNode->post.typeStringNQ,"signed char")) applySignedCharConvert=true;
@@ -338,8 +338,8 @@ void applyTypeCast(ExpressionTreeNode* thisNode,const char* typeStringTo_input, 
 		goto quickEnd;
 	}
 	if (thisNode->ib.numberOfSlotsAllocated!=0){
-		InstructionBuffer* ib_apply_0=NULL;
-		InstructionBuffer* ib_apply_1=NULL;
+		const InstructionBuffer* ib_apply_0=NULL;
+		const InstructionBuffer* ib_apply_1=NULL;
 		bool doLoad255=false;
 		if (typeIdForFrom==1){
 			if (typeIdForTo>=6) {
@@ -717,7 +717,7 @@ void applyAutoTypeConversion_Sizeof(ExpressionTreeNode* thisNode){
 	char* typeStringToGetSize;
 	ExpressionTreeNode* rn;
 	if (thisNode->isArgumentTypeForSizeof){
-		typeStringToGetSize = fullTypeParseAvoidAdd(sourceContainer.string,thisNode->argumentIndexStart,thisNode->argumentIndexEnd);
+		typeStringToGetSize = fullTypeParseAvoidAdd(thisNode->argumentIndexStart,thisNode->argumentIndexEnd);
 	} else {
 		recursiveApplyAutoTypeConversionForSizeof(
 			rn = expressionTreeGlobalBuffer.expressionTreeNodes+thisNode->pre.rightNode);
@@ -1045,7 +1045,7 @@ void applyAutoTypeConversion_Typical(ExpressionTreeNode* tn){
 		break;
 		case 14:{
 			etc_07(&r);
-			*thisTSP=fullTypeParseAvoidAdd(sourceContainer.string,tn->argumentIndexStart,tn->argumentIndexEnd);
+			*thisTSP=fullTypeParseAvoidAdd(tn->argumentIndexStart,tn->argumentIndexEnd);
 			applyTypeCast(rn,*thisTSP,0);
 		}
 		break;
@@ -1389,9 +1389,8 @@ void applyOperator(ExpressionTreeNode* thisNode){
 	uint8_t oID = thisNode->operatorID;
 	uint16_t operatorTypeID = thisNode->post.operatorTypeID;
 	uint32_t extraVal = thisNode->post.extraVal;
-	//InstructionBuffer ibTemp;
-	InstructionBuffer* ib_core0;
-	InstructionBuffer* ib_core1;
+	const InstructionBuffer* ib_core0;
+	const InstructionBuffer* ib_core1;
 	InstructionBuffer* ib=&thisNode->ib;
 	InstructionBuffer* ibLeft;
 	InstructionBuffer* ibRight;
@@ -2534,7 +2533,7 @@ void expressionToAssemblyWithInitializer(
 	uint8_t initalizerCatagory=initializerMap.entries[initializerRoot].typeOfEntry;
 	
 	
-	char* typeString = fullTypeParseAndAdd(sourceContainer.string,startIndexForDeclaration,endIndexForDeclaration,false);
+	char* typeString = fullTypeParseAndAdd(startIndexForDeclaration,endIndexForDeclaration,false);
 	char* typeStringNI = applyToTypeStringRemoveIdentifierToNew(typeString); // what about potentially having multiple identifiers?
 	char* identifier = applyToTypeStringGetIdentifierToNew(typeString);
 	cosmic_free(typeString);

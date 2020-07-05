@@ -1188,21 +1188,10 @@ if (indexStart==-1) then no location will be emmitted
 else if (indexEnd<=indexStart) then only the arrow will be printed, not the tildas after it
 */
 void printInformativeMessageAtSourceContainerIndex(bool isError,const char* message, int32_t indexStart, int32_t indexEnd){
-	/*
 	char tempString1[ERR_MSG_LEN*2+1];
 	char tempString2[ERR_MSG_LEN*2+1];
 	char arrowString1[ERR_MSG_LEN*2+1];
 	char arrowString2[ERR_MSG_LEN*2+1];
-	*/
-	assert(ERR_MSG_LEN==60); // temporary for before I get constant exp in type analysis
-	char arrowString1[121];
-	char arrowString2[121];
-	char tempString1[121];
-	char tempString2[121];
-
-
-
-
 	for (uint8_t i=0;i<ERR_MSG_LEN*2+1;i++){
 		arrowString1[i]=0;
 		arrowString2[i]=0;

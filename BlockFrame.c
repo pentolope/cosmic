@@ -1053,15 +1053,15 @@ char* breakDownTypeAndAdd(char* typeString, bool addToGlobal){
 	return finalString;
 }
 
-char* fullTypeParseAndAdd(char* string,int32_t startIndex,int32_t endIndex,bool addToGlobal){
-	char* typeString_1 = convertType(string,startIndex,endIndex);
+char* fullTypeParseAndAdd(int32_t startIndex,int32_t endIndex,bool addToGlobal){
+	char* typeString_1 = convertType(startIndex,endIndex);
 	char* typeString_2 = breakDownTypeAndAdd(typeString_1,addToGlobal);
 	cosmic_free(typeString_1);
 	return typeString_2;
 }
 
-char* fullTypeParseAvoidAdd(char* string,int32_t startIndex,int32_t endIndex){
-	char* typeString_1 = convertType(string,startIndex,endIndex);
+char* fullTypeParseAvoidAdd(int32_t startIndex,int32_t endIndex){
+	char* typeString_1 = convertType(startIndex,endIndex);
 	for (uint32_t i=0;typeString_1[i];i++){
 		if (typeString_1[i]=='{'){
 			printf("That type descriptor should not be defining a new type\n");

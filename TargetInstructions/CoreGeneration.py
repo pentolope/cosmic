@@ -2534,9 +2534,9 @@ for k in namesToUse:
     altName2 = altName1+'_contents'
     splitInstructions = splitInstructionString(dictionaryOfInitializationContents[k])
     numberOfInstructionsAsString = str(len(splitInstructions))
-    f.write('InstructionSingle '+altName2+'['+numberOfInstructionsAsString+']={')
+    f.write('const InstructionSingle '+altName2+'['+numberOfInstructionsAsString+']={')
     f.write(','.join(filter(lambda x:len(x)!=0,map(genInitializerForSplitInstructions,list(enumerate(splitInstructions))))))
-    f.write('};\nInstructionBuffer '+altName1+'={'+altName2+','+numberOfInstructionsAsString+','+numberOfInstructionsAsString+'};\n\n')
+    f.write('};\nconst InstructionBuffer '+altName1+'={(InstructionSingle*)'+altName2+','+numberOfInstructionsAsString+','+numberOfInstructionsAsString+'};\n\n')
 
 
 f.close()

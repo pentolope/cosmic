@@ -197,8 +197,8 @@ struct InstructionBuffersOfFunctions{
 	uint32_t numberOfSlotsTaken;
 } globalInstructionBuffersOfFunctions;
 
-static const InstructionBuffer resetInstructionBuffer={0};
-#define INIT_INSTRUCTION_BUFFER_SIZE 64
+const InstructionBuffer resetInstructionBuffer={0};
+#define INIT_INSTRUCTION_BUFFER_SIZE 1024
 
 
 void initInstructionBuffer(InstructionBuffer* ib){

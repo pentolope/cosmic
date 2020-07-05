@@ -35,6 +35,8 @@ Because of the large amount of places that call
   printInformativeMessageAtSourceContainerIndex()
   and may pass constant arguments, then often call exit(),
   these functions are made to reduce both code size and binary size
+  (unfortunately, it is also likely that when using optimizations,
+  modern compilers will likely inline these functions)
 
 err_ABCDE()
 
@@ -88,7 +90,7 @@ void err_1111_(const char* message,int32_t s,int32_t e){printInformativeMessageA
 #if 0
 const char* startFileName="\"input2.c\"";
 #else
-const char* startFileName="\"StatementWalk.c\"";
+const char* startFileName="\"Main.c\"";
 #endif
 
 

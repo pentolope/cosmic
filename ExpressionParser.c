@@ -1,9 +1,5 @@
 
-
 #include "Common.c"
-
-
-
 
 
 // doesn't check much. returns -1 if there was an obvious failure. returns the index directly after the token ends
@@ -425,7 +421,7 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 		} else if (lengthOfStringInCurrentToken==2){
 			if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"++"))      n_oID = 52;
 			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"--")) n_oID = 53;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"->")) n_oID = 6;
+			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"->")) n_oID =  6;
 			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"<<")) n_oID = 23;
 			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,">>")) n_oID = 24;
 			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"<=")) n_oID = 25;
@@ -444,8 +440,8 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"|=")) n_oID = 48;
 		} else if (lengthOfStringInCurrentToken==1){
 			if (firstCharacterOfCurrentToken=='(')      n_oID = 63;
-			else if (firstCharacterOfCurrentToken=='[') n_oID = 4;
-			else if (firstCharacterOfCurrentToken=='.') n_oID = 5;
+			else if (firstCharacterOfCurrentToken=='[') n_oID =  4;
+			else if (firstCharacterOfCurrentToken=='.') n_oID =  5;
 			else if (firstCharacterOfCurrentToken=='+') n_oID = 54;
 			else if (firstCharacterOfCurrentToken=='-') n_oID = 55;
 			else if (firstCharacterOfCurrentToken=='!') n_oID = 12;
@@ -598,13 +594,6 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 			} else {
 				ExpressionToken *previousTokenPtr = &(expressionTokens[i-1]);
 				uint8_t previousOperatorID = previousTokenPtr->operatorID;
-				// I'm not 100% confident that this check is always going to give the right answer...
-				/*
-				if (previousTokenPtr->isOpenEnclosement | (previousOperatorID>=8 & previousOperatorID<=17)){
-					isPostfix = false;
-				}
-				*/
-				// this next test is what I added later
 				if (previousTokenPtr->isOpenEnclosement | (previousOperatorID<=50 & previousOperatorID>=8)) isPostfix = false;
 			}
 			if (isPostfix)
@@ -1008,6 +997,17 @@ typedef struct ExpressionTreeGlobalBuffer{
 	int16_t walkingIndexForNextOpenSlot;
 } ExpressionTreeGlobalBuffer;
 ExpressionTreeGlobalBuffer expressionTreeGlobalBuffer;
+
+void packExpressionTreeGlobalBuffer(ExpressionTreeGlobalBuffer* pack){
+	*pack=expressionTreeGlobalBuffer;
+	const ExpressionTreeGlobalBuffer n={0};
+	expressionTreeGlobalBuffer=n;
+}
+
+void unpackExpressionTreeGlobalBuffer(ExpressionTreeGlobalBuffer* pack){
+	cosmic_free(expressionTreeGlobalBuffer.expressionTreeNodes);
+	expressionTreeGlobalBuffer=*pack;
+}
 
 
 void genSinglePreWalkData(int16_t nodeIndex){
@@ -1638,11 +1638,15 @@ void clearPreviousExpressions(){
 
 
 
+
+
 /*
 this will be the public function that gets used most
 returns -1 if there is no expression to be processed there
 */
 int16_t buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(char *string, int32_t startIndexInString, int32_t endIndexInString, bool doClearPreviousExpressions){
+	assert(string==sourceContainer.string);
+	
 	if (startIndexInString>=endIndexInString ||
 		(string[startIndexInString]==' ' & startIndexInString+1>=endIndexInString)){
 #ifdef COMPILE_EXP_DEBUG_PRINTOUT

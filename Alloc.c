@@ -3,7 +3,7 @@
 
 #ifdef USE_ALT_ALLOC
 
-#define ALT_ALLOC_BLK_SIZE 64
+#define ALT_ALLOC_BLK_SIZE 88
 /*
 Because of the way that malloc,calloc,realloc,free are often used 
 (especially in the compiler), it can result in heap fragmentation.
@@ -26,8 +26,7 @@ struct {
 
 
 struct cosmic_alloc_block{
-	//uint8_t entries[ALT_ALLOC_BLK_SIZE*8][ALT_ALLOC_BLK_SIZE];
-	uint8_t entries[512][ALT_ALLOC_BLK_SIZE];
+	uint8_t entries[ALT_ALLOC_BLK_SIZE*8][ALT_ALLOC_BLK_SIZE];
 	uint8_t isNotTaken[ALT_ALLOC_BLK_SIZE];
 	struct cosmic_alloc_block* next;
 	struct cosmic_alloc_block* prev;
@@ -114,9 +113,9 @@ void* cosmic_calloc(size_t nmemb,size_t size){
 
 void cosmic_ptr_hit(void* ptr,struct cosmic_alloc_block* hit){
 	uint32_t diff=(uint32_t)((uint8_t*)ptr-(uint8_t*)&hit->entries);
+	assert((uint32_t)diff==(uint16_t)diff); // if this is false then the type size for diff on the cast needs to be larger
 	uint16_t entry=(uint16_t)diff/(uint16_t)sizeof(uint8_t[ALT_ALLOC_BLK_SIZE]);
 	hit->isNotTaken[entry/8U]^=1U<<(entry&7U);
-	assert((uint32_t)diff==(uint16_t)diff); // if this is false then the type size for diff on the cast needs to be larger
 }
 
 void cosmic_free(void* ptr){

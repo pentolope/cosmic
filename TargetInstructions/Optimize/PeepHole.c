@@ -1024,8 +1024,7 @@ void shiftInstrIndexesForFutureInsert(ValueTraceEntriesApplicableRepeatedParams*
 	if (!hasShifted[vtearp->walkSource] & thisInstr>above) ++thisSource->instr;
 	hasShifted[vtearp->walkSource]=1;
 	++vtearp->walkSource;
-	if (thisSource->id==I_DEPL) return;
-	if (thisSource->entryType&0x02) return;
+	if (thisSource->id==I_DEPL | (thisSource->entryType&0x02)) return;
 	InstructionInformation II;
 	fillInstructionInformation(&II,vtearp->ib,thisInstr);
 	uint8_t ri=0;
@@ -1136,67 +1135,42 @@ uint8_t peepholeSortQuad(ValueTraceEntriesApplicableRepeatedParams* vtearp){
 	uint32_t b=vtearp->pushPopRecord[1];
 	uint32_t c=vtearp->pushPopRecord[2];
 	uint32_t d=vtearp->pushPopRecord[3];
-	// comments are the items in decending order
 	if (a > b){
 		if (b > c){
 			if (d > b)
 				return (d < a)+0;
-				//0=[d, a, b, c]
-				//1=[a, d, b, c]
 			else
 				return (d < c)+2;
-				//2=[a, b, d, c]
-				//3=[a, b, c, d]
 		} else {
 			if (a > c){
 				if (d > c)
 					return (d < a)+4;
-					//4=[d, a, c, b]
-					//5=[a, d, c, b]
 				else
 					return (d < b)+6;
-					//6=[a, c, d, b]
-					//7=[a, c, b, d]
 			} else {
 				if (d > a)
 					return (d < c)+8;
-					//8=[d, c, a, b]
-					//9=[c, d, a, b]
 				else
 					return (d < b)+10;
-					//10=[c, a, d, b]
-					//11=[c, a, b, d]
 			}
 		}
 	} else {
 		if (a > c){
 			if (d > a)
 				return (d < b)+12;
-				//12=[d, b, a, c]
-				//13=[b, d, a, c]
 			else
 				return (d < c)+14;
-				//14=[b, a, d, c]
-				//15=[b, a, c, d]
 		} else {
 			if (b > c){
 				if (d > c)
 					return (d < b)+16;
-					//16=[d, b, c, a]
-					//17=[b, d, c, a]
 				else
 					return (d < a)+18;
-					//18=[b, c, d, a]
-					//19=[b, c, a, d]
 			} else {
 				if (d > b)
 					return (d < c)+20;
-					//20=[d, c, b, a]
-					//21=[c, d, b, a]
 				else
 					return (d < a)+22;
-					//22=[c, b, d, a]
-					//23=[c, b, a, d]
 			}
 		}
 	}
@@ -1231,6 +1205,8 @@ void peepholeSortQuadWithPattern(ValueTraceEntriesApplicableRepeatedParams* vtea
 		default:assert(false);
 	}
 	/*
+	case = items in decending order
+	
 	 0=[d, a, b, c]
 	 1=[a, d, b, c]
 	 2=[a, b, d, c]

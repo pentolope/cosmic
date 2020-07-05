@@ -3,7 +3,7 @@ typedef struct InstructionInformation{
 	enum InstructionTypeID id;
 	uint32_t cv; // the constant value associated with RL2_,RL1_,BL1_,STPA,STPS,STWV,STWN,STRV,STRN,ALCR,STOF
 	uint8_t regIN[5]; // no more then 4 inputs are listed
-	uint8_t regOUT[3]; // no more then 2 outputs are listed
+	uint8_t regOUT[5]; // no more then 2 outputs are listed
 	
 	bool usesReg_E; // these are for if it uses that register in a special way that cannot be renamed
 	bool usesReg_F;
@@ -33,7 +33,7 @@ typedef struct InstructionInformation{
 bool doingSanityCheck = false;
 #endif
 
-const InstructionInformation resetII = {.regIN={16,16,16,16,16},.regOUT={16,16,16}};
+const InstructionInformation resetII = {.regIN={16,16,16,16,16},.regOUT={16,16,16,16,16}};
 
 void fillInstructionInformation(InstructionInformation* II, const InstructionBuffer* ib, uint32_t index){
 	*II=resetII;
@@ -400,9 +400,9 @@ uint16_t findLengthOfSymbolicCalc(const InstructionBuffer* ib,const uint32_t tar
 	return length;
 }
 
-
-
 bool doesRegListContain(const uint8_t* regList,const uint8_t item){
+	return regList[0]==item | regList[1]==item | regList[2]==item | regList[3]==item;
+	// older code (which is more general-purpose) is below
 	uint8_t itemInRegList;
 	while ((itemInRegList=*(regList++))!=16){
 		if (itemInRegList==item) return true;
@@ -410,17 +410,16 @@ bool doesRegListContain(const uint8_t* regList,const uint8_t item){
 	return false;
 }
 
-
-
-
 bool doRegListsHaveCommon(const uint8_t* regList0,const uint8_t* regList1){
+	if (regList0[0]==16 | regList1[0]==16) return false;
+	if (regList0[1]==16 & regList1[1]==16) return regList0[0]==regList1[0];
+	// older code (which is more general-purpose) is below
 	uint8_t itemInRegList0;
 	while ((itemInRegList0=*(regList0++))!=16){
 		if (doesRegListContain(regList1,itemInRegList0)) return true;
 	}
 	return false;
 }
-
 
 // the return value indicates that the target instruction can be reordered to any position down to and including the index returned
 uint32_t findLowerReorderBoundry(const InstructionBuffer *ib,const uint32_t target){

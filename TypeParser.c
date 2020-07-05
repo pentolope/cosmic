@@ -31,7 +31,7 @@ struct, enum, union will preface the name or a bracket (and the name may be foll
 
 Remember, what comes out of here is not finished. It needs to have the structure declarations taken out and typedefs resolved by "breakDownTypeAndAdd()"
 */
-char* convertType(char *string, int32_t startIndex, int32_t endIndex);
+char* convertType(int32_t startIndex, int32_t endIndex);
 
 /*
 finds the endIndex for a C style declaration, primarily for convertType(). Does not include the brackets for function declarations
@@ -119,7 +119,7 @@ bool doesThisTypeStringHaveAnIdentifierAtBeginning(const char* string){
 
 
 
-
+bool isArrayBracketsInvalidOnTypeString(const char* string);
 
 uint16_t numberInterpreterForEnumEnumerationNormalizer(char* string, int32_t indexOfStartOfNumber){
 	int32_t indexOfEndSpace = indexOfStartOfNumber;
@@ -349,12 +349,113 @@ char* giveNamesToAllAnonymous(char* string){
 	return string;
 }
 
+int32_t advancedSourceFindSub(char* string, int32_t sourceStart, int32_t sourceEnd){
+	int32_t i0=sourceStart;
+	int32_t i1=0;
+	if (sourceContainer.string[i0]=='['){
+		++i0;
+		while (true){
+			bool didSourceAdvance=false;
+			bool didStringAdvance=false;
+			while (sourceContainer.string[i0]==' ' | sourceContainer.string[i0]=='\n'){
+				++i0;didSourceAdvance=true;
+			}
+			while (string[i1]==' ' | string[i1]=='\n'){
+				++i1;didStringAdvance=true;
+			}
+			if (i0>sourceEnd | sourceContainer.string[i0]==0 | (didSourceAdvance&!didStringAdvance)){
+				return -1;
+			}
+			assert(string[i1]!=0);
+			if (string[i1]!=sourceContainer.string[i0]){
+				return -1;
+			}
+			if (string[i1]==']'){
+				return i0;
+			}
+			++i0;++i1;
+		}
+	}
+	return -1;
+}
+
+bool advancedSourceFind(char* string, int32_t sourceStart, int32_t sourceEnd, int32_t* sourceStartOut, int32_t* sourceEndOut){
+	for (int32_t subStart=sourceStart;subStart<sourceEnd;subStart++){
+		int32_t ret=advancedSourceFindSub(string,subStart,sourceEnd);
+		if (ret!=-1){
+			*sourceStartOut=subStart+1;
+			*sourceEndOut=ret;
+			return false;
+		}
+	}
+	return true;
+}
+
+
+// the input string is potentially destroyed, and an output string is given (cosmic_realloc() may be used on the input string)
+char* resolveConstantExpressionInTypeString(char* string,int32_t sourceStart,int32_t sourceEnd){
+	ExpressionTreeGlobalBuffer pack;
+	for (int32_t i=0;string[i];i++){
+		if (string[i]=='[') goto StartResolve;
+	}
+	return string; // nothing to resolve
+	
+	StartResolve:
+	packExpressionTreeGlobalBuffer(&pack);
+	for (int32_t i0=0;string[i0];i0++){
+		if (string[i0]=='['){
+			assert(string[i0+1]==' ');
+			if (string[i0+2]==']') continue;
+			for (int32_t i1=i0+1;string[i1];i1++){
+				if (string[i1]==']'){
+					char* t0=copyStringSegmentToHeap(string,0,i0+2);
+					char* t1=copyStringSegmentToHeap(string,i0+2,i1+1);
+					char* t2=copyStringSegmentToHeap(string,i1-1,strlen(string));
+					int32_t internalSourceStart;
+					int32_t internalSourceEnd;
+					if (advancedSourceFind(t1,sourceStart,sourceEnd,&internalSourceStart,&internalSourceEnd)){
+						// this is basically an internal error, it shouldn't happen
+						printInformativeMessageAtSourceContainerIndex(true,"Type parser failed to figure out the original position of the contents of an array bracket pair",sourceStart,sourceEnd);
+						exit(1);
+					}
+					int16_t root=buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(sourceContainer.string,internalSourceStart,internalSourceEnd,true);
+					assert(root!=-1); // empty brackets should have already been check for
+					uint32_t arrSize=expressionToConstantValue("unsigned long",root);
+					char numberBuffer[14] = {0};
+					snprintf(numberBuffer,13,"%lu",(unsigned long)arrSize);
+					char* t3=tripleConcatStrings(t0,numberBuffer,t2);
+					cosmic_free(t0);
+					cosmic_free(t1);
+					cosmic_free(t2);
+					cosmic_free(string);
+					string=t3;
+					break;
+				}
+			}
+		}
+	}
+	unpackExpressionTreeGlobalBuffer(&pack);
+	return string;
+}
+
 
 // allocates a new string
 // does not care if there is an identifier
 // this function is called in this file and should not be used elsewhere
-char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* stringIn){
+char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* stringIn, uint16_t* errorValue, int32_t sourceStart, int32_t sourceEnd){
+	*errorValue=0;
 	char* stringInternal = copyStringToHeapString(stringIn);
+	for (int32_t i=0;stringInternal[i];i++){
+		if (stringInternal[i]=='\"' | stringInternal[i]=='\''){
+			*errorValue=2;
+			return NULL;
+		}
+	}
+	if (isArrayBracketsInvalidOnTypeString(stringInternal)){
+		*errorValue=3;
+		return NULL;
+	}
+	stringInternal=resolveConstantExpressionInTypeString(stringInternal,sourceStart,sourceEnd);
 	int32_t length = strlen(stringInternal);
 	
 	struct SegmentOfTypeInTypeString{
@@ -541,9 +642,8 @@ char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* st
 				}
 			}
 			if (isWrong){
-				// we don't really have a proper main string index here... oh well I guess, I'll figure out how to get this function access later
-				printf("That type had type keywords in a wrong order\n");
-				exit(1);
+				*errorValue=1;
+				return NULL;
 			}
 		}
 	}
@@ -764,12 +864,12 @@ char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* st
 				isSegmentRebuildNecessary = true;
 				continue;
 			}
-			// TODO: write check to recursively apply "const" and "volatile" to struct and union members (this might not be nessassary due to how expressions propagate volatile and const)
 			i++;
 		}
 	}
-	// and nearly done with normalizing everything, just have to add unique names to anonymous struct, enum, union. 
-	// and we need to add values to any enum's enumerator-lists there may be
+	// and nearly done with normalizing everything
+	// 1. add unique names to anonymous struct, enum, union. 
+	// 2. add values to any enum's enumerator-lists there may be
 	cosmic_free(segments);
 	stringInternal = giveNamesToAllAnonymous(stringInternal);
 	stringInternal = giveNumbersForAllEnumEnumerators(stringInternal);
@@ -795,7 +895,6 @@ struct TypeToken{
 struct TypeTokenArray{
 	struct TypeToken* typeTokens;
 	int16_t* indexesForRearrangement;
-	char* string;
 	int16_t length;
 };
 
@@ -824,24 +923,24 @@ int16_t findStartForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t bou
 		int32_t startIndexOfStartBound = typeTokenArray.typeTokens[boundStart].stringIndexStart;
 		int16_t lengthOfBoundStartToken = typeTokenArray.typeTokens[boundStart].stringIndexEnd-startIndexOfStartBound;
 		if (lengthOfBoundStartToken==4){
-			if (isSectionOfStringEquivalent(typeTokenArray.string,startIndexOfStartBound,"enum")){
+			if (isSectionOfStringEquivalent(sourceContainer.string,startIndexOfStartBound,"enum")){
 				doContainerStart = true;
 				doStartSkip = true;
 			}
 		} else if (lengthOfBoundStartToken==5){
-			if (isSectionOfStringEquivalent(typeTokenArray.string,startIndexOfStartBound,"union")){
+			if (isSectionOfStringEquivalent(sourceContainer.string,startIndexOfStartBound,"union")){
 				doContainerStart = true;
 				doStartSkip = true;
-			} else if (isSectionOfStringEquivalent(typeTokenArray.string,startIndexOfStartBound,"const")){
+			} else if (isSectionOfStringEquivalent(sourceContainer.string,startIndexOfStartBound,"const")){
 				return findStartForTypeTokens(typeTokenArray,boundStart+1,boundEnd);
 			}
 		} else if (lengthOfBoundStartToken==6){
-			if (isSectionOfStringEquivalent(typeTokenArray.string,startIndexOfStartBound,"struct")){
+			if (isSectionOfStringEquivalent(sourceContainer.string,startIndexOfStartBound,"struct")){
 				doContainerStart = true;
 				doStartSkip = true;
 			}
 		} else if (lengthOfBoundStartToken==8){
-			if (isSectionOfStringEquivalent(typeTokenArray.string,startIndexOfStartBound,"volatile")){
+			if (isSectionOfStringEquivalent(sourceContainer.string,startIndexOfStartBound,"volatile")){
 				return findStartForTypeTokens(typeTokenArray,boundStart+1,boundEnd);
 			}
 		}
@@ -1008,15 +1107,15 @@ void bracketHandlerForMainWalkForTypeTokens(struct TypeTokenArray typeTokenArray
 	int32_t startIndexInString = typeTokenArray.typeTokens[descriptorIndex].stringIndexStart;
 	int16_t lengthInString = typeTokenArray.typeTokens[descriptorIndex].stringIndexEnd-startIndexInString;
 	if (lengthInString==4){
-		if (isSectionOfStringEquivalent(typeTokenArray.string,startIndexInString,"enum")){
+		if (isSectionOfStringEquivalent(sourceContainer.string,startIndexInString,"enum")){
 			outID = 1;
 		}
 	} else if (lengthInString==5){
-		if (isSectionOfStringEquivalent(typeTokenArray.string,startIndexInString,"union")){
+		if (isSectionOfStringEquivalent(sourceContainer.string,startIndexInString,"union")){
 			outID = 2;
 		}
 	} else if (lengthInString==6){
-		if (isSectionOfStringEquivalent(typeTokenArray.string,startIndexInString,"struct")){
+		if (isSectionOfStringEquivalent(sourceContainer.string,startIndexInString,"struct")){
 			outID = 3;
 		}
 	}
@@ -1128,7 +1227,6 @@ void splitterStarterForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t 
 }
 
 void keywordAndTypedefDetectInTypeTokens(struct TypeTokenArray typeTokenArray){
-	char* string = typeTokenArray.string;
 	for (int16_t i=0;i<typeTokenArray.length;i++){
 		int32_t startIndex = typeTokenArray.typeTokens[i].stringIndexStart;
 		int32_t endIndex = typeTokenArray.typeTokens[i].stringIndexEnd;
@@ -1137,20 +1235,20 @@ void keywordAndTypedefDetectInTypeTokens(struct TypeTokenArray typeTokenArray){
 		if (lengthOfThisToken==1){
 			// do nothing, this is to consume the case because it is common for lengthOfThisToken==1
 		} else if (lengthOfThisToken==3){
-			if (isSectionOfStringEquivalent(string,startIndex,"int") ||
-				isSectionOfStringEquivalent(string,startIndex,"...")){ 
+			if (isSectionOfStringEquivalent(sourceContainer.string,startIndex,"int") ||
+				isSectionOfStringEquivalent(sourceContainer.string,startIndex,"...")){ 
 				// the ... is for multiple arguments in a function
 				
 				isKeyword = true;
 			}
 		} else if (lengthOfThisToken==4){
-			if (isSectionOfStringEquivalent(string,startIndex,"long") ||
-				isSectionOfStringEquivalent(string,startIndex,"void") ||
-				isSectionOfStringEquivalent(string,startIndex,"char")){
+			if (isSectionOfStringEquivalent(sourceContainer.string,startIndex,"long") ||
+				isSectionOfStringEquivalent(sourceContainer.string,startIndex,"void") ||
+				isSectionOfStringEquivalent(sourceContainer.string,startIndex,"char")){
 					
 				isKeyword = true;
 			}
-			if (isSectionOfStringEquivalent(string,startIndex,"enum")){
+			if (isSectionOfStringEquivalent(sourceContainer.string,startIndex,"enum")){
 				if (i+1>=typeTokenArray.length){
 					printf("keyword \'enum\' must have something after it\n");
 					exit(1);
@@ -1158,14 +1256,14 @@ void keywordAndTypedefDetectInTypeTokens(struct TypeTokenArray typeTokenArray){
 				isKeyword = true;
 			}
 		} else if (lengthOfThisToken==5){
-			if (isSectionOfStringEquivalent(string,startIndex,"short") ||
-				isSectionOfStringEquivalent(string,startIndex,"const") ||
-				isSectionOfStringEquivalent(string,startIndex,"float") ||
-				isSectionOfStringEquivalent(string,startIndex,"_Bool")){
+			if (isSectionOfStringEquivalent(sourceContainer.string,startIndex,"short") ||
+				isSectionOfStringEquivalent(sourceContainer.string,startIndex,"const") ||
+				isSectionOfStringEquivalent(sourceContainer.string,startIndex,"float") ||
+				isSectionOfStringEquivalent(sourceContainer.string,startIndex,"_Bool")){
 				
 				isKeyword = true;
 			}
-			if (isSectionOfStringEquivalent(string,startIndex,"union")){
+			if (isSectionOfStringEquivalent(sourceContainer.string,startIndex,"union")){
 				if (i+1>=typeTokenArray.length){
 					printf("keyword \'union\' must have something after it\n");
 					exit(1);
@@ -1173,11 +1271,11 @@ void keywordAndTypedefDetectInTypeTokens(struct TypeTokenArray typeTokenArray){
 				isKeyword = true;
 			}
 		} else if (lengthOfThisToken==6){
-			if (isSectionOfStringEquivalent(string,startIndex,"signed") ||
-				isSectionOfStringEquivalent(string,startIndex,"double")){
+			if (isSectionOfStringEquivalent(sourceContainer.string,startIndex,"signed") ||
+				isSectionOfStringEquivalent(sourceContainer.string,startIndex,"double")){
 				isKeyword = true;
 			}
-			if (isSectionOfStringEquivalent(string,startIndex,"struct")){
+			if (isSectionOfStringEquivalent(sourceContainer.string,startIndex,"struct")){
 				if (i+1>=typeTokenArray.length){
 					printf("keyword \'struct\' must have something after it\n");
 					exit(1);
@@ -1185,12 +1283,12 @@ void keywordAndTypedefDetectInTypeTokens(struct TypeTokenArray typeTokenArray){
 				isKeyword = true;
 			}
 		} else if (lengthOfThisToken==8){
-			if (isSectionOfStringEquivalent(string,startIndex,"volatile") ||
-				isSectionOfStringEquivalent(string,startIndex,"unsigned")){
+			if (isSectionOfStringEquivalent(sourceContainer.string,startIndex,"volatile") ||
+				isSectionOfStringEquivalent(sourceContainer.string,startIndex,"unsigned")){
 				isKeyword = true;
 			}
 		}
-		bool isTypedefed = isSectionOfStringTypedefed(string,startIndex,endIndex);
+		bool isTypedefed = isSectionOfStringTypedefed(sourceContainer.string,startIndex,endIndex);
 		typeTokenArray.typeTokens[i].isKeywordOrTypedefed = isKeyword | isTypedefed;
 	}
 }
@@ -1258,7 +1356,7 @@ void enclosementMatchTypeTokens(struct TypeTokenArray typeTokenArray){
 	}
 }
 
-struct TypeTokenArray typeTokenizeForAnalysis(char *string, int32_t startIndex, int32_t endIndex){
+struct TypeTokenArray typeTokenizeForAnalysis(int32_t startIndex, int32_t endIndex){
 	// This function has optimization potential (doing multiple cosmic_malloc()'s for the TypeToken* are not actually necessary)
 	struct TypeToken * typeTokensOfStringSegment_1 = cosmic_malloc(
 		sizeof(struct TypeToken)*(endIndex-startIndex));
@@ -1266,11 +1364,11 @@ struct TypeTokenArray typeTokenizeForAnalysis(char *string, int32_t startIndex, 
 		struct TypeToken* thisToken = typeTokensOfStringSegment_1+(i-startIndex);
 		thisToken->stringIndexStart = i;
 		thisToken->stringIndexEnd = i+1;
-		char firstCharacter = string[i];
-		thisToken->isNonSymbol = isCharNonSymbolForTypeToken(firstCharacter);
 		thisToken->doSkip = false;
-		thisToken->firstCharacter = firstCharacter;
 		thisToken->enclosementMatch = 0;
+		char firstCharacter = sourceContainer.string[i];
+		thisToken->firstCharacter = firstCharacter;
+		thisToken->isNonSymbol = isCharNonSymbolForTypeToken(firstCharacter);
 	}
 	for (int32_t i=1;i<(endIndex-startIndex);i++){
 		if (typeTokensOfStringSegment_1[i-1].isNonSymbol && typeTokensOfStringSegment_1[i].isNonSymbol){
@@ -1317,7 +1415,6 @@ struct TypeTokenArray typeTokenizeForAnalysis(char *string, int32_t startIndex, 
 	struct TypeTokenArray returnVal;
 	returnVal.typeTokens = typeTokensOfStringSegment_3;
 	returnVal.length = part3Length;
-	returnVal.string = string;
 	returnVal.indexesForRearrangement = cosmic_malloc(sizeof(int16_t)*(part3Length+1));
 	for (int16_t i=0;i<(part3Length+1);i++){
 		returnVal.indexesForRearrangement[i]=-1;
@@ -1325,8 +1422,8 @@ struct TypeTokenArray typeTokenizeForAnalysis(char *string, int32_t startIndex, 
 	return returnVal;
 }
 
-char* convertType(char* string, int32_t startIndex, int32_t endIndex){
-	struct TypeTokenArray typeTokenArray = typeTokenizeForAnalysis(string,startIndex,endIndex);
+char* convertType(int32_t startIndex, int32_t endIndex){
+	struct TypeTokenArray typeTokenArray = typeTokenizeForAnalysis(startIndex,endIndex);
 	enclosementMatchTypeTokens(typeTokenArray);
 	keywordAndTypedefDetectInTypeTokens(typeTokenArray);
 	mainWalkForTypeTokens(typeTokenArray,0,typeTokenArray.length,0,false);
@@ -1345,7 +1442,7 @@ char* convertType(char* string, int32_t startIndex, int32_t endIndex){
 	while (typeTokenArray.indexesForRearrangement[walkingIndex]!=-1){
 		struct TypeToken thisTypeToken = typeTokenArray.typeTokens[typeTokenArray.indexesForRearrangement[walkingIndex]];
 		for (int32_t i=thisTypeToken.stringIndexStart;i<thisTypeToken.stringIndexEnd;i++){
-			resultString[walkingCount++]=string[i];
+			resultString[walkingCount++]=sourceContainer.string[i];
 		}
 		resultString[walkingCount++]=' ';
 		walkingIndex++;
@@ -1353,15 +1450,27 @@ char* convertType(char* string, int32_t startIndex, int32_t endIndex){
 	resultString[endIndexForReturnString]=0;
 	cosmic_free(typeTokenArray.typeTokens);
 	cosmic_free(typeTokenArray.indexesForRearrangement);
-	char *normalizedResultString = checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(resultString);
+	uint16_t errorValueForTypeNormalizer;
+	char *normalizedResultString = checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(resultString,&errorValueForTypeNormalizer,startIndex,endIndex);
+	if (normalizedResultString==NULL){
+		if (errorValueForTypeNormalizer==1){
+			printInformativeMessageAtSourceContainerIndex(true,"type keywords cannot be out of proper order",startIndex,endIndex);
+		} else if (errorValueForTypeNormalizer==2){
+			printInformativeMessageAtSourceContainerIndex(true,"types cannot contain the character `\'` or `\"`",startIndex,endIndex);
+		} else if (errorValueForTypeNormalizer==3){
+			printInformativeMessageAtSourceContainerIndex(true,"types cannot contain nested array brackets",startIndex,endIndex);
+		} else {
+			assert(false);
+		}
+		exit(1);
+	}
+	assert(errorValueForTypeNormalizer==0);
 	cosmic_free(resultString);
 	return normalizedResultString;
 }
 
-
-/*
-
-
+// some old testing code is below. The code above has been updated many times since the test code below has been run
+#if 0
 void temp(char *s){
 	int32_t length;
 	for (length=0;s[length];length++){
@@ -1421,7 +1530,6 @@ int main(){
 	temp("const int i");
 	temp("union ARGU{struct {char a_0;} R;struct {char a_0;char a_1;} RR; struct {char a_0;char a_2;} RRR;struct {char a_0;char a_1;} RB;struct {char a_0;unsigned int a_1;} RW;struct {char a_0;char a_1;unsigned long a_2;} RRD;struct {char a_0;char a_1;unsigned long a_2;} RRL;struct {char a_0;char a_1;unsigned long a_2;} RRW;struct {unsigned long a_0;} P;}");
 	temp("union ARGU{struct {char a_0;} R;}");
-	//(struct TypeTokenArray (*[5])(float)) 5;
 	
 	printf("this should fail\n");
 	temp("char var*[1]");
@@ -1435,7 +1543,7 @@ int main(){
 	printf("\nDONE\n");
 	return 0;
 }
-*/
+#endif
 
 
 

@@ -36,6 +36,32 @@ void applyConstantOperator(ExpressionTreeNode* thisNode){
 		break;
 		case 11:{
 			*thisConstVal=-((int32_t)rightConstVal);
+			if (operatorTypeID==2) *thisConstVal&=0xFFFFu;
+		}
+		break;
+		case 18:{
+			*thisConstVal=leftConstVal*rightConstVal;
+			if (operatorTypeID==2) *thisConstVal&=0xFFFFu;
+		}
+		break;
+		case 21:{
+			if (operatorTypeID==1){
+				*thisConstVal=leftConstVal+rightConstVal;
+			} else if (operatorTypeID==2){
+				*thisConstVal=(leftConstVal+rightConstVal)&0xFFFFu;
+			} else {
+				goto GiveHasNotAddedMessage;
+			}
+		}
+		break;
+		case 22:{
+			if (operatorTypeID==1){
+				*thisConstVal=leftConstVal-rightConstVal;
+			} else if (operatorTypeID==2){
+				*thisConstVal=(leftConstVal-rightConstVal)&0xFFFFu;
+			} else {
+				goto GiveHasNotAddedMessage;
+			}
 		}
 		break;
 		case 17:
@@ -67,6 +93,7 @@ void applyConstantOperator(ExpressionTreeNode* thisNode){
 		}
 		break;
 		default:
+		GiveHasNotAddedMessage:
 		printInformativeMessageForExpression(true,"Unimplemented Error: I have not (or cannot) add support for this operand in constant expressions",thisNode);
 		exit(1);
 	}

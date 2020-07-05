@@ -369,7 +369,7 @@ int32_t functionStatementsWalk(
 						expressionToAssemblyWithInitializer(&instructionBufferLocalTemp_0,indexOfStartOfInitializer,indexOfEndOfInitializer,walkingIndex,indexOfEndOfDeclaration,usedRegister,usedStatic);
 						walkingIndex=indexOfEndOfInitializer;
 					} else {
-						char* typeString = fullTypeParseAndAdd(sourceContainer.string,walkingIndex,indexOfEndOfDeclaration,false);
+						char* typeString = fullTypeParseAndAdd(walkingIndex,indexOfEndOfDeclaration,false);
 						addVariableToBlockFrame(typeString,usedRegister,usedStatic);
 						cosmic_free(typeString);
 						walkingIndex=indexOfEndOfDeclaration;
@@ -727,7 +727,7 @@ int32_t functionStatementsWalk(
 					expressionToAssemblyWithInitializer(parentInstructionBufferToInsertTo,indexOfStartOfInitializer,indexOfEndOfInitializer,walkingIndex,indexOfEndOfDeclaration,usedRegister,usedStatic);
 					walkingIndex=indexOfEndOfInitializer;
 				} else {
-					char* typeString = fullTypeParseAndAdd(sourceContainer.string,walkingIndex,indexOfEndOfDeclaration,false);
+					char* typeString = fullTypeParseAndAdd(walkingIndex,indexOfEndOfDeclaration,false);
 					addVariableToBlockFrame(typeString,usedRegister,usedStatic);
 					cosmic_free(typeString);
 					walkingIndex=indexOfEndOfDeclaration;
@@ -786,7 +786,7 @@ void fileScopeStatementsWalk(){
 			// then this is a typedef entry
 			int32_t startIndexForDeclaration = walkingIndex+8;
 			int32_t endIndexForDeclaration = findEndIndexForConvertType(sourceContainer.string,startIndexForDeclaration);
-			char* typeString = fullTypeParseAndAdd(sourceContainer.string,startIndexForDeclaration,endIndexForDeclaration,true);
+			char* typeString = fullTypeParseAndAdd(startIndexForDeclaration,endIndexForDeclaration,true);
 			addTypedefEntry(typeString);
 			cosmic_free(typeString);
 			walkingIndex=1+endIndexForDeclaration;
@@ -843,7 +843,7 @@ void fileScopeStatementsWalk(){
 				hasInline=inlineCount!=0;
 			}
 			int32_t endIndexForDeclaration = findEndIndexForConvertType(sourceContainer.string,startIndexForDeclaration);
-			char* typeString = fullTypeParseAndAdd(sourceContainer.string,startIndexForDeclaration,endIndexForDeclaration,true);
+			char* typeString = fullTypeParseAndAdd(startIndexForDeclaration,endIndexForDeclaration,true);
 			int32_t gotoFailIndex=startIndexForDeclaration;
 			walkingIndex=1+endIndexForDeclaration;
 			if (doesThisTypeStringHaveAnIdentifierAtBeginning(typeString)){
