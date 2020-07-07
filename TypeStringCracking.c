@@ -1,17 +1,9 @@
 
 
-
 // free()'s it's input, string[start] should be the 's' or 'u' for struct or union
 char* crackStructUnion(char* string, int32_t start){
-	uint8_t type;
-	if (string[start]=='s'){
-		type=0;
-	} else if (string[start]=='u'){
-		type=1;
-	} else {
-		printf("Internal Error: crackStructUnion() called wrong\n");
-		exit(1);
-	}
+	uint8_t type=string[start]=='u';
+	assert(string[start]=='s' | string[start]=='u');
 	int32_t middle=getIndexOfNthSpace(string+start,0)+start;
 	int32_t end=getIndexOfNthSpace(string+start,1);
 	if (end==-1) end=strlen(string);
@@ -36,46 +28,26 @@ char* crackStructUnion(char* string, int32_t start){
 	char* t0;
 	char* t1;
 	char* t2;
-	char* t3;
-	char* t4;
-	char* t5;
-	t0=concatStrings(" < ",workingString);
-	cosmic_free(workingString);
-	workingString=t0;
-	t0=concatStrings(workingString," { ");
+	t0=strMerge3(" < ",workingString," { ");
 	cosmic_free(workingString);
 	workingString=t0;
 	for (uint16_t i=0;i<numberOfMemberEntries;i++){
 		t0=applyToTypeStringRemoveIdentifierToNew(arrayOfMemberEntries[i].typeString);
 		t1=applyToTypeStringGetIdentifierToNew(arrayOfMemberEntries[i].typeString);
-		t2=concatStrings(t0," ");
-		t3=concatStrings(t2,t1);
-		t4=concatStrings(t3," ; ");
-		t5=concatStrings(workingString,t4);
+		t2=strMerge5(workingString,t0," ",t1," ; ");
+		cosmic_free(workingString);
 		cosmic_free(t0);
 		cosmic_free(t1);
-		cosmic_free(t2);
-		cosmic_free(t3);
-		cosmic_free(t4);
-		cosmic_free(workingString);
-		workingString=t5;
+		workingString=t2;
 	}
-	t0=concatStrings(workingString," } ");
-	cosmic_free(workingString);
-	workingString=t0;
-	t0=concatStrings(workingString," > ");
-	cosmic_free(workingString);
-	workingString=t0;
 	t0=copyStringSegmentToHeap(string,0,start);
 	t1=copyStringSegmentToHeap(string,end,strlen(string));
 	cosmic_free(string);
-	t2=concatStrings(t0,workingString);
+	t2=strMerge4(t0,workingString," } > ",t1);
 	cosmic_free(t0);
-	cosmic_free(workingString);
-	workingString=concatStrings(t2,t1);
-	cosmic_free(t2);
 	cosmic_free(t1);
-	return workingString;
+	cosmic_free(workingString);
+	return t2;
 }
 
 // runs in place
@@ -91,10 +63,8 @@ void crackArraysAndEnum(char* string){
 	for (int32_t i=0;string[i];i++){
 		if (string[i]=='['){
 			int32_t i1=getIndexOfMatchingEnclosement(string,i);
-			if (i1==-1){
-				printf("Internal Error: typeString corruption\n");
-				exit(1);
-			}
+			assert(i1!=-1); // type string corruption
+			
 			string[i   ]=26;
 			string[i+1 ]='#';
 			string[i1  ]=26;
@@ -105,15 +75,9 @@ void crackArraysAndEnum(char* string){
 	for (int32_t i=0;string[i];i++){
 		if (isSectionOfStringEquivalent(string,i,"enum ")){
 			int32_t end=getIndexOfNthSpace(string+i,1);
-			if (end==-1){
-				printf("Internal Error: typeString corruption\n");
-				exit(1);
-			} else {
-				end+=i;
-			}
-			for (int32_t i1=i;i1<end;i1++){
-				string[i1]=26;
-			}
+			assert(end!=-1); // type string corruption
+			end+=i;
+			for (int32_t i1=i;i1<end;i1++) string[i1]=26;
 			string[i  ]='i';
 			string[i+1]='n';
 			string[i+2]='t';
@@ -124,17 +88,15 @@ void crackArraysAndEnum(char* string){
 
 void strInPlaceReplaceForTypeCrack(char* string,const char* from,const char to){
 	int32_t fromLen=strlen(from);
-	Start:
 	for (int32_t i=0;string[i];i++){
-		if (isSectionOfStringEquivalent(string,i,from)){
-			for (int32_t i1=i;i1<i+fromLen;i1++){
-				string[i1]=26;
+		if (string[i]==from[0]){ // this check reduces amount of function call overhead
+			if (isSectionOfStringEquivalent(string,i,from)){
+				for (int32_t i1=i;i1<i+fromLen;i1++) string[i1]=26;
+				string[i  ]=' ';
+				string[i+1]=to;
+				string[i+2]=' ';
+				copyDownForInPlaceEdit(string+i);
 			}
-			string[i  ]=' ';
-			string[i+1]=to;
-			string[i+2]=' ';
-			copyDownForInPlaceEdit(string);
-			goto Start;
 		}
 	}
 }
@@ -152,40 +114,75 @@ void crackTypeNames(char* string){
 		/*k*/" _Bool ",
 		/*j*/" struct ",
 		/*h*/" union ",
-		/*_*/" const ",
-		/*_*/" volatile "
+		/*g*/" const ",
+		/*f*/" volatile ",
+		/*d*/" void "
 	};
-	const char to[]={'z','x','c','v','b','n','m','l','k','j','h',26,26,0};
+	const char to[]={'z','x','c','v','b','n','m','l','k','j','h','g','f','d',0};
 	for (uint16_t i=0;to[i];i++){
 		strInPlaceReplaceForTypeCrack(string,from[i],to[i]);
 	}
 }
 
-const char* crackedTypeToTypeString(char* crackedType,bool* didAllocate){
-	char c=*crackedType;
-	if (c=='*' | c=='#'){
-		if (c=='#'){
-			crackedType+=8;
-			printf("Internal Warning: using array decay when converting from cracked type to type string (are you initializing a pointer to array?)\n");
+
+// will always allocate
+char* advancedCrackedTypeToTypeString(char* crackedType){
+	char* sub;
+	char* this;
+	switch (crackedType[0]){
+		case 'z':return copyStringToHeapString("unsigned long long");
+		case 'x':return copyStringToHeapString("unsigned long");
+		case 'c':return copyStringToHeapString("unsigned int");
+		case 'v':return copyStringToHeapString("signed char");
+		case 'b':return copyStringToHeapString("long long");
+		case 'n':return copyStringToHeapString("long");
+		case 'm':return copyStringToHeapString("int");
+		case 'l':return copyStringToHeapString("char");
+		case 'k':return copyStringToHeapString("_Bool");
+		case 'd':return copyStringToHeapString("void");
+		case 'g':
+		sub=advancedCrackedTypeToTypeString(crackedType+1);
+		this=strMerge2("const ",sub);
+		cosmic_free(sub);
+		return this;
+		case 'f':
+		sub=advancedCrackedTypeToTypeString(crackedType+1);
+		this=strMerge2("volatile ",sub);
+		cosmic_free(sub);
+		return this;
+		case '*':
+		sub=advancedCrackedTypeToTypeString(crackedType+1);
+		this=strMerge2("* ",sub);
+		cosmic_free(sub);
+		return this;
+		case '#':
+		{
+		char numberBuffer[14] = {0};
+		snprintf(numberBuffer,13,"%lu",(unsigned long)readHexInString(crackedType+1));
+		sub=advancedCrackedTypeToTypeString(crackedType+9);
+		this=strMerge4("[ ",numberBuffer," ] ",sub);
+		cosmic_free(sub);
+		return this;
 		}
-		*didAllocate=true;
-		bool didSubAllocate;
-		const char* subString=crackedTypeToTypeString(crackedType+1,&didSubAllocate);
-		char* workingString=concatStrings("* ",subString);
-		if (didSubAllocate) cosmic_free((char*)subString);
-		return workingString;
-	}
-	*didAllocate=false;
-	switch (c){
-		case 'z':return "unsigned long long";
-		case 'x':return "unsigned long";
-		case 'c':return "unsigned int";
-		case 'v':return "signed char";
-		case 'b':return "long long";
-		case 'n':return "long";
-		case 'm':return "int";
-		case 'l':return "char";
-		case 'k':return "_Bool";
+		case 'j':
+		case 'h':
+		crackedType--;
+		case '<':
+		{
+		bool isStruct=crackedType[1]=='j';
+		assert(crackedType[1]=='j' | crackedType[1]=='h');
+		uint32_t nameEnd=2;
+		while (crackedType[nameEnd]!='{' & crackedType[nameEnd]!='|'){
+			assert(crackedType[nameEnd]!=0);
+			nameEnd++;
+		}
+		sub=copyStringSegmentToHeap(crackedType,2,nameEnd);
+		this=strMerge2(isStruct?"struct ":"union ",sub);
+		cosmic_free(sub);
+		return this;
+		}
+		case '(':
+		printf("Hit paren!\n");
 	}
 	printf("Internal Error: invalid crackedCharacter\n");
 	exit(1);
@@ -198,27 +195,20 @@ char* crackArraySizes(char* string){
 			uint32_t value=0;
 			bool isValueKnown=string[i]=='#';
 			if (isValueKnown){
-				while (string[e]!=0 & string[e]!=' '){
-					e++;
-				}
+				while (string[e]!=0 & string[e]!=' ') e++;
 				for (uint16_t t=i+1;t<e;t++){
-					if (!(string[t]>='0' & string[t]<='9')){
-						printf("Internal Error: array size had bad character\n");
-						exit(1);
-					}
+					assert(string[t]>='0' & string[t]<='9'); // for decimal numbers as array sizes in type strings
 					value*=10;
 					value+=string[t]-'0';
 				}
 			}
 			char* t0=copyStringSegmentToHeap(string,0,i+1);
 			char* t1=copyStringSegmentToHeap(string,e,strlen(string));
-			char* t2=concatStrings(t0,"00000000");
-			char* t3=concatStrings(t2,t1);
+			char* t2=strMerge3(t0,"00000000",t1);
 			cosmic_free(string);
 			cosmic_free(t0);
 			cosmic_free(t1);
-			cosmic_free(t2);
-			string=t3;
+			string=t2;
 			if (isValueKnown) writeHexInString(string+(i+1),value);
 		}
 	}
@@ -227,9 +217,7 @@ char* crackArraySizes(char* string){
 
 void removeSpaces(char* string){
 	for (int32_t i=0;string[i];i++){
-		if (string[i]==' '){
-			string[i]=26;
-		}
+		if (string[i]==' ') string[i]=26;
 	}
 	copyDownForInPlaceEdit(string);
 }
@@ -238,39 +226,158 @@ void removeSpaces(char* string){
 int32_t findUncrackedStructOrUnion(char* string){
 	for (int32_t i=0;string[i];i++){
 		int32_t p=i-2;
-		if (isSectionOfStringEquivalent(string,i,"struct ")){
-			if (p<0 || string[p]!='<'){
-				return i;
-			}
-		} else if (isSectionOfStringEquivalent(string,i,"union ")){
-			if (p<0 || string[p]!='<'){
-				return i;
+		char c=string[i];
+		if (c=='('){
+			int32_t functionJump=getIndexOfMatchingEnclosement(string,i);
+			assert(functionJump!=-1);
+			i=functionJump;
+		} else if ((
+			c=='s' && isSectionOfStringEquivalent(string,i,"struct ")) || (
+			c=='u' && isSectionOfStringEquivalent(string,i,"union "))){
+			
+			if (i==0 || string[i-1]==' '){
+				if (p<0 || (string[p]!='<' & string[p]!='*')){
+					return i;
+				}
 			}
 		}
 	}
 	return -1;
 }
 
+void splitUncrackedStructUnion(char** stringPtr){
+	Start:;
+	char* string=*stringPtr;
+	for (int32_t i=0;string[i];i++){
+		int32_t p=i-2;
+		char c=string[i];
+		if ((
+			c=='s' && isSectionOfStringEquivalent(string,i,"struct ")) || (
+			c=='u' && isSectionOfStringEquivalent(string,i,"union "))){
+			
+			if (i==0 || string[i-1]==' '){
+				if (p>=0 && string[p]!='<'){
+					int32_t endCheck=getIndexOfNthSpace(string+i,1);
+					assert(endCheck!=-1);
+					endCheck+=i;
+					if (string[endCheck+1]!='|'){
+						char* t0=copyStringSegmentToHeap(string,0,endCheck);
+						char* t1=copyStringSegmentToHeap(string,endCheck,strlen(string));
+						char* t2=strMerge3(t0," |",t1);
+						cosmic_free(string);
+						cosmic_free(t0);
+						cosmic_free(t1);
+						*stringPtr=t2;
+						goto Start;
+					}
+				}
+			}
+		}
+	}
+}
+
+// fixFunctionParams() removes identifiers from function parameters (functions can occur if there are function pointers)
+void fixFunctionParams(char** stringPtr){
+	char* string=*stringPtr;
+	for (int32_t i0=0;string[i0];i0++){
+		if (string[i0]=='('){
+			int32_t functionEnd=getIndexOfMatchingEnclosement(string,i0);
+			assert(functionEnd!=-1);
+			char* t0=copyStringSegmentToHeap(string,0,i0);
+			char* t1=copyStringSegmentToHeap(string,functionEnd+1,strlen(string));
+			char* t2=copyStringSegmentToHeap(string,i0,functionEnd+1);
+			char* t3=copyStringToHeapString("");
+			char* t4;
+			char* t5;
+			char* t6;
+			int32_t prev=1;
+			for (int32_t cur=1;t2[cur];cur++){
+				char c=t2[cur];
+				if (c=='('){
+					// this is for function parameters that are function pointers, which causes recursion
+					int32_t next=getIndexOfMatchingEnclosement(t2,cur);
+					assert(next!=-1);
+					char* t7=copyStringSegmentToHeap(t2,0,cur);
+					char* t8=copyStringSegmentToHeap(t2,cur,next+1);
+					t6=strMerge2(t8," ");
+					cosmic_free(t8);
+					t8=t6;
+					char* t9=copyStringSegmentToHeap(t2,next+1,strlen(t2));
+					fixFunctionParams(&t8);
+					t6=strMerge3(t7,t8,t9);
+					cosmic_free(t7);
+					cosmic_free(t8);
+					cosmic_free(t9);
+					cosmic_free(t2);
+					t2=t6;
+					cur=next;
+				}
+			}
+			for (int32_t cur=1;t2[cur];cur++){
+				char c=t2[cur];
+				if (c==',' | c==')'){
+					// this performs the identifier removal
+					if (prev<cur-1){
+						t4=copyStringSegmentToHeap(t2,prev,cur-1);
+						while (t4[0]==' '){
+							t4[0]=26;
+							copyDownForInPlaceEdit(t4);
+						}
+						uint32_t l;
+						while ((l=strlen(t4))!=0 && t4[l-1]==' ') t4[l-1]=0;
+						if (t4[0]!=0 && doesThisTypeStringHaveAnIdentifierAtBeginning(t4)){
+							applyToTypeStringRemoveIdentifierToSelf(t4);
+						}
+						if (prev!=1) t5=strMerge5(" ",t3," , ",t4," ");
+						else         t5=strMerge3(" ",t4," ");
+						cosmic_free(t3);
+						cosmic_free(t4);
+						t3=t5;
+					}
+					prev=cur+1;
+				} else if (c=='('){
+					cur=getIndexOfMatchingEnclosement(t2,cur);
+					assert(cur!=-1);
+				}
+			}
+			cosmic_free(t2);
+			t6=strMerge5(t0," ( ",t3," ) ",t1);
+			cosmic_free(t0);
+			cosmic_free(t1);
+			cosmic_free(t3);
+			cosmic_free(string);
+			string=t6;
+			*stringPtr=string;
+			i0=functionEnd;
+		}
+	}
+}
+
+void removeDupeSpaces(char* string){
+	for (int32_t i=1;string[i];i++){
+		if (string[i-1]==' ' & string[i]==' '){
+			string[i-1]=26;
+		}
+	}
+	copyDownForInPlaceEdit(string);
+}
 
 // returns a new string. it is kinda like a type string, but it is in a very different format.
 char* crackTypeString(char* typeStringIn){
 	assert(!doesThisTypeStringHaveAnIdentifierAtBeginning(typeStringIn)); // should not get identifiers at the beginning of it's input type string
-	char* stringWorking=tripleConcatStrings(" ",typeStringIn," ");
+	char* stringWorking=strMerge3(" ",typeStringIn," ");
 	int32_t next;
 	while ((next=findUncrackedStructOrUnion(stringWorking))!=-1){
 		stringWorking=crackStructUnion(stringWorking,next);
 		if (stringWorking==NULL) return NULL;
 	}
+	fixFunctionParams(&stringWorking);
+	removeDupeSpaces(stringWorking);
+	splitUncrackedStructUnion(&stringWorking);
 	crackArraysAndEnum(stringWorking);
 	crackTypeNames(stringWorking);
 	stringWorking=crackArraySizes(stringWorking);
 	removeSpaces(stringWorking);
-	for (int32_t i=0;stringWorking[i];i++){
-		if (stringWorking[i]=='('){
-			printf("Functions not supported in the cracked type format. They may be supported in the future. In other words, do not use an initializer with an array and a function pointer\n");
-			exit(1);
-		}
-	}
 	return stringWorking;
 }
 

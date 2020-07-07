@@ -10,7 +10,7 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 	char* stringInternal = copyStringToHeapString(typeStringIn);
 	if (doesThisTypeStringHaveAnIdentifierAtBeginning(stringInternal)){
 		if (failIfHasIdentifier){
-			err_00__1(tripleConcatStrings(
+			err_00__1(strMerge3(
 				"sizeof failed on type `",
 				stringInternal,
 				"` by \"had identifier with identifier rejection\""));
@@ -63,7 +63,7 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 				// indexOfOtherBrace<0 is if the bracket match failed
 				// indexOfOtherBrace==2 is if there is nothing inside the brackets
 				// (indexOfOtherBrace+2)>=strlen(stringInternal) is if there is nothing after the brackets
-				err_00__1(tripleConcatStrings(
+				err_00__1(strMerge3(
 					"sizeof failed on type `",
 					stringInternal,
 					"` by \"array brackets invalid\""));
@@ -90,7 +90,7 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 				char* stringInternalSkipStart=stringInternal+(6+(1-typeOfThis));
 				if (getIndexOfFirstSpaceInString(stringInternalSkipStart)>0){
 					// this should not happen. sizeof should not get a struct/union definition either
-					err_10_01(tripleConcatStrings(
+					err_10_01(strMerge3(
 						"sizeof failed on type `",
 						stringInternal,
 						"` by \"struct/union corruption\""));
@@ -99,7 +99,7 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 				struct TypeSearchResult typeSearchResult;
 				searchForType(&typeSearchResult,stringInternalSkipStart,typeOfThis);
 				if (!typeSearchResult.didExist){
-					err_00__1(tripleConcatStrings(
+					err_00__1(strMerge3(
 						"sizeof failed on type `",
 						stringInternal,
 						"` by \"incomplete type\""));
@@ -129,7 +129,7 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 			ret=8;goto End;
 		}
 	}
-	err_10_01(tripleConcatStrings(
+	err_10_01(strMerge3(
 		"sizeof failed on type `",
 		stringInternal,
 		"` by \"corruption\""));

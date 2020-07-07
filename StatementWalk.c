@@ -392,7 +392,7 @@ int32_t functionStatementsWalk(
 			walkingIndex=advanceToNonNewlineSpace(sourceContainer.string,walkingIndex);
 			if (sourceContainer.string[walkingIndex]!=';'){
 				int32_t endingSemicolon = findIndexOfTypicalStatementEnd(sourceContainer.string,walkingIndex);
-				expressionToAssemblyWithCast(&instructionBufferLocalTemp_1,"void",walkingIndex,endingSemicolon);
+				expressionToAssemblyWithCast(&instructionBufferLocalTemp_1,"_Bool",walkingIndex,endingSemicolon);
 				walkingIndex=endingSemicolon+1;
 			} else if (sourceContainer.string[walkingIndex]==')'){
 				printf("Expected \';\' or expression\n");
@@ -978,7 +978,7 @@ printInstructionBufferWithMessageAndNumber(&instructionBufferForFunction,typeStr
 							printf("Internal Error: how did that not crash?");
 							exit(1);
 						}
-						typeString=tripleConcatStrings(typeStringIdentifier," ",typeStringNI);
+						typeString=strMerge3(typeStringIdentifier," ",typeStringNI);
 						cosmic_free(typeStringIdentifier);
 						cosmic_free(typeStringNI);
 						retValForAddingVariable = addGlobalVariable(typeString,0,hasStatic,hasExtern,true);

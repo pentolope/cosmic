@@ -16,7 +16,7 @@ int32_t functionStatementsWalk(
 
 
 
-bool doSymbolicConstantGenForExp = false; // InitializerMapping controls this. typically it is false. (as of writting this is still being implemented)
+bool doSymbolicConstantGenForExp = false; // InitializerMapping controls this
 
 
 
@@ -105,7 +105,7 @@ bool checkTypeStringForConstMembers(const char* typeString,ExpressionTreeNode* t
 }
 
 void applyPrependWithInputReplace(const char* begin,char** inTS){
-	char* tempTS=concatStrings(begin,*inTS);
+	char* tempTS=strMerge2(begin,*inTS);
 	cosmic_free(*inTS);
 	*inTS=tempTS;
 }
@@ -115,10 +115,7 @@ void genTypeStringNQ(ExpressionTreeNode* thisNode){
 }
 
 void applyRvaluePointerToLvalueTransform(ExpressionTreeNode* thisNode){
-	if (!(thisNode->post.typeStringNQ[0]=='*' & !thisNode->post.isLValue)){
-		printf("Internal Error: cannot apply rvalue pointer to lvalue transform\n");
-		exit(1);
-	}
+	assert(thisNode->post.typeStringNQ[0]=='*' & !thisNode->post.isLValue); // Internal Error: cannot apply rvalue pointer to lvalue transform
 	char* new=copyStringToHeapString(thisNode->post.typeStringNQ+2);
 	cosmic_free(thisNode->post.typeString);
 	thisNode->post.typeString=new;
@@ -129,10 +126,7 @@ void applyRvaluePointerToLvalueTransform(ExpressionTreeNode* thisNode){
 }
 
 void applyConvertToRvalue(ExpressionTreeNode* thisNode){
-	if (!thisNode->post.isLValue){
-		printf("Internal Error: value is already an Rvalue\n");
-		exit(1);
-	}
+	assert(thisNode->post.isLValue); // Internal Error: value is already an Rvalue
 	thisNode->post.isLValue=false;
 	bool decayedArray=applyToTypeStringBaseArrayDecayToSelf(thisNode->post.typeString);
 	genTypeStringNQ(thisNode);
@@ -142,29 +136,31 @@ void applyConvertToRvalue(ExpressionTreeNode* thisNode){
 		printInformativeMessageForExpression(true,"During lvalue to rvalue conversion, this object\'s type has unresolvable size",thisNode);
 		exit(1);
 	}
-	if (isTypeStringOfStructOrUnion(thisNode->post.typeStringNQ)){
-		printf("Internal Error: cannot convert struct or union to rvalue in that way\n");
-		exit(1);
-	}
+	assert(!isTypeStringOfStructOrUnion(thisNode->post.typeStringNQ)); // Internal Error: cannot convert struct or union to rvalue in that way
 	if (thisNode->ib.numberOfSlotsAllocated!=0){
-		const InstructionBuffer* ibMem;
-		bool applySignedCharConvert=false;
-		if (size==1){
-			if (doStringsMatch(thisNode->post.typeStringNQ,"signed char")) applySignedCharConvert=true;
-			if (thisNode->post.isLValueVolatile) ibMem=&ib_mem_byte_read_v;
-			else ibMem=&ib_mem_byte_read_n;
-		} else if (size==2){
-			if (thisNode->post.isLValueVolatile) ibMem=&ib_mem_word_read_v;
-			else ibMem=&ib_mem_word_read_n;
-		} else if (size==4){
-			if (thisNode->post.isLValueVolatile) ibMem=&ib_mem_dword_read_v;
-			else ibMem=&ib_mem_dword_read_n;
-		} else {
-			printf("Internal Error: bad size for lvalue->rvalue\n");
+		if (doSymbolicConstantGenForExp){
+			printf("Error: static expression tried to convert to rvalue. That transformation is not implemented\n");
 			exit(1);
+		} else {
+			const InstructionBuffer* ibMem;
+			bool applySignedCharConvert=false;
+			if (size==1){
+				if (doStringsMatch(thisNode->post.typeStringNQ,"signed char")) applySignedCharConvert=true;
+				if (thisNode->post.isLValueVolatile) ibMem=&ib_mem_byte_read_v;
+				else ibMem=&ib_mem_byte_read_n;
+			} else if (size==2){
+				if (thisNode->post.isLValueVolatile) ibMem=&ib_mem_word_read_v;
+				else ibMem=&ib_mem_word_read_n;
+			} else if (size==4){
+				if (thisNode->post.isLValueVolatile) ibMem=&ib_mem_dword_read_v;
+				else ibMem=&ib_mem_dword_read_n;
+			} else {
+				printf("Internal Error: bad size for lvalue->rvalue\n");
+				exit(1);
+			}
+			singleMergeIB(&thisNode->ib,ibMem);
+			if (applySignedCharConvert) singleMergeIB(&thisNode->ib,&ib_char_s_TO_int_s);
 		}
-		singleMergeIB(&thisNode->ib,ibMem);
-		if (applySignedCharConvert) singleMergeIB(&thisNode->ib,&ib_char_s_TO_int_s);
 	} else {
 		printf("Error: constant expression tried to convert to rvalue. That transformation is not implemented\n");
 		exit(1);
@@ -222,7 +218,7 @@ void warnForTypeCastChangeQualifiersOrTypeStructure(
 		if ( v1&!v2) printInformativeMessageForExpression(false,"A volatile qualifier is being removed in this type",thisNode);
 		if (!v1& v2) printInformativeMessageForExpression(false,"A volatile qualifier is being added in this type",thisNode);
 		
-		//this check below may cause some annoying warnings, but I think it's actually good
+		//this check below may cause some annoying warnings, but I think it's actually a good warning to give
 		if ( c1&!c2&hasHadPointer) printInformativeMessageForExpression(false,"A const qualifier is being removed in this type",thisNode);
 	}
 	if (doStringsMatch(typeString1NQ,typeString2NQ)) return;
@@ -266,6 +262,7 @@ if a pointer to non-pointer cast is performed and the non-pointer type cannot ho
 if either type is a struct or union that will cause an error message (unless either type is void)
 if typeStringTo is "void", then it is guaranteed to succeed and no warnings will be given.
 */
+// todo: check if this will properly handle function type casts
 void applyTypeCast(ExpressionTreeNode* thisNode,const char* typeStringTo_input, uint16_t warnState){
 	char* typeStringTo=applyToTypeStringBaseArrayDecayToNew(typeStringTo_input);
 	if (applyToTypeStringBaseArrayDecayToSelf(thisNode->post.typeString)){
@@ -337,10 +334,99 @@ void applyTypeCast(ExpressionTreeNode* thisNode,const char* typeStringTo_input, 
 		sPtrToPtr = typeIdForFrom==9 & typeIdForTo==9 & !wQualifierStructure;
 		goto quickEnd;
 	}
-	if (thisNode->ib.numberOfSlotsAllocated!=0){
+	bool doLoad255=false;
+	if (doSymbolicConstantGenForExp){
+		InstructionSingle is_apply_0;
+		InstructionSingle is_apply_1;
+		InstructionSingle is_load255;
+		is_apply_0.id=I_NOP_;
+		is_apply_1.id=I_NOP_;
+		is_load255.id=I_SYCB;
+		is_load255.arg.B.a_0=255;
+		if (typeIdForFrom==1){
+			if (typeIdForTo>=6) {
+				is_apply_1.id=I_SYCZ;
+			}
+		} else if (typeIdForFrom==2){
+			if (typeIdForTo==1){
+				is_apply_1.id=I_SYCN;
+				*thisConstVal=(bool)(*thisConstVal);
+			} else if (typeIdForTo==3){
+				doLoad255=true;
+				is_apply_1.id=I_SYCA;
+				*thisConstVal=0x00FF&(*thisConstVal);
+			} else if (typeIdForTo==4 | typeIdForTo==5){
+				is_apply_1.id=I_SYCC;
+				*thisConstVal=(int16_t)((char)(*thisConstVal));
+			} else {
+				is_apply_0.id=I_SYCC;
+				is_apply_1.id=I_SYCS;
+				*thisConstVal=(int32_t)((char)(*thisConstVal));
+			}
+		} else if (typeIdForFrom==3){
+			if (typeIdForTo==1){
+				is_apply_1.id=I_SYCN;
+				*thisConstVal=(bool)(*thisConstVal);
+			} else if (typeIdForTo>=6 & typeIdForTo<=9){
+				is_apply_1.id=I_SYCZ;
+			}
+		} else if (typeIdForFrom==4){
+			if (typeIdForTo==1){
+				is_apply_1.id=I_SYCN;
+				*thisConstVal=(bool)(*thisConstVal);
+			} else if (typeIdForTo==2 | typeIdForTo==3){
+				doLoad255=true;
+				is_apply_1.id=I_SYCA;
+				*thisConstVal=0x00FF&(*thisConstVal);
+			} else if (typeIdForTo>=6 & typeIdForTo<=9){
+				is_apply_1.id=I_SYCS;
+				*thisConstVal=(int32_t)((int16_t)(*thisConstVal));
+			}
+		} else if (typeIdForFrom==5){
+			if (typeIdForTo==1){
+				is_apply_1.id=I_SYCN;
+				*thisConstVal=(bool)(*thisConstVal);
+			} else if (typeIdForTo==2 | typeIdForTo==3){
+				doLoad255=true;
+				is_apply_1.id=I_SYCA;
+				*thisConstVal=0x00FF&(*thisConstVal);
+			} else if (typeIdForTo>=6 & typeIdForTo<=9){
+				is_apply_1.id=I_SYCZ;
+			}
+		} else if (typeIdForFrom>=6 & typeIdForFrom<=8){
+			if (typeIdForTo==1){
+				is_apply_1.id=I_SYCM;
+				*thisConstVal=(bool)(*thisConstVal);
+			} else if (typeIdForTo==2 | typeIdForTo==3){
+				doLoad255=true;
+				is_apply_0.id=I_SYCT;
+				is_apply_1.id=I_SYCA;
+				*thisConstVal=0x00FF&(*thisConstVal);
+			} else if (typeIdForTo==4 | typeIdForTo==5){
+				is_apply_1.id=I_SYCT;
+				*thisConstVal=0xFFFF&(*thisConstVal);
+			}
+		} else {
+			if (typeIdForTo==1){
+				is_apply_1.id=I_SYCM;
+				*thisConstVal=(bool)(*thisConstVal);
+			} else if (typeIdForTo==2 | typeIdForTo==3){
+				doLoad255=true;
+				is_apply_0.id=I_SYCT;
+				is_apply_1.id=I_SYCA;
+				*thisConstVal=0x00FF&(*thisConstVal);
+			} else if (typeIdForTo==4 | typeIdForTo==5){
+				is_apply_1.id=I_SYCT;
+				*thisConstVal=0xFFFF&(*thisConstVal);
+			}
+		}
+		assert(thisNode->ib.numberOfSlotsAllocated!=0);
+		if (is_apply_0.id!=I_NOP_) addInstruction(&thisNode->ib,is_apply_0);
+		if (doLoad255) addInstruction(&thisNode->ib,is_load255);
+		if (is_apply_1.id!=I_NOP_) addInstruction(&thisNode->ib,is_apply_1);
+	} else {
 		const InstructionBuffer* ib_apply_0=NULL;
 		const InstructionBuffer* ib_apply_1=NULL;
-		bool doLoad255=false;
 		if (typeIdForFrom==1){
 			if (typeIdForTo>=6) {
 				ib_apply_1=&ib_int_u_TO_long;
@@ -418,9 +504,11 @@ void applyTypeCast(ExpressionTreeNode* thisNode,const char* typeStringTo_input, 
 				*thisConstVal=0xFFFF&(*thisConstVal);
 			}
 		}
-		if (ib_apply_0!=NULL) singleMergeIB(&thisNode->ib,ib_apply_0);
-		if (doLoad255) insert_IB_load_byte(&thisNode->ib,255);
-		if (ib_apply_1!=NULL) singleMergeIB(&thisNode->ib,ib_apply_1);
+		if (thisNode->ib.numberOfSlotsAllocated!=0){
+			if (ib_apply_0!=NULL) singleMergeIB(&thisNode->ib,ib_apply_0);
+			if (doLoad255) insert_IB_load_byte(&thisNode->ib,255);
+			if (ib_apply_1!=NULL) singleMergeIB(&thisNode->ib,ib_apply_1);
+		}
 	}
 	quickEnd:
 	if (wPtrToPtr&sPtrToPtr) warnForTypeCastChangeQualifiersOrTypeStructure(thisNode,thisNode->post.typeString,typeStringTo,false,true,false);
@@ -474,10 +562,7 @@ void pushAsParam(ExpressionTreeNode* thisNode,const char* typeStringTo){
 
 uint16_t getNumberOfParametersOnFunctionCall(ExpressionTreeNode* expTreeNode){
 	uint16_t n=0;
-	if (!(expTreeNode->operatorID==65 | expTreeNode->operatorID==66)){
-		printf("Internal Error: getNumberOfParametersOnFunctionCall() called wrong\n");
-		exit(1);
-	}
+	assert(expTreeNode->operatorID==65 | expTreeNode->operatorID==66);
 	if (expTreeNode->pre.hasRightNode){
 		expTreeNode=expressionTreeGlobalBuffer.expressionTreeNodes+expTreeNode->pre.rightNode;
 		n++;
@@ -609,7 +694,7 @@ struct AdvancedTypeInfo genAdvancedTypeInfo(ExpressionTreeNode* thisNode){
 	if (!this.isSU&!this.isPtr){
 		this.itpr=getRankOfPromotedTypeString(this.post->typeString);
 		if (!this.itpr.didSucceed){
-			printf("Internal Error: itpr should succeed on <%s>\n",this.post->typeString);
+			printf("Internal Error: itpr should succeed on `%s`\n",this.post->typeString);
 			exit(1);
 		}
 	}
@@ -694,18 +779,12 @@ void applyAutoTypeConversion_Ternary(ExpressionTreeNode* thisNode){
 				struct IntegralTypePromoteResult itpr_l={0};
 				itpr_r=getRankOfPromotedTypeString(rn->post.typeString);
 				itpr_l=getRankOfPromotedTypeString(ln->post.typeString);
-				if (!itpr_r.didSucceed|!itpr_l.didSucceed){
-					printf("Internal Error: itpr_r and itpr_l should succeed\n");
-					exit(1);
-				}
+				assert(itpr_r.didSucceed&itpr_l.didSucceed); // Internal Error: both should succeed
 				const char* tsc=getTypeStringForCommonRank(itpr_l.rankValue,itpr_r.rankValue);
 				applyTypeCast(rn,tsc,15);
 				applyTypeCast(ln,tsc,15);
 			}
-			if (!doStringsMatch(ln->post.typeString,rn->post.typeString)){
-				printf("Internal Error: those types should match\n");
-				exit(1);
-			}
+			assert(doStringsMatch(ln->post.typeString,rn->post.typeString)); // Internal Error: those types should match
 		}
 		thisNode->post.typeString=copyStringToHeapString(rn->post.typeString);
 	}
@@ -761,6 +840,10 @@ void applyAutoTypeConversion_Identifier(ExpressionTreeNode* thisNode){
 			thisNode->post.typeString = applyToTypeStringRemoveIdentifierToNew(globalVariableEntry->typeString);
 		} else {
 			// local variable
+			if (doSymbolicConstantGenForExp){
+				printInformativeMessageForExpression(true,"Local variables are not allowed in static initializers",thisNode);
+				exit(1);
+			}
 			thisNode->post.operatorTypeID=2;
 			thisNode->post.extraVal = getReversedOffsetForLocalVariable(&isr.reference.variableReference);
 			thisNode->post.typeString = applyToTypeStringRemoveIdentifierToNew(
@@ -776,14 +859,14 @@ void applyAutoTypeConversion_Identifier(ExpressionTreeNode* thisNode){
 				blockFrameArray.globalBlockFrame.globalTypeEntries+isr.reference.typeMemberReference.typeEntryIndex;
 			thisNode->post.extraPtr = 
 				globalTypeEntryPtr->arrayOfMemberEntries+isr.reference.typeMemberReference.memberEntryIndex;
-			thisNode->post.typeString = concatStrings("const enum ",globalTypeEntryPtr->name);
+			thisNode->post.typeString = strMerge2("const enum ",globalTypeEntryPtr->name);
 		} else {
 			struct BlockFrameTypeEntry* blockFrameTypeEntryPtr = 
 				blockFrameArray.entries[isr.reference.typeMemberReference.blockFrameEntryIndex]
 				.typeEntries+isr.reference.typeMemberReference.typeEntryIndex;
 			thisNode->post.extraPtr = 
 				blockFrameTypeEntryPtr->arrayOfMemberEntries+isr.reference.typeMemberReference.memberEntryIndex;
-			thisNode->post.typeString = concatStrings("const enum ",blockFrameTypeEntryPtr->name);
+			thisNode->post.typeString = strMerge2("const enum ",blockFrameTypeEntryPtr->name);
 		}
 		struct NumberParseResult npr;
 		const char* numberString = getIndexOfNthSpace(
@@ -807,8 +890,9 @@ void applyAutoTypeConversion_Identifier(ExpressionTreeNode* thisNode){
 		thisNode->post.extraPtr = gfep;
 		thisNode->post.extraVal = gfep->labelID;
 		thisNode->post.typeString = applyToTypeStringRemoveIdentifierToNew(gfep->typeString);
+		applyPrependWithInputReplace("const ",&thisNode->post.typeString);
 	} else {
-		printf("Internal Error: IdentifierSearchResult does not make sense\n");
+		assert(false);
 		exit(1);
 	}
 }
@@ -875,12 +959,12 @@ void applyAutoTypeConversion_Constant(ExpressionTreeNode* thisNode){
 					} else {
 						valueToSet=c2*16+c3;
 					}
-				}else if (c1=='a') valueToSet=7;
-				else if (c1=='b')  valueToSet=8;
+				}else if (c1=='a') valueToSet= 7;
+				else if (c1=='b')  valueToSet= 8;
 				else if (c1=='f')  valueToSet=12;
 				else if (c1=='n')  valueToSet=10;
 				else if (c1=='r')  valueToSet=13;
-				else if (c1=='t')  valueToSet=9;
+				else if (c1=='t')  valueToSet= 9;
 				else if (c1=='v')  valueToSet=11;
 				else if (c1=='\'') valueToSet=39;
 				else if (c1=='\"') valueToSet=34;
@@ -913,17 +997,11 @@ void applyAutoTypeConversion_Constant(ExpressionTreeNode* thisNode){
 			exit(1);
 		}
 		uint16_t thisSizeof = getSizeofForTypeString(npr.typeString,true);
-		if ((thisSizeof&1)!=0){
-			printf("Internal Error: number constant typeString not stack alligned\n");
-			exit(1);
-		}
-		if (thisSizeof==0){
-			printf("Internal Error: sizeof with number constant typeString failed\n");
-			exit(1);
-		}
+		assert((thisSizeof&1)==0); // Internal Error: number constant typeString not stack alligned
+		assert(thisSizeof!=0); // Internal Error: sizeof with number constant typeString failed
 		thisNode->post.extraVal=npr.valueUnion.value;
-		thisNode->post.typeString=copyStringToHeapString(npr.typeString);
 		thisNode->post.operatorTypeID=thisSizeof/2U;
+		thisNode->post.typeString=copyStringToHeapString(npr.typeString);
 	}
 }
 
@@ -945,7 +1023,7 @@ void applyAutoTypeConversion_Typical(ExpressionTreeNode* tn){
 	if (tn->pre.hasLeftNode){
 		ln=expressionTreeGlobalBuffer.expressionTreeNodes+tn->pre.leftNode;
 		if (applyToTypeStringBaseArrayDecayToSelf(ln->post.typeString)){
-			assert(ln->post.isLValue); // how did an rvalue array type exist at this stage?
+			assert(ln->post.isLValue); // how would an rvalue array type exist at this stage?
 			ln->post.isLValue=false;
 		}
 		genTypeStringNQ(ln);
@@ -957,7 +1035,7 @@ void applyAutoTypeConversion_Typical(ExpressionTreeNode* tn){
 		if (!(oID==5 | oID==6)){
 			if (oID!=16){
 				if (applyToTypeStringBaseArrayDecayToSelf(rn->post.typeString)){
-					assert(rn->post.isLValue); // how did an rvalue array type exist at this stage?
+					assert(rn->post.isLValue); // how would an rvalue array type exist at this stage?
 					rn->post.isLValue=false;
 				}
 			}
@@ -1061,7 +1139,7 @@ void applyAutoTypeConversion_Typical(ExpressionTreeNode* tn){
 		break;
 		case 16:{
 			etc_02(rn);
-			*thisTSP=concatStrings("* ",*rTS);
+			*thisTSP=strMerge2("* ",*rTS);
 			if (rn->post.isLValueConst) applyPrependWithInputReplace("const ",thisTSP);
 			if (rn->post.isLValueVolatile) applyPrependWithInputReplace("volatile ",thisTSP);
 		}
@@ -1341,21 +1419,13 @@ void applyAutoTypeConversion_Typical(ExpressionTreeNode* tn){
 		printf("Internal Error: invalid oID");
 		exit(1);
 	}
-	
-	
-	// debug
-	if (tn->post.typeString==NULL){
-		printf("Internal Error: TypeString still null (%d)\n",oID);
-		exit(1);
-	}
-	
 }
 
 
 /*
 applies type convertions to operands for any node (except function calls)
 inserts some information into thisNode->post
-cosmic_frees typeStrings in child nodes
+cosmic_free's typeStrings in child nodes
 */
 void applyAutoTypeConversion(ExpressionTreeNode* thisNode){
 	uint8_t oID = thisNode->operatorID;
@@ -1363,16 +1433,12 @@ void applyAutoTypeConversion(ExpressionTreeNode* thisNode){
 	else if (oID==17) applyAutoTypeConversion_Sizeof(thisNode);
 	else if (oID==61 | oID==62) applyAutoTypeConversion_Constant(thisNode);
 	else if (oID==36 | oID==37) applyAutoTypeConversion_Ternary(thisNode);
-	else if (oID==65 | oID==66){
-		printf("Internal Error: function call given to applyAutoTypeConversion()");
-		exit(1);
-	} else applyAutoTypeConversion_Typical(thisNode);
-	
-	// debug
-	if (thisNode->post.typeString==NULL){
-		printf("Internal Error: TypeString still null after (%d)\n",oID);
-		exit(1);
+	else {
+		assert(oID!=65 & oID!=66); // Internal Error: function call given to applyAutoTypeConversion()
+		applyAutoTypeConversion_Typical(thisNode);
 	}
+	
+	assert(thisNode->post.typeString!=NULL); // Internal Error: TypeString still null after applyAutoTypeConversion()
 	#ifdef EXP_TO_ASSEMBLY_DEBUG
 	printf(">%s<%d,%d,%d,%d\n",thisNode->post.typeString,thisNode->operatorID,thisNode->post.isLValue,thisNode->post.isLValueVolatile,thisNode->post.isLValueConst);
 	#endif
@@ -1663,10 +1729,6 @@ void applyOperator(ExpressionTreeNode* thisNode){
 				ib_core0=&ib_b_not_int;
 			}
 			dualMergeIB(ib,ibRight,ib_core0);
-		}
-		break;
-		case 17:{
-			insert_IB_load_dword(ib,extraVal);
 		}
 		break;
 		case 18:{
@@ -2267,6 +2329,7 @@ void applyOperator(ExpressionTreeNode* thisNode){
 			if (operatorTypeID==1){
 				insert_IB_load_word(ib,extraVal);
 			} else if (operatorTypeID==2){
+		case 17:
 				insert_IB_load_dword(ib,extraVal);
 			} else {
 				goto BadOperatorTypeID;
@@ -2274,12 +2337,12 @@ void applyOperator(ExpressionTreeNode* thisNode){
 		}
 		break;
 		default:
-		printf("Internal Error: invalid oID");
+		printf("Internal Error: invalid oID during applyOperator()");
 		exit(1);
 	}
 	return;
 	BadOperatorTypeID:
-	printf("Internal Error: invalid operatorTypeID");
+	printf("Internal Error: invalid operatorTypeID during applyOperator()");
 	exit(1);
 }
 
@@ -2487,7 +2550,7 @@ void expressionToAssemblyWithReturn(
 	returnIdentifier->post.typeString=copyStringToHeapString("unsigned int");
 	genTypeStringNQ(returnIdentifier);
 	insert_IB_STPA(&returnIdentifier->ib,returnIdentifier->post.extraVal);
-	char* temp=concatStrings("* ",singleTypicalIntegralTypePromote(returnTypeString,NULL));
+	char* temp=strMerge2("* ",singleTypicalIntegralTypePromote(returnTypeString,NULL));
 	applyTypeCast(returnIdentifier,temp,0);
 	cosmic_free(temp);
 	applyRvaluePointerToLvalueTransform(returnIdentifier);
@@ -2549,7 +2612,7 @@ void expressionToAssemblyWithInitializer(
 	} else {
 		
 	}
-	typeString=tripleConcatStrings(identifier," ",typeStringNI);
+	typeString=strMerge3(identifier," ",typeStringNI);
 	
 	addVariableToBlockFrame(typeString,usedRegister,usedStatic);
 	struct IdentifierSearchResult isr;
@@ -2568,12 +2631,6 @@ void expressionToAssemblyWithInitializer(
 	cosmic_free(typeString);
 	cosmic_free(identifier);
 	cosmic_free(typeStringNI);
-	
-	
-	
-	
-	
-	
 	
 	
 }

@@ -423,7 +423,7 @@ char* resolveConstantExpressionInTypeString(char* string,int32_t sourceStart,int
 					uint32_t arrSize=expressionToConstantValue("unsigned long",root);
 					char numberBuffer[14] = {0};
 					snprintf(numberBuffer,13,"%lu",(unsigned long)arrSize);
-					char* t3=tripleConcatStrings(t0,numberBuffer,t2);
+					char* t3=strMerge3(t0,numberBuffer,t2);
 					cosmic_free(t0);
 					cosmic_free(t1);
 					cosmic_free(t2);
@@ -853,12 +853,12 @@ char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* st
 				char* temp2=copyStringSegmentToHeap(stringInternal,segments[i].endInString,strlen(stringInternal));
 				char* temp3;
 				if (isHandlingConst){
-					temp3=concatStrings(temp0,"const");
+					temp3=strMerge2(temp0,"const");
 				} else {
-					temp3=concatStrings(temp0,"volatile");
+					temp3=strMerge2(temp0,"volatile");
 				}
-				char* temp4=tripleConcatStrings(temp3," ",temp1);
-				char* newStringInternal=concatStrings(temp4,temp2);
+				char* temp4=strMerge3(temp3," ",temp1);
+				char* newStringInternal=strMerge2(temp4,temp2);
 				cosmic_free(stringInternal);cosmic_free(temp0);cosmic_free(temp1);cosmic_free(temp2);cosmic_free(temp3);cosmic_free(temp4);
 				stringInternal=newStringInternal;
 				isSegmentRebuildNecessary = true;

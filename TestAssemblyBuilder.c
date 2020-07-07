@@ -71,8 +71,10 @@ void printSingleInstructionOptCode(const InstructionSingle instructionSingle){
 		case I_SYRW:printf("SYRW %%%01X",instructionSingle.arg.B.a_0);break;
 		case I_SYRD:printf("SYRD %%%01X %%%01X",instructionSingle.arg.BB.a_0,instructionSingle.arg.BB.a_1);break;
 		case I_SYRE:printf("SYRE");break;
-		case I_NSPB:printf("NSPB !%08X",instructionSingle.arg.D.a_0);break;
-		case I_NSPW:printf("NSPW !%08X",instructionSingle.arg.D.a_0);break;
+		case I_NSNB:printf("NSNB !%08X",instructionSingle.arg.D.a_0);break;
+		case I_NSCB:printf("NSCB !%08X",instructionSingle.arg.D.a_0);break;
+		case I_NSNW:printf("NSNW !%08X",instructionSingle.arg.D.a_0);break;
+		case I_NSCW:printf("NSCW !%08X",instructionSingle.arg.D.a_0);break;
 		case I_ZNXB:printf("ZNXB !%08X",instructionSingle.arg.D.a_0);break;
 		case I_ZNXW:printf("ZNXW !%08X",instructionSingle.arg.D.a_0);break;
 		case I_BYTE:printf("BYTE $%02X",instructionSingle.arg.B.a_0);break;
@@ -82,6 +84,7 @@ void printSingleInstructionOptCode(const InstructionSingle instructionSingle){
 		case I_SYDW:printf("SYDW");break;
 		case I_SYDD:printf("SYDD");break;
 		case I_SYDE:printf("SYDE");break;
+		case I_LOFF:printf("LOFF !%08X",instructionSingle.arg.D.a_0);break;
 		case I_SYCB:printf("SYCB $%02X",instructionSingle.arg.B.a_0);break;
 		case I_SYCW:printf("SYCW #%04X",instructionSingle.arg.W.a_0);break;
 		case I_SYCD:printf("SYCD !%08X",instructionSingle.arg.D.a_0);break;
@@ -95,6 +98,15 @@ void printSingleInstructionOptCode(const InstructionSingle instructionSingle){
 		case I_SYC7:printf("SYC7");break;
 		case I_SYC8:printf("SYC8");break;
 		case I_SYC9:printf("SYC9");break;
+		case I_SYCX:printf("SYCX");break;
+		case I_SYCY:printf("SYCY");break;
+		case I_SYCA:printf("SYCA");break;
+		case I_SYCU:printf("SYCU");break;
+		case I_SYCO:printf("SYCO");break;
+		case I_SYCQ:printf("SYCQ");break;
+		case I_SYCC:printf("SYCC");break;
+		case I_SYCN:printf("SYCN");break;
+		case I_SYCM:printf("SYCM");break;
 		case I_SYCZ:printf("SYCZ");break;
 		case I_SYCS:printf("SYCS");break;
 		case I_SYCT:printf("SYCT");break;
@@ -114,12 +126,12 @@ void printInstructionBuffer(const InstructionBuffer* instructionBuffer){
 }
 
 void printInstructionBufferWithMessageAndNumber(const InstructionBuffer* instructionBuffer,const char* string,const uint32_t number){
-	printf("\n%s [%04X]\n",string,number);
+	printf("\n%s [%08X]\n",string,number);
 	printInstructionBuffer(instructionBuffer);
 	printf("\n");
 }
 
-#ifdef not_defined_because_remove_this
+#if 0
 void runTestOnString(char* string, InstructionBuffer* instructionBuffer){
 	expressionToAssemblyWithBaseRemoval(instructionBuffer,string,0,strlen(string)-1);
 	

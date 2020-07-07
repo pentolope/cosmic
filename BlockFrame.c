@@ -701,10 +701,7 @@ componentName should not have any spaces in it
 the return value is NOT always word alligned
 */
 struct TypeMemberEntry* getOffsetAndTypeStringOfMemberInType(const char* typeString,const char* componentName){
-	if (getIndexOfNthSpace(typeString,1)!=-1){
-		printf("getOffsetOfComponentInType() got bad typeString (1)\n");
-		exit(1);
-	}
+	assert(getIndexOfNthSpace(typeString,1)==-1);
 	int32_t indexOfFirstSpaceInTypeString = getIndexOfNthSpace(typeString,0);
 	uint8_t typeNumber;
 	if (isSectionOfStringEquivalent(typeString,0,"struct ")){
@@ -712,15 +709,11 @@ struct TypeMemberEntry* getOffsetAndTypeStringOfMemberInType(const char* typeStr
 	} else if (isSectionOfStringEquivalent(typeString,0,"union ")){
 		typeNumber = 1;
 	} else {
-		printf("getOffsetOfComponentInType() got bad typeString (2)\n");
-		exit(1);
+		assert(false);
 	}
 	struct TypeSearchResult typeSearchResult;
 	searchForType(&typeSearchResult,typeString+(indexOfFirstSpaceInTypeString+1),typeNumber);
-	if (!typeSearchResult.didExist){
-		printf("getOffsetOfComponentInType() got bad typeString (3)\n");
-		exit(1);
-	}
+	assert(typeSearchResult.didExist);
 	if (typeSearchResult.isGlobal){
 		struct GlobalTypeEntry* globalTypeEntryPtr = 
 			&(blockFrameArray.globalBlockFrame
@@ -824,9 +817,7 @@ char* resolveTypdefsInTypeString(char* typeString, bool* didAllocateNewString){
 					}
 					newString[lengthOfNewString]=0;
 					mainStart=startIndex+lengthOfTypedefSubstitution;
-					if (didFindOneYet){
-						cosmic_free(typeString);
-					}
+					if (didFindOneYet) cosmic_free(typeString);
 					typeString=newString;
 					didFindOne=true;
 					didFindOneYet=true;
@@ -862,10 +853,7 @@ char* breakDownTypeAndAdd(char* typeString, bool addToGlobal){
 	for (int32_t i=0;i<length;i++){
 		if (internalString[i]=='{'){
 			int32_t pair = getIndexOfMatchingEnclosement(internalString,i);
-			if (pair<0){
-				printf("breakDownTypeAndAdd() failed (1)\n");
-				exit(1);
-			}
+			assert(pair>=0);
 			int32_t target2=i;
 			for (int32_t j=i-2;j>=0;j--){
 				if (internalString[j]==' '){
@@ -873,10 +861,7 @@ char* breakDownTypeAndAdd(char* typeString, bool addToGlobal){
 					break;
 				}
 			}
-			if (target2==i){
-				printf("breakDownTypeAndAdd() failed (2)\n");
-				exit(1);
-			}
+			assert(target2!=i);
 			int32_t target1=0;
 			for (int32_t j=target2-1;j>=0;j--){
 				if (internalString[j]==' '){
@@ -887,10 +872,7 @@ char* breakDownTypeAndAdd(char* typeString, bool addToGlobal){
 			bool isEnum = specificStringEqualCheck(internalString,target1,target2,"enum");
 			bool isUnion = specificStringEqualCheck(internalString,target1,target2,"union");
 			bool isStruct = specificStringEqualCheck(internalString,target1,target2,"struct");
-			if (!(isEnum | isUnion | isStruct)){
-				printf("breakDownTypeAndAdd() failed (3)\n");
-				exit(1);
-			}
+			assert(isEnum | isUnion | isStruct);
 			char splitChar;
 			int32_t endSplitSearchIndex;
 			if (isEnum){
@@ -907,10 +889,7 @@ char* breakDownTypeAndAdd(char* typeString, bool addToGlobal){
 					numberOfSplitSegments++;
 				} else if (c=='(' | c=='[' | c=='{'){
 					j = getIndexOfMatchingEnclosement(internalString,j);
-					if (j<0){
-						printf("breakDownTypeAndAdd() failed (4)\n");
-						exit(1);
-					}
+					assert(j>=0);
 				}
 			}
 			int32_t* indexesOfSplitStart = cosmic_malloc(numberOfSplitSegments*sizeof(int32_t));
@@ -940,10 +919,7 @@ char* breakDownTypeAndAdd(char* typeString, bool addToGlobal){
 				} else {
 					stringsOfSegmentsAfter[j] = breakDownTypeAndAdd(stringsOfSegmentsBefore[j],addToGlobal);
 					cosmic_free(stringsOfSegmentsBefore[j]);
-					if (!doesThisTypeStringHaveAnIdentifierAtBeginning(stringsOfSegmentsAfter[j])){
-						printf("breakDownTypeAndAdd() failed (5)\n");
-						exit(1);
-					}
+					assert(doesThisTypeStringHaveAnIdentifierAtBeginning(stringsOfSegmentsAfter[j]));
 				}
 			}
 			cosmic_free(stringsOfSegmentsBefore);
@@ -1047,9 +1023,7 @@ char* breakDownTypeAndAdd(char* typeString, bool addToGlobal){
 	}
 	bool didAllocateAnotherString;
 	char* finalString = resolveTypdefsInTypeString(internalString,&didAllocateAnotherString);
-	if (didAllocateAnotherString){
-		cosmic_free(internalString);
-	}
+	if (didAllocateAnotherString) cosmic_free(internalString);
 	return finalString;
 }
 
@@ -1064,19 +1038,15 @@ char* fullTypeParseAvoidAdd(int32_t startIndex,int32_t endIndex){
 	char* typeString_1 = convertType(startIndex,endIndex);
 	for (uint32_t i=0;typeString_1[i];i++){
 		if (typeString_1[i]=='{'){
-			printf("That type descriptor should not be defining a new type\n");
-			exit(1);
+			err_1111_("This type descriptor should not be defining a new type\n",startIndex,endIndex);
 		}
 	}
 	bool didAllocateAnotherString;
 	char* typeString_2 = resolveTypdefsInTypeString(typeString_1,&didAllocateAnotherString);
-	if (didAllocateAnotherString){
-		cosmic_free(typeString_1);
-	}
+	if (didAllocateAnotherString) cosmic_free(typeString_1);
 	for (uint32_t i=0;typeString_2[i];i++){
 		if (typeString_2[i]=='{'){
-			printf("That type descriptor should not be defining a new type\n");
-			exit(1);
+			err_1111_("This type descriptor should not be defining a new type\n",startIndex,endIndex);
 		}
 	}
 	return typeString_2;

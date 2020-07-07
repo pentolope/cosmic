@@ -30,32 +30,14 @@ static inline char* stripQualifiers(char* typeString,bool* hadVolatile,bool* had
 	return (char*)stripQualifiersC(typeString,hadVolatile,hadConst);
 }
 
-// returns -1 if that space number doesn't exist
-// the first space is n==0
-int32_t getIndexOfNthSpace(const char* string, uint16_t n){
-	uint16_t walkingN = 0;
-	for (int32_t i=0;string[i];i++){
-		if (string[i]==' '){
-			if (walkingN==n){
-				return i;
-			} else {
-				walkingN++;
-			}
-		}
-	}
-	return -1;
-}
-
 void copyDownForInPlaceEdit(char* string){
-	int32_t length = strlen(string);
 	int32_t walkingIndex=0;
-	for (int32_t i=0;i<=length;i++){
-		// yes, i<=length is desired, the null terminator needs to be copied too
-		string[walkingIndex]=string[i];
-		if (string[i]!=26){
-			walkingIndex++;
-		}
-	}
+	int32_t i=0;
+	char c;
+	do {
+		c=(string[walkingIndex]=string[i++]);
+		walkingIndex+=c!=26;
+	} while (c!=0);
 }
 
 // does a basic check to see if array brackets have one end for each beginning and are not nested

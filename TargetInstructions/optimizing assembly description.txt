@@ -131,8 +131,12 @@ SYRW %
 SYRD % %
 SYRE
 
-NSPB !
-NSPW !
+NSNB !
+NSCB !
+
+NSNW !
+NSCW !
+
 ZNXB !
 ZNXW !
 
@@ -266,6 +270,13 @@ FCST $ # :
 
 DWRD !
 SYCD !
+NSNB !
+NSCB !
+NSNW !
+NSCW !
+ZNXB !
+ZNXW !
+
 
 JTEN @
 SYCL @
@@ -292,7 +303,7 @@ CALL - call to location at registers, Second_Reg is upper word. (see CALL/RET_ d
 RET_ - return to calling function  (see CALL/RET_ description at bottom)
 STPA - transform stack offset into real address using [ %1 + ( Stack_Size - # ) -> First_Reg ]
 			this instruction, when combined with others, may often by optimized into STWN , STRN , STWV , STRV
-STPS - identical to STPA, however it is verified that ( ( Stack_Size - # ) <= 0x00FF ) is true, so the backend can use 1 less instruction (and ~2x less cycles) [this might not be needed because I might do the convertion and then put it back into the optimizer]
+STPS - identical to STPA, however it is verified that ( ( Stack_Size - # ) <= 0x00FF ) is true, so the backend can use 1 less instruction (and ~2x less cycles)
 
 STWN - write memory ( word access, non-volatile ) at [ ( %1 + ( 2 * $ ) ) , 0 ] with data in First_Reg
 STRN - read  memory ( word access, non-volatile ) at [ ( %1 + ( 2 * $ ) ) , 0 ] into First_Reg
@@ -450,14 +461,17 @@ SYRE - ends the symbolic calculation for SYRB,SYRW,SYRD
 -- the following opt-codes are for symbolic constant data in data segments, and may appear in data segments but not code segments
 
 
-NSPB - the indicated number of bytes that are next cannot be split up
-NSPW - the indicated number of words that are next cannot be split up
+NSNB - the indicated number of bytes that are next cannot be split up, and the bytes are non-constant
+NSCB - the indicated number of bytes that are next cannot be split up, and the bytes are     constant
 ZNXB - places the indicated number of 0 bytes at location
+
+NSNW - the indicated number of words that are next cannot be split up, and the words are non-constant
+NSCW - the indicated number of words that are next cannot be split up, and the words are     constant
 ZNXW - places the indicated number of 0 words at location
 
-BYTE - places the given byte at location. No allignment is enforced.
-WORD - places the given word at location. Word allignment is enforced (will be padded with zeros on backend).
-DWRD - places the given double word at location. Word allignment is enforced.
+BYTE - places the given  byte at location. No allignment is enforced.
+WORD - places the given  word at location. Word allignment is enforced (will be padded with zeros on backend).
+DWRD - places the given dword at location. Word allignment is enforced (will be padded with zeros on backend).
 
 SYDB - places the result of the symbolic calculation that follows as a byte
 SYDW - places the result of the symbolic calculation that follows as a word
@@ -473,22 +487,29 @@ SYCW - push constant word (to symbolic stack)
 SYCD - push constant dword (to symbolic stack)
 SYCL - push location of label (to symbolic stack)
 
-SYC0 - word addition
+SYC0 -  word addition
 SYC1 - dword addition
-SYC2 - word subtraction
+SYC2 -  word subtraction
 SYC3 - dword subtraction
-SYC4 - word multiplication
+SYC4 -  word multiplication
 SYC5 - dword multiplication
-SYC6 - word division
+SYC6 -  word division
 SYC7 - dword division
-SYC8 - word remainder
+SYC8 -  word remainder
 SYC9 - dword remainder
+SYCX -  word bitwise xor
+SYCY - dword bitwise xor
+SYCA -  word bitwise and
+SYCU - dword bitwise and
+SYCO -  word bitwise or
+SYCQ - dword bitwise or
 
 SYCZ - zero extend word to dword
 SYCS - sign extend word to dword
-SYCT - trim dword to word
-
-
+SYCC - sign extend byte (on stack as word) to  word
+SYCT - trim dword to word (simply drops the upper word)
+SYCN - convert  word to bool (if any bits are 1, the word on symbolic stack is 1)
+SYCM - convert dword to bool (if any bits are 1, the word on symbolic stack is 1)
 
 
 -- Using CALL/RET_ :

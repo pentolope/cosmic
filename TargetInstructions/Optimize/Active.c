@@ -250,8 +250,43 @@ printInstructionBufferWithMessageAndNumber(ib,"starting const opt",0);
 				if (II.isSymbolicInternal | II.id==I_NOP_) continue;
 				if (II.id==I_ADDC & isRegValueUnused[15]){
 					buffer[i].id=I_ADDN;
+					didSucceedAtLeastOnce_1=true;
+#ifdef OPT_DEBUG_CONST
+printInstructionBufferWithMessageAndNumber(ib,"const opt by ADDC->ADDN",i);
+#endif
+#ifdef OPT_DEBUG_SANITY
+sanityCheck(ib);
+#endif
 					goto UnusedResultLoopStart;
 				}
+				if (II.regIN[0]==II.regIN[1] & II.regIN[0]!=16){
+					InstructionSingle writeIS;
+					if (II.id==I_XOR_){
+						writeIS.id=I_BL1_;
+						writeIS.arg.BB.a_0=II.regOUT[0];
+						writeIS.arg.BB.a_1=0;
+					} else if (II.id==I_OR__){
+						writeIS.id=I_MOV_;
+						writeIS.arg.BB.a_0=II.regOUT[0];
+						writeIS.arg.BB.a_1=II.regIN[0];
+					} else if (II.id==I_AND_){
+						writeIS.id=I_MOV_;
+						writeIS.arg.BB.a_0=II.regOUT[0];
+						writeIS.arg.BB.a_1=II.regIN[0];
+					} else {
+						goto ExitForNoSpecial;
+					}
+					didSucceedAtLeastOnce_1=true;
+					buffer[i]=writeIS;
+#ifdef OPT_DEBUG_CONST
+printInstructionBufferWithMessageAndNumber(ib,"const opt by special",i);
+#endif
+#ifdef OPT_DEBUG_SANITY
+sanityCheck(ib);
+#endif
+					goto UnusedResultLoopStart;
+				}
+				ExitForNoSpecial:
 				isRegValueUnused[16]=1;
 				bool canRemove=II.regOUT[0]!=16 & isRegValueUnused[II.regOUT[0]] & isRegValueUnused[II.regOUT[1]] & !(II.doesMoveStack | II.isMemoryAccess);
 				if (canRemove){
@@ -1740,6 +1775,13 @@ void applySTPAtoSTPSopt(InstructionBuffer* ib){
 	for (uint32_t i=0;i<numberOfSlotsTaken;i++){
 		switch ((IS_ptr1=IS_ptr0++)->id){
 			case I_STPA:;
+			// this out of bounds check is only valid if the function is not a varadic function
+			/*
+			if (stackSize<IS_ptr1->arg.BW.a_1 && !compileSettings.hasGivenOutOfBoundsStackAccessWarning){
+				compileSettings.hasGivenOutOfBoundsStackAccessWarning=true;
+err_00__0("Optimizer detected out of bounds memory access on stack\n  no source location avalible\n  future warnings of this type will be suppressed");
+			}
+			*/
 			if (isStackSizeKnown & ((stackSize-IS_ptr1->arg.BW.a_1)&0xFF00)==0) IS_ptr1->id=I_STPS;
 			break;
 			case I_FCST:

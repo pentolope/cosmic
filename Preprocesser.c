@@ -1097,14 +1097,14 @@ void insertFileIntoSourceContainer(const char* fileName, int32_t characterIndexT
 					directoryStr[i++]=0;
 				}
 			}
-			char* newStr = concatStrings(directoryStr,fileNameWithoutEdges);
+			char* newStr = strMerge2(directoryStr,fileNameWithoutEdges);
 			cosmic_free(directoryStr);
 			cosmic_free(fileNameWithoutEdges);
 			fileNameWithoutEdges=newStr;
 		}
 	} else if (firstChar=='<' & lastChar=='>'){
 		hadBrackets=true;
-		char* newStr = concatStrings("StandardHeaders/",fileNameWithoutEdges);
+		char* newStr = strMerge2("StandardHeaders/",fileNameWithoutEdges);
 		cosmic_free(fileNameWithoutEdges);
 		fileNameWithoutEdges=newStr;
 	} else {
@@ -1478,7 +1478,7 @@ int16_t insertMacroIntoEmptySlot(Macro macroToPlace){
 			if (isInputComplex) hasConflict = isMacroComplex(i) && doesStringMatchUntilParen(i_def,macroToPlace.definition);
 			else hasConflict = doStringsMatch(i_def,macroToPlace.definition);
 			if (hasConflict){
-				char* temp=tripleConcatStrings("Warning: macro with name \"",i_def,"\" is being redefined");
+				char* temp=strMerge3("Warning: macro with name \"",i_def,"\" is being redefined");
 				printInformativeMessageAtSourceContainerIndex(false,temp,-1,0);
 				cosmic_free(temp);
 				removeMacro(i);
@@ -1830,7 +1830,7 @@ PreprocessTokenWithContents* macroComplexReplaceSubFunction(int16_t macroIndex, 
 					this->name = copyStringSegmentToHeap(thisMacro.definition,lastIndex,i);
 					lastIndex=i+1;
 					if (needsArgumentsBeforePrescan){
-						this->nameWithHash = concatStrings("#",this->name);
+						this->nameWithHash = strMerge2("#",this->name);
 					}
 				}
 			}

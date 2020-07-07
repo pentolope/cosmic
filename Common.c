@@ -88,7 +88,7 @@ void err_1111_(const char* message,int32_t s,int32_t e){printInformativeMessageA
 
 
 #if 0
-const char* startFileName="\"input2.c\"";
+const char* startFileName="\"input1.c\"";
 #else
 const char* startFileName="\"Main.c\"";
 #endif
@@ -142,6 +142,8 @@ struct CompileSettings{
 	*/
 	bool noColor; // used to disable color printing if desired
 	
+	bool warnForZeroCastInStructOrUnionInInitializer;
+	
 	bool hasGivenConstDivByZeroWarning; 
 	// if the optimizer detects a constant division by zero, it sets this and prints a warning if the flag wasn't set
 	
@@ -149,7 +151,8 @@ struct CompileSettings{
 	// if the optimizer detects an out of bounds stack access, it sets this and prints a warning if the flag wasn't set
 } compileSettings = {
 	.optLevel=2,
-	.noColor=false
+	.noColor=false,
+	.warnForZeroCastInStructOrUnionInInitializer=false
 };
 
 
@@ -391,53 +394,85 @@ bool isSegmentAnywhereInString(const char* stringSearchIn,const char* stringSear
 	return false;
 }
 
-
-
-
-int32_t getIndexOfFirstSpaceInString(const char* string){
+// returns -1 if that space number doesn't exist
+// the first space is n==0
+int32_t getIndexOfNthSpace(const char* string, uint16_t n){
+	uint16_t walkingN = 0;
 	for (int32_t i=0;string[i];i++){
 		if (string[i]==' '){
-			return i;
+			if (walkingN==n){
+				return i;
+			} else {
+				walkingN++;
+			}
 		}
 	}
-	return -1; // then there was no space character in the string
+	return -1;
 }
 
+int32_t getIndexOfFirstSpaceInString(const char* string){
+	return getIndexOfNthSpace(string,0);
+}
 
-char* concatStrings(const char* s0,const char* s1){
+char* strMerge2(const char* s0,const char* s1){
 	uint32_t l0 = strlen(s0);
 	uint32_t l1 = strlen(s1);
-	char* s2 = cosmic_malloc(l0+l1+1);
+	char* sf = cosmic_malloc(l0+l1+1);
 	uint32_t w=0;
-	for (uint32_t i=0;i<l0;i++){
-		s2[w++]=s0[i];
-	}
-	for (uint32_t i=0;i<l1;i++){
-		s2[w++]=s1[i];
-	}
-	s2[w]=0;
-	return s2;
+	uint32_t i;
+	for (i=0;i<l0;) sf[w++]=s0[i++];
+	for (i=0;i<l1;) sf[w++]=s1[i++];
+	sf[w]=0;
+	return sf;
 }
 
-char* tripleConcatStrings(const char* s0,const char* s1,const char* s2){
+char* strMerge3(const char* s0,const char* s1,const char* s2){
 	uint32_t l0 = strlen(s0);
 	uint32_t l1 = strlen(s1);
 	uint32_t l2 = strlen(s2);
-	char* s3 = cosmic_malloc(l0+l1+l2+1);
+	char* sf = cosmic_malloc(l0+l1+l2+1);
 	uint32_t w=0;
-	for (uint32_t i=0;i<l0;i++){
-		s3[w++]=s0[i];
-	}
-	for (uint32_t i=0;i<l1;i++){
-		s3[w++]=s1[i];
-	}
-	for (uint32_t i=0;i<l2;i++){
-		s3[w++]=s2[i];
-	}
-	s3[w]=0;
-	return s3;
+	uint32_t i;
+	for (i=0;i<l0;) sf[w++]=s0[i++];
+	for (i=0;i<l1;) sf[w++]=s1[i++];
+	for (i=0;i<l2;) sf[w++]=s2[i++];
+	sf[w]=0;
+	return sf;
 }
 
+char* strMerge4(const char* s0,const char* s1,const char* s2,const char* s3){
+	uint32_t l0 = strlen(s0);
+	uint32_t l1 = strlen(s1);
+	uint32_t l2 = strlen(s2);
+	uint32_t l3 = strlen(s3);
+	char* sf = cosmic_malloc(l0+l1+l2+l3+1);
+	uint32_t w=0;
+	uint32_t i;
+	for (i=0;i<l0;) sf[w++]=s0[i++];
+	for (i=0;i<l1;) sf[w++]=s1[i++];
+	for (i=0;i<l2;) sf[w++]=s2[i++];
+	for (i=0;i<l3;) sf[w++]=s3[i++];
+	sf[w]=0;
+	return sf;
+}
+
+char* strMerge5(const char* s0,const char* s1,const char* s2,const char* s3,const char* s4){
+	uint32_t l0 = strlen(s0);
+	uint32_t l1 = strlen(s1);
+	uint32_t l2 = strlen(s2);
+	uint32_t l3 = strlen(s3);
+	uint32_t l4 = strlen(s4);
+	char* sf = cosmic_malloc(l0+l1+l2+l3+l4+1);
+	uint32_t w=0;
+	uint32_t i;
+	for (i=0;i<l0;) sf[w++]=s0[i++];
+	for (i=0;i<l1;) sf[w++]=s1[i++];
+	for (i=0;i<l2;) sf[w++]=s2[i++];
+	for (i=0;i<l3;) sf[w++]=s3[i++];
+	for (i=0;i<l4;) sf[w++]=s4[i++];
+	sf[w]=0;
+	return sf;
+}
 
 
 // this next part is typedef entries listing and managment functions, which must be avalible to many parts of the compiler
@@ -489,11 +524,9 @@ int32_t addTypedefEntry(const char* typeSpecifierToInsert){
 
 void removeTypedefEntry(const int32_t indexOfTypedefEntry){
 	struct TypedefEntry* typedefEntryPtr = &(globalTypedefEntries.entries[indexOfTypedefEntry]);
-	if (typedefEntryPtr->isThisSlotTaken){
-		typedefEntryPtr->isThisSlotTaken = false;
-		cosmic_free(typedefEntryPtr->typeSpecifier);
-	}
-	// for now, this just does nothing if that index was already deallocated. Should we throw an error?
+	assert(typedefEntryPtr->isThisSlotTaken);
+	typedefEntryPtr->isThisSlotTaken = false;
+	cosmic_free(typedefEntryPtr->typeSpecifier);
 }
 
 // returns -1 if it is not there
@@ -512,9 +545,7 @@ int32_t indexOfTypedefEntryForSectionOfString(const char* string,const int32_t s
 				}
 				i2++;
 			}
-			if (isEqual){
-				return i;
-			}
+			if (isEqual) return i;
 		}
 	}
 	return -1;
@@ -551,50 +582,41 @@ bool isSegmentOfStringTypeLike(const char* string,const int32_t startIndex,const
 }
 
 
-
-
-
 /*
 writes 8 characters
 the letters of hexadecimal are uppercase
 does not shift the characters in the string over, it just writes to them
 */
 void writeHexInString(char* string, uint32_t numberToTranslate){
-	uint8_t *bytePtr = (uint8_t*)(&numberToTranslate);
-	uint8_t byteArray[4];
-	byteArray[0]=bytePtr[3];
-	byteArray[1]=bytePtr[2];
-	byteArray[2]=bytePtr[1];
-	byteArray[3]=bytePtr[0];
-	// technically, the above is unspecified behaviour. However, all it requires is little-endian storage of the uint32_t
-	for (int16_t i=0;i<4;i++){
-		uint8_t thisByte = byteArray[i];
-		uint8_t byteSide0 = thisByte&0x0F;
-		uint8_t byteSide1 = ((thisByte&0xF0)/16);
-		if (byteSide0>9){
-			byteSide0+=55;
-		} else {
-			byteSide0+=48;
-		}
-		if (byteSide1>9){
-			byteSide1+=55;
-		} else {
-			byteSide1+=48;
-		}
-		string[i*2  ] = byteSide1;
-		string[i*2+1] = byteSide0;
+	{
+	uint8_t byteArray[4] = {
+		((char*)&numberToTranslate)[0],
+		((char*)&numberToTranslate)[1],
+		((char*)&numberToTranslate)[2],
+		((char*)&numberToTranslate)[3]
+	};
+	assert(*((uint32_t*)byteArray)==numberToTranslate);
+	// if this assert fails, then the current computer's arcitecture is not compatible with this compiler
+	}
+	
+	for (unsigned int i=0;i<4u;i++){
+		unsigned int byte0=((char*)&numberToTranslate)[3u-i];
+		unsigned int digit0=(byte0>>4)&0xFu;
+		unsigned int digit1=(byte0>>0)&0xFu;
+		digit0=digit0+(digit0>=10u)*7u+48u;
+		digit1=digit1+(digit1>=10u)*7u+48u;
+		string[i*2u+0u]=digit0;
+		string[i*2u+1u]=digit1;
 	}
 }
 
 // reads 8 characters. assumes this would be a valid operation. letters should be uppercase
 uint32_t readHexInString(const char* string){
 	uint32_t value=0;
-	for (uint16_t i=0;i<8;i++){
-		char c=string[i];
-		if (c>='A') c-=('A'-'9')-1;
-		c-='0';
-		value*=16;
-		value+=c;
+	for (unsigned int i=0;i<8u;i++){
+		value*=16u;
+		uint8_t c=string[i];
+		value+=c-('0'+(c>='A')*(('A'-'9')-1));
 	}
 	return value;
 }

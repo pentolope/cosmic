@@ -41,6 +41,42 @@ void fillInstructionInformation(InstructionInformation* II, const InstructionBuf
 	AfterReset:;
 	InstructionSingle IS=ib->buffer[index];
 	switch (IS.id){
+		case I_SYRE:
+		case I_SYCB:
+		case I_SYCW:
+		case I_SYCD:
+		case I_SYCL:
+		case I_SYC0:
+		case I_SYC1:
+		case I_SYC2:
+		case I_SYC3:
+		case I_SYC4:
+		case I_SYC5:
+		case I_SYC6:
+		case I_SYC7:
+		case I_SYC8:
+		case I_SYC9:
+		case I_SYCZ:
+		case I_SYCS:
+		case I_SYCT:
+		case I_SYCX:
+		case I_SYCY:
+		case I_SYCA:
+		case I_SYCU:
+		case I_SYCO:
+		case I_SYCQ:
+		case I_SYCC:
+		case I_SYCN:
+		case I_SYCM:
+		II->isSymbolicInternal=true;
+		{
+		enum InstructionTypeID id;
+		do {
+			assert(index!=0);
+			id=ib->buffer[--index].id;
+		} while (id!=I_SYRB & id!=I_SYRW & id!=I_SYRD);
+		}
+		goto AfterReset;
 		case I_PHIS:
 		II->regIN[0]=IS.arg.B.a_0;
 		II->doesBlockReorder=true;
@@ -65,33 +101,6 @@ void fillInstructionInformation(InstructionInformation* II, const InstructionBuf
 		II->doesBlockReorder=true;
 		II->doesDestroyReg=true;
 		break;
-		case I_SYRE:
-		case I_SYCB:
-		case I_SYCW:
-		case I_SYCD:
-		case I_SYCL:
-		case I_SYC0:
-		case I_SYC1:
-		case I_SYC2:
-		case I_SYC3:
-		case I_SYC4:
-		case I_SYC5:
-		case I_SYC6:
-		case I_SYC7:
-		case I_SYC8:
-		case I_SYC9:
-		case I_SYCZ:
-		case I_SYCS:
-		case I_SYCT:
-		II->isSymbolicInternal=true;
-		{
-		enum InstructionTypeID id;
-		do {
-			assert(index!=0);
-			id=ib->buffer[--index].id;
-		} while (id!=I_SYRB & id!=I_SYRW & id!=I_SYRD);
-		}
-		goto AfterReset;
 		case I_PU1_:
 		case I_PUA1:
 		II->doesMoveStack=true;

@@ -94,14 +94,26 @@ typedef struct InstructionSingle{
 		I_SYC7,
 		I_SYC8,
 		I_SYC9,
-
+		
+		I_SYCX,
+		I_SYCY,
+		I_SYCA,
+		I_SYCU,
+		I_SYCO,
+		I_SYCQ,
+		I_SYCC,
+		I_SYCN,
+		I_SYCM,
+		
 		I_SYCZ,
 		I_SYCS,
 		I_SYCT,
 		
 		// the following should not be encontered by the instruction optimizer
-		I_NSPB,
-		I_NSPW,
+		I_NSNB,
+		I_NSCB,
+		I_NSNW,
+		I_NSCW,
 		I_ZNXB,
 		I_ZNXW,
 
@@ -118,6 +130,8 @@ typedef struct InstructionSingle{
 		I_PEPH, // used in peephole optimization templates for poping or pushing a value
 		
 		I_STPI, // for placing initializer offsets. Is converted to I_STPA after the variable's local offset is calculated.
+		
+		I_LOFF, // used temporarily by static initializers to indicate an offset of the data that comes next
 		
 		I_INSR // this is the insert placeholder for core entries, it is not an instruction. It uses the 'B' struct in the 'arg' union
 	} id;
@@ -280,6 +294,15 @@ uint8_t instructionContentCatagory(enum InstructionTypeID id){
 		case I_SYCZ:
 		case I_SYCS:
 		case I_SYCT:
+		case I_SYCX:
+		case I_SYCY:
+		case I_SYCA:
+		case I_SYCU:
+		case I_SYCO:
+		case I_SYCQ:
+		case I_SYCC:
+		case I_SYCN:
+		case I_SYCM:
 		return 0;
 		case I_PU1_:
 		case I_PUA1:
@@ -343,16 +366,48 @@ uint8_t instructionContentCatagory(enum InstructionTypeID id){
 		case I_JJMP:
 		return 9;
 		case I_LABL:
-		case I_DWRD:
-		case I_SYCD:
 		case I_JTEN:
+		case I_SYCD:
 		case I_SYCL:
+		case I_DWRD:
+		case I_NSNB:
+		case I_NSCB:
+		case I_NSNW:
+		case I_NSCW:
+		case I_ZNXB:
+		case I_ZNXW:
 		return 10;
 		case I_FCST:
 		return 11;
 		default:;
 	}
-	printf("Invalid operator ID\n");
+	assert(false); // invalid operator id
+	exit(1);
+}
+
+uint8_t getStorageDeltaForInstruction(enum InstructionTypeID id){
+	// if something changes, do not just change this, there are other places
+	switch (instructionContentCatagory(id)){
+		case 0:
+		return 1;
+		case 1:
+		case 2:
+		case 3:
+		return 2;
+		case 4:
+		case 5:
+		case 6:
+		return 3;
+		case 7:
+		case 8:
+		return 4;
+		case 9:
+		case 10:
+		return 6;
+		case 11:
+		return 8;
+	}
+	assert(false); // invalid storage catagory
 	exit(1);
 }
 
@@ -361,33 +416,7 @@ CompressedInstructionBuffer compressInstructionBuffer(const InstructionBuffer* i
 	uint32_t length=1;
 	for (uint32_t i=0;i<ib->numberOfSlotsTaken;i++){
 		uint16_t delta=0;
-		switch (instructionContentCatagory(ib->buffer[i].id)){
-			case 0:
-			delta=1;
-			break;
-			case 1:
-			case 2:
-			case 3:
-			delta=2;
-			break;
-			case 4:
-			case 5:
-			case 6:
-			delta=3;
-			break;
-			case 7:
-			case 8:
-			delta=4;
-			break;
-			case 9:
-			case 10:
-			delta=6;
-			break;
-			case 11:
-			delta=8;
-			break;
-		}
-		length+=delta;
+		length+=getStorageDeltaForInstruction(ib->buffer[i].id);
 	}
 	cib.byteCode=cosmic_calloc(length+1,sizeof(uint8_t));
 	uint8_t* byteCode=cib.byteCode;
@@ -674,7 +703,8 @@ void convertSTPI_STPA(InstructionBuffer* ib, uint16_t offsetToAdd){
 	for (uint32_t i=0;i<ib->numberOfSlotsTaken;i++){
 		if (ib->buffer[i].id==I_STPI){
 			ib->buffer[i].id=I_STPA;
-			ib->buffer[i].arg.BBW.a_2+=offsetToAdd;
+			uint16_t* vp=&ib->buffer[i].arg.BBW.a_2;
+			*vp=offsetToAdd-*vp;
 		}
 	}
 }

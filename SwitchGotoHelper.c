@@ -259,7 +259,7 @@ void resolveGoto(int32_t failIndex){
 		}
 		if (!didFind){
 			char* warnString;
-			printInformativeMessageAtSourceContainerIndex(true,warnString=tripleConcatStrings("This function used, but did not have, a label \'",thisName,"\'"),failIndex,0);
+			printInformativeMessageAtSourceContainerIndex(true,warnString=strMerge3("This function used, but did not have, a label \'",thisName,"\'"),failIndex,0);
 			exit(1);
 		}
 	}
@@ -274,7 +274,7 @@ void resolveGoto(int32_t failIndex){
 		}
 		if (!didFind){
 			char* warnString;
-			printInformativeMessageAtSourceContainerIndex(false,warnString=tripleConcatStrings("This function has a useless label \'",thisName,"\'"),failIndex,0);
+			printInformativeMessageAtSourceContainerIndex(false,warnString=strMerge3("This function has a useless label \'",thisName,"\'"),failIndex,0);
 			cosmic_free(warnString);
 		}
 	}

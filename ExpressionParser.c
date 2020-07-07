@@ -301,7 +301,7 @@ bool isExpressionTokenName(ExpressionTokenArray expressionTokenArray, int32_t in
 	char firstCharacter = expressionTokenArray.string[expressionToken.tokenStart];
 	if (isLetter(firstCharacter)){
 		if (firstCharacter=='L'){
-			return expressionTokenArray.string[expressionToken.tokenStart+1]!='\"'; // this should not cause an out of bounds error due to null termination on the string
+			return expressionTokenArray.string[expressionToken.tokenStart+1]!='\"'; // this should not cause an out of bounds error
 		} else {
 			return true; // normally, we would also check for if it was not sizeof, however that check is done elsewhere
 		}
@@ -394,7 +394,7 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 	uint8_t operatorIDofCurrentToken;
 	bool doPairing = false;
 	/* 
-	we will be looping a lot so those variable declarations up there can just go there for common names between loops.
+	This will be looping a lot so those variable declarations up there can just go there for common names between loops.
 	sometimes the variable is set for a loop, sometimes it is not. check the beginning of the loop to see which ones are set for that loop
 	*/
 	
@@ -412,9 +412,9 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 		lengthOfStringInCurrentToken = currentTokenPtr->tokenEnd - indexOfFirstCharacterInCurrentToken;
 		firstCharacterOfCurrentToken = string[indexOfFirstCharacterInCurrentToken];
 		
-		uint8_t n_oID = 0; // this variable is basically just to reduce the amount of assembly from compiler
+		uint8_t n_oID = 0;
 		if (lengthOfStringInCurrentToken==6){
-			if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"sizeof")) n_oID = 17;
+			if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"sizeof"))   n_oID = 17;
 		} else if (lengthOfStringInCurrentToken==3){
 			if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"<<="))      n_oID = 44;
 			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,">>=")) n_oID = 45;
@@ -459,7 +459,6 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 			else if (firstCharacterOfCurrentToken=='=') n_oID = 38;
 			else if (firstCharacterOfCurrentToken==',') n_oID = 51;
 		}
-		currentTokenPtr->operatorID = n_oID;
 		if (n_oID==0){
 			if (isLetter(firstCharacterOfCurrentToken) |
 				isDigit(firstCharacterOfCurrentToken) |
@@ -468,29 +467,26 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 				firstCharacterOfCurrentToken=='.'){
 				
 				if (isExpressionTokenName(expressionTokenArray,i)){
-					if (isSubstringANameForAValidType(string,indexOfFirstCharacterInCurrentToken,currentTokenPtr->tokenEnd)){
-						currentTokenPtr->operatorID = 60;
-					} else {
-						currentTokenPtr->operatorID = 59;
-					}
+					n_oID = 59+(bool)isSubstringANameForAValidType(string,indexOfFirstCharacterInCurrentToken,currentTokenPtr->tokenEnd);
 				} else {
 					if (firstCharacterOfCurrentToken=='\"' |
 					    firstCharacterOfCurrentToken=='\'' |
 						(firstCharacterOfCurrentToken=='L' & 
 						 string[indexOfFirstCharacterInCurrentToken+1]=='\"')){
 						
-						currentTokenPtr->operatorID = 61;
+						n_oID = 61;
 					} else if (isDigit(firstCharacterOfCurrentToken) || (isDigit(string[indexOfFirstCharacterInCurrentToken+1]) & firstCharacterOfCurrentToken=='.')){
-						currentTokenPtr->operatorID = 62;
+						n_oID = 62;
 					} else {
 						printf("ill-formed token detected: cannot discern between number, name, or literal\n");
 						exit(1);
 					}
 				}
 			} else {
-				currentTokenPtr->operatorID = 58; // or it is something very invalid. but i'm not checking that right now because I don't want to write the code for it
+				n_oID = 58; // or it is something very invalid. but i'm not checking that right now because I don't want to write the code for it
 			}
 		}
+		currentTokenPtr->operatorID = n_oID;
 	}
 	
 	// currently, function calls are detected by the token to the left of an open parenthese being a name or through a pair of tokens like this: ")(" with some additional checks
@@ -542,15 +538,25 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 				n_oID = 58;
 			} else if (totalNumberOfVotes==1){
 				if (voteForFunctionCall){
-					n_oID = 3;
-					expressionTokens[i-1].operatorID = 65; // couldn't have been first token due to previous checks, so no index error
+					bool isActuallyDualSidedFunctionCall=false;
+					if (i>=2){
+						uint8_t farOpID=expressionTokens[i-2].operatorID;
+						isActuallyDualSidedFunctionCall= farOpID==5 | farOpID==6;
+					}
+					if (isActuallyDualSidedFunctionCall){
+						n_oID = 66;
+					} else {
+						n_oID = 3;
+						expressionTokens[i-1].operatorID = 65; // couldn't have been first token due to previous checks, so no index error
+					}
 				} else if (voteForTypeCast){
 					n_oID = 14;
 				} else if (voteForSizeofArgument){
 					n_oID = 64;
-				} else if (voteForDualSidedFunctionCall){
+				} else {
+					assert(voteForDualSidedFunctionCall);
 					n_oID = 66;
-				} // no other cases possible
+				}
 			} else {
 				// too many votes, the compiler can't tell what this parenthese is supposed to mean
 				printf("an ambigous parenthese is not okay (%d,%d,%d,%d)\n",voteForFunctionCall,voteForTypeCast,voteForSizeofArgument,voteForDualSidedFunctionCall);

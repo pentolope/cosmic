@@ -3,10 +3,12 @@
 /*
 
 running initializerMapRoot() will destroy any previous initializer mappings
-initializerMapRoot() doesn't even need to have the type defined, it doesn't even look at blockFrameArray
+	doesn't even need to have the type defined, it doesn't look at blockFrameArray
 
+initializerImplementRoot() does need to have the type defined, 
+	and it will walk the initializer map that is currently created 
 
-There is constant expression walking and evaluation in this file too
+There is constant and static expression walking and evaluation in this file too
 
 */
 
@@ -64,22 +66,22 @@ void applyConstantOperator(ExpressionTreeNode* thisNode){
 			}
 		}
 		break;
-		case 17:
+		case 14:
 		case 62:{
 			*thisConstVal=extraVal;
 		}
 		break;
 		case 59:{
 			if (operatorTypeID==1){
-				printInformativeMessageForExpression(true,"Local variables are not ready to be in constant expressions",thisNode);
-				exit(1);
+				printInformativeMessageForExpression(true,"Global variables are not quite ready to be in constant expressions",thisNode);
+				//exit(1);
 			} else if (operatorTypeID==2){
-				printInformativeMessageForExpression(true,"Global variables are not ready to be in constant expressions",thisNode);
-				exit(1);
+				printInformativeMessageForExpression(true,"Local variables cannot be in constant expressions",thisNode);
+				//exit(1);
 			} else if (operatorTypeID==3){
 				*thisConstVal=extraVal;
 			} else { //operatorTypeID==4
-				printInformativeMessageForExpression(true,"Function pointers not allowed in constant expressions (the memory location is symbolic at this point!)",thisNode);
+				printInformativeMessageForExpression(true,"Function pointers cannot be in constant expressions",thisNode);
 				exit(1);
 			}
 		}
@@ -99,6 +101,140 @@ void applyConstantOperator(ExpressionTreeNode* thisNode){
 	}
 }
 
+void applySymbolicOperator(ExpressionTreeNode* thisNode){
+	ExpressionTreeNode* ln;
+	ExpressionTreeNode* rn;
+	uint16_t operatorTypeID = thisNode->post.operatorTypeID;
+	uint32_t extraVal = thisNode->post.extraVal;
+	InstructionBuffer* ib=&thisNode->ib;
+	InstructionBuffer* ibLeft;
+	InstructionBuffer* ibRight;
+	InstructionSingle writeIS; 
+	if (thisNode->pre.hasLeftNode){
+		ln=expressionTreeGlobalBuffer.expressionTreeNodes+thisNode->pre.leftNode;
+		ibLeft=&(ln->ib);
+	}
+	if (thisNode->pre.hasRightNode){
+		rn=expressionTreeGlobalBuffer.expressionTreeNodes+thisNode->pre.rightNode;
+		if (!(thisNode->operatorID==5 | thisNode->operatorID==6)) ibRight=&(rn->ib);
+	}
+	switch (thisNode->operatorID){
+		case 10:
+		case 14:
+		singleMergeIB(ib,ibRight);
+		break;
+		case 11:{
+			if (operatorTypeID==2){
+				writeIS.id=I_SYCD;
+				writeIS.arg.D.a_0=0;
+				addInstruction(ib,writeIS);
+				singleMergeIB(ib,ibRight);
+				writeIS.id=I_SYC3;
+				addInstruction(ib,writeIS);
+			} else {
+				writeIS.id=I_SYCW;
+				writeIS.arg.W.a_0=0;
+				addInstruction(ib,writeIS);
+				singleMergeIB(ib,ibRight);
+				writeIS.id=I_SYC2;
+				addInstruction(ib,writeIS);
+			}
+		}
+		break;
+		case 18:{
+			if (operatorTypeID==2){
+				dualMergeIB(ib,ibLeft,ibRight);
+				writeIS.id=I_SYC5;
+				addInstruction(ib,writeIS);
+			} else {
+				dualMergeIB(ib,ibLeft,ibRight);
+				writeIS.id=I_SYC4;
+				addInstruction(ib,writeIS);
+			}
+		}
+		break;
+		case 21:{
+			if (operatorTypeID==1){
+				dualMergeIB(ib,ibLeft,ibRight);
+				writeIS.id=I_SYC1;
+				addInstruction(ib,writeIS);
+			} else if (operatorTypeID==2){
+				dualMergeIB(ib,ibLeft,ibRight);
+				writeIS.id=I_SYC0;
+				addInstruction(ib,writeIS);
+			} else {
+				goto GiveHasNotAddedMessage;
+			}
+		}
+		break;
+		case 22:{
+			if (operatorTypeID==1){
+				dualMergeIB(ib,ibLeft,ibRight);
+				writeIS.id=I_SYC3;
+				addInstruction(ib,writeIS);
+			} else if (operatorTypeID==2){
+				dualMergeIB(ib,ibLeft,ibRight);
+				writeIS.id=I_SYC2;
+				addInstruction(ib,writeIS);
+			} else {
+				goto GiveHasNotAddedMessage;
+			}
+		}
+		break;
+		case 59:{
+			if (operatorTypeID==1){
+				writeIS.id=I_SYCL;
+				writeIS.arg.D.a_0=extraVal;
+				addInstruction(ib,writeIS);
+			} else if (operatorTypeID==2){
+				// should be unreachable
+				printInformativeMessageForExpression(true,"Local variables cannot be in static expressions",thisNode);
+				exit(1);
+			} else if (operatorTypeID==3){
+				writeIS.id=I_SYCW;
+				writeIS.arg.W.a_0=extraVal;
+				addInstruction(ib,writeIS);
+			} else { //operatorTypeID==4
+				writeIS.id=I_SYCL;
+				writeIS.arg.D.a_0=extraVal;
+				addInstruction(ib,writeIS);
+				printInformativeMessageForExpression(true,"Function pointers in static expressions are... possibly functional right now",thisNode);
+			}
+		}
+		break;
+		case 61:{
+			if (operatorTypeID==1){
+				writeIS.id=I_SYCW;
+				writeIS.arg.W.a_0=extraVal;
+				addInstruction(ib,writeIS);
+			} else {
+				writeIS.id=I_SYCL;
+				writeIS.arg.D.a_0=extraVal;
+				addInstruction(ib,writeIS);
+			}
+		}
+		break;
+		case 62:
+		{
+			if (operatorTypeID==1){
+				writeIS.id=I_SYCW;
+				writeIS.arg.W.a_0=extraVal;
+				addInstruction(ib,writeIS);
+			} else {
+		case 17:
+				writeIS.id=I_SYCD;
+				writeIS.arg.D.a_0=extraVal;
+				addInstruction(ib,writeIS);
+			}
+		}
+		break;
+		default:
+		GiveHasNotAddedMessage:
+		printInformativeMessageForExpression(true,"Unimplemented Error: I have not (or cannot) add support for this operand in static expressions",thisNode);
+		exit(1);
+	}
+}
+
 void expressionToConstant(int16_t nodeIndex){
 	ExpressionTreeNode* thisNode=expressionTreeGlobalBuffer.expressionTreeNodes+nodeIndex;
 	uint8_t oID = thisNode->operatorID;
@@ -108,6 +244,10 @@ void expressionToConstant(int16_t nodeIndex){
 	}
 	if (oID==65 | oID==66){
 		printInformativeMessageForExpression(true,"Cannot have function call inside constant expression",thisNode);
+		exit(1);
+	}
+	if (oID==36 | oID==37){
+		printInformativeMessageForExpression(true,"Cannot have ternary inside constant expression",thisNode);
 		exit(1);
 	}
 	// should I add short-circuiting to this evaluation?
@@ -120,12 +260,52 @@ void expressionToConstant(int16_t nodeIndex){
 	applyConstantOperator(thisNode);
 }
 
+
+void expressionToSymbolic(int16_t nodeIndex){
+	ExpressionTreeNode* thisNode=expressionTreeGlobalBuffer.expressionTreeNodes+nodeIndex;
+	uint8_t oID = thisNode->operatorID;
+	if ((oID>=38 & oID<=48) | oID==1 | oID==2 | oID==8 | oID==9){
+		printInformativeMessageForExpression(true,"Cannot have value modifying operator inside static expression",thisNode);
+		exit(1);
+	}
+	if (oID==65 | oID==66){
+		printInformativeMessageForExpression(true,"Cannot have function call inside static expression",thisNode);
+		exit(1);
+	}
+	if (oID==36 | oID==37){
+		printInformativeMessageForExpression(true,"Cannot have ternary inside static expression",thisNode);
+		exit(1);
+	}
+	if (thisNode->pre.hasLeftNode)
+		expressionToSymbolic(thisNode->pre.leftNode);
+	if (thisNode->pre.hasRightNode&!(oID==5 | oID==6))
+		expressionToSymbolic(thisNode->pre.rightNode);
+	ensureExpNodeInit(thisNode);
+	initInstructionBuffer(&thisNode->ib);
+	applyAutoTypeConversion(thisNode);
+	applySymbolicOperator(thisNode);
+	if (thisNode->pre.hasLeftNode)
+		destroyInstructionBuffer(&expressionTreeGlobalBuffer.expressionTreeNodes[thisNode->pre.leftNode ].ib);
+	if (thisNode->pre.hasRightNode&!(oID==5 | oID==6 | oID==17))
+		destroyInstructionBuffer(&expressionTreeGlobalBuffer.expressionTreeNodes[thisNode->pre.rightNode].ib);
+}
+
+
+
+
 struct ConstValueTypePair{
 	uint32_t value;
 	uint32_t size; // of typeString
 };
 
-void expressionToConstantBase(struct ConstValueTypePair* cvtp,const char* typeStringCast, int16_t nodeIndex){
+
+// this function has specific expectations for being called
+bool shouldAvoidWarningsForInitializerExpressionElement(ExpressionTreeNode* rootNode){
+	return rootNode->operatorID==62 && (!compileSettings.warnForZeroCastInStructOrUnionInInitializer & rootNode->post.extraVal==0);
+}
+
+
+void expressionToConstantBase(struct ConstValueTypePair* cvtp,const char* typeStringCast, int16_t nodeIndex){ // potentialNoWarn is intended to be removed
 	expressionToConstant(nodeIndex);
 	ExpressionTreeNode* thisNode=expressionTreeGlobalBuffer.expressionTreeNodes+nodeIndex;
 	applyTypeCast(thisNode,typeStringCast,15);
@@ -142,6 +322,50 @@ uint32_t expressionToConstantValue(const char* typeStringCast,int16_t nodeIndex)
 	struct ConstValueTypePair cvtp;
 	expressionToConstantBase(&cvtp,typeStringCast,nodeIndex);
 	return cvtp.value;
+}
+
+void expressionToSymbolicRoot(InstructionBuffer* parent_ib,const char* typeStringCast,uint32_t offset,int16_t nodeIndex, bool potentialNoWarn){
+	assert(!doSymbolicConstantGenForExp);
+	doSymbolicConstantGenForExp=true;
+	ExpressionTreeNode* thisNode=expressionTreeGlobalBuffer.expressionTreeNodes+nodeIndex;
+	uint32_t sizeOfCastType=getSizeofForTypeString(typeStringCast,true);
+	if (sizeOfCastType==0 | sizeOfCastType==3 | sizeOfCastType>4){
+		printInformativeMessageForExpression(true,"type size for the destination type of this static expression is invalid",thisNode);
+		exit(1);
+	}
+	expressionToSymbolic(nodeIndex);
+	applyTypeCast(thisNode,typeStringCast,15*!(potentialNoWarn && shouldAvoidWarningsForInitializerExpressionElement(thisNode)));
+	InstructionBuffer* ib=&thisNode->ib;
+	InstructionBuffer ibTemp;
+	initInstructionBuffer(&ibTemp);
+	InstructionSingle writeIS;
+	writeIS.id=I_LOFF;
+	writeIS.arg.D.a_0=offset;
+	addInstruction(&ibTemp,writeIS);
+	//printf("typeString:`%s`\n",typeStringCast);
+	if (sizeOfCastType==1){
+		writeIS.id=I_SYDB;
+	} else if (sizeOfCastType==2){
+		writeIS.id=I_SYDW;
+	} else if (sizeOfCastType==4){
+		writeIS.id=I_SYDD;
+	} else {
+		assert(false);
+	}
+	addInstruction(&ibTemp,writeIS);
+	singleMergeIB(&ibTemp,ib);
+	destroyInstructionBuffer(ib);
+	writeIS.id=I_SYDE;
+	addInstruction(&ibTemp,writeIS);
+	
+	//printInformativeMessageForExpression(false,"output for this expression follows:",thisNode);
+	//printInstructionBufferWithMessageAndNumber(&ibTemp,"output",0);
+	
+	//printf("test exit!\n");
+	//exit(0);
+	destroyInstructionBuffer(&ibTemp);
+	cosmic_free(thisNode->post.typeString);
+	doSymbolicConstantGenForExp=false;
 }
 
 
@@ -471,60 +695,97 @@ int32_t initializerMapRoot(int32_t strStart,int32_t strEnd){
 #include "TypeStringCracking.c"
 
 
-
-
-
-
-
-
-
+char* getTypeStringOfFirstNonStructUnionMember(const char* typeString){
+	struct TypeSearchResult tsr;
+	typeString=stripQualifiersC(typeString,NULL,NULL);
+	assert(isTypeStringOfStructOrUnion(typeString));
+	bool isUnion=isSectionOfStringEquivalent(typeString,0,"union");
+	searchForType(&tsr,typeString+(7-isUnion),isUnion);
+	assert(tsr.didExist);
+	char* firstMemberTypeString;
+	if (tsr.isGlobal) firstMemberTypeString=(char*)blockFrameArray.globalBlockFrame.globalTypeEntries[tsr.typeEntryIndex].arrayOfMemberEntries[0].typeString;
+	else firstMemberTypeString=(char*)blockFrameArray.entries[tsr.blockFrameEntryIndex].typeEntries[tsr.typeEntryIndex].arrayOfMemberEntries[0].typeString;
+	firstMemberTypeString=applyToTypeStringRemoveIdentifierToNew(firstMemberTypeString);// this is why the cast to (char*) is okay [a new string gets allocated]
+	if (isTypeStringOfStructOrUnion(firstMemberTypeString)){
+		char* sub=getTypeStringOfFirstNonStructUnionMember(firstMemberTypeString);
+		cosmic_free(firstMemberTypeString);
+		return sub;
+	}
+	return firstMemberTypeString;
+}
 
 
 void initializerImplementStaticExpression(
 		int32_t entryIndex,
 		struct RawMemoryForInitializer* rmfi,
-		char* typeStringCast,
-		uint32_t memoryOffset){
+		const char* typeStringCast,
+		uint32_t memoryOffset,
+		bool potentialNoWarn){
 	
-	struct InitializerMapEntry* ime=initializerMap.entries+entryIndex;
-	struct ConstValueTypePair cvtp;
-	expressionToConstantBase(&cvtp,typeStringCast,ime->expNode);
-	bool didSetFail;
-	if (cvtp.size==1){
-		didSetFail=setByteRawMemoryForInitializer(rmfi,1,memoryOffset,cvtp.value);
-	} else if (cvtp.size==2){
-		didSetFail=setWordRawMemoryForInitializer(rmfi,2,memoryOffset,cvtp.value);
-	} else if (cvtp.size==4){
-		didSetFail=setDwordRawMemoryForInitializer(rmfi,4,memoryOffset,cvtp.value);
+	if (isTypeStringOfStructOrUnion(stripQualifiersC(typeStringCast,NULL,NULL))){
+		// this causes static initizations of structs/unions from expression -> initializing that struct/union 's first member from expression
+		char* firstMemberTypeString=getTypeStringOfFirstNonStructUnionMember(typeStringCast);
+		initializerImplementStaticExpression(entryIndex,rmfi,firstMemberTypeString,memoryOffset,true);
+		cosmic_free(firstMemberTypeString);
 	} else {
-		assert(false); //bad size
-	}
-	if (didSetFail){
-		printf("Warning: data overlap in initializer\n");
+		struct InitializerMapEntry* ime=initializerMap.entries+entryIndex;
+		/*
+		struct ConstValueTypePair cvtp;
+		expressionToConstantBase(&cvtp,typeStringCast,ime->expNode,potentialNoWarn);
+		bool didSetFail;
+		if (cvtp.size==1){
+			didSetFail=setByteRawMemoryForInitializer(rmfi,1,memoryOffset,cvtp.value);
+		} else if (cvtp.size==2){
+			didSetFail=setWordRawMemoryForInitializer(rmfi,2,memoryOffset,cvtp.value);
+		} else if (cvtp.size==4){
+			didSetFail=setDwordRawMemoryForInitializer(rmfi,4,memoryOffset,cvtp.value);
+		} else {
+			assert(false); //bad size
+		}
+		if (didSetFail){
+			printf("Warning: data overlap in initializer\n");
+		}
+		*/
+		expressionToSymbolicRoot(NULL,typeStringCast,memoryOffset,ime->expNode,potentialNoWarn); // todo: remove null
 	}
 }
 
 void initializerImplementNonstaticExpression(
 		int32_t entryIndex,
 		InstructionBuffer* ib,
-		char* typeStringCast,
-		uint16_t stackOffset){
+		const char* typeStringCast,
+		uint16_t stackOffset,
+		bool isBehindList,
+		bool potentialNoWarn){
 	
 	struct InitializerMapEntry* ime=initializerMap.entries+entryIndex;
 	ExpressionTreeNode* thisNode=expressionTreeGlobalBuffer.expressionTreeNodes+ime->expNode;
 	expressionToAssembly(ime->expNode,NULL,0);
-	uint32_t typeSize=getSizeofForTypeString(typeStringCast,true);
-	char* typeStringCastNQ=stripQualifiers(typeStringCast,NULL,NULL);
 	bool isSU=isTypeStringOfStructOrUnion(thisNode->post.typeStringNQ);
+	uint32_t typeSize=getSizeofForTypeString(typeStringCast,true);
+	const char* typeStringCastNQ=stripQualifiersC(typeStringCast,NULL,NULL);
 	bool isToSU=isTypeStringOfStructOrUnion(typeStringCastNQ);
+	uint8_t warnValue=15*!(potentialNoWarn && shouldAvoidWarningsForInitializerExpressionElement(thisNode));
 	if (isSU!=isToSU){
-		const char* message;
-		if (!isSU& isToSU) message="Cannot initialize non-struct and non-union with struct or union expression";
-		else message="Cannot initialize struct or union with non-struct and non-union expression";
-		printInformativeMessageAtSourceContainerIndex(true,message,ime->strStart,0);
-		exit(1);
+		if (isBehindList&!isSU){
+			// this causes the first member of a struct/union to be initialized when attempting to initialize it from a non-struct/union expression when in a list initializer
+			isToSU=false;isSU=false; // not needed, but to be clear what this ends up doing
+			
+			char* firstMemberTypeString=getTypeStringOfFirstNonStructUnionMember(typeStringCast);
+			applyTypeCast(thisNode,firstMemberTypeString,warnValue);
+			typeSize=getSizeofForTypeString(firstMemberTypeString,true);
+			cosmic_free(firstMemberTypeString);
+			goto InsertJmp;
+		} else {
+			const char* message;
+			if (isSU) message="Cannot initialize non-struct and non-union with struct or union expression";
+			else message="Cannot initialize struct or union with non-struct and non-union expression";
+			printInformativeMessageAtSourceContainerIndex(true,message,ime->strStart,0);
+			exit(1);
+		}
 	}
-	if (!isSU) applyTypeCast(thisNode,typeStringCast,15);
+	if (!isSU) applyTypeCast(thisNode,typeStringCast,warnValue);
+	InsertJmp:;
 	singleMergeIB(ib,&thisNode->ib);
 	destroyInstructionBuffer(&thisNode->ib);
 	if (isSU){
@@ -553,7 +814,9 @@ void initializerImplementNonstaticExpression(
 	} else {
 		assert(!(typeSize==0 | typeSize==3 | typeSize>4));
 		insert_IB_STPI(ib,stackOffset);
-		if (typeSize==4){
+		if (typeSize==1){
+			singleMergeIB(ib,&ib_mem_byte_write_n);
+		} else if (typeSize==4){
 			singleMergeIB(ib,&ib_mem_dword_write_n);
 			addVoidPop(ib);
 		} else {
@@ -565,16 +828,19 @@ void initializerImplementNonstaticExpression(
 }
 
 char* advanceToMembersInCrackedType(char* crackedType){
-	while (*(crackedType++)!='{'){
+	char c;
+	while ((c=*(crackedType++))!='{'){
+		assert(c!=0);
+		if (c=='|') return NULL;
 	}
 	return crackedType;
 }
 
 char* advanceToNextMemberInCrackedType(char* crackedType){
-	while (*crackedType!=';'){
-		if (*crackedType=='<'){
-			crackedType=getIndexOfMatchingEnclosement(crackedType,0)+crackedType;
-		}
+	char c;
+	while ((c=*crackedType)!=';'){
+		assert(c!=0);
+		if (c=='<') crackedType=getIndexOfMatchingEnclosement(crackedType,0)+crackedType;
 		crackedType++;
 	}
 	return crackedType+1;
@@ -582,141 +848,204 @@ char* advanceToNextMemberInCrackedType(char* crackedType){
 
 char* gotoMemberAtIndex(char* crackedType,uint16_t memberIndex){
 	crackedType=advanceToMembersInCrackedType(crackedType);
+	if (crackedType==NULL) return NULL;
 	for (uint16_t i=0;i<memberIndex;i++){
 		crackedType=advanceToNextMemberInCrackedType(crackedType);
-		if (*crackedType=='}'){
-			return NULL;
-		}
+		if (*crackedType=='}') return NULL;
 	}
 	return crackedType;
 }
 
-uint16_t getMemberCount(char* crackedType){
-	uint16_t count=0;
-	while (gotoMemberAtIndex(crackedType,count)!=NULL){
-		count++;
+char* advanceToNameInCrackedType(char* crackedType){
+	char c;
+	while (true){
+		c=*crackedType;
+		if (c=='<'){
+			crackedType+=getIndexOfMatchingEnclosement(crackedType,0)+1;
+			break;
+		} else if (c=='('){
+			crackedType+=getIndexOfMatchingEnclosement(crackedType,0)+1;
+			crackedType=advanceToNameInCrackedType(crackedType);
+			break;
+		} else if (c=='?'|c=='!'|c=='#'){
+			crackedType+=8;
+		} else if (c=='j' | c=='h'){
+			while (*crackedType!='|'){
+				assert(*crackedType!=0);
+				crackedType++;
+			}
+			crackedType++;
+			break;
+		} else if (c!='*'){
+			crackedType++;
+			break;
+		}
+		crackedType++;
 	}
-	return count;
+	return crackedType;
 }
 
 uint16_t findMemberIndexForName(char* crackedType,int32_t strStart,int32_t strEnd){
 	char* subCrackedType;
 	uint16_t i=0;
 	while ((subCrackedType=gotoMemberAtIndex(crackedType,i))!=NULL){
-		char c;
-		while (true){
-			c=*subCrackedType;
-			if (c=='<'){
-				subCrackedType+=getIndexOfMatchingEnclosement(subCrackedType,0)+1;
-				break;
-			} else if (c=='?'|c=='!'|c=='#'){
-				subCrackedType+=8;
-			} else if (c!='*'){
-				subCrackedType++;
-				break;
-			}
-			subCrackedType++;
-		}
+		subCrackedType=advanceToNameInCrackedType(subCrackedType);
 		int32_t strWalk=strStart;
 		while (true){
 			if (*subCrackedType==';'){
-				if (strWalk==strEnd){
-					return i;
-				} else {
-					break;
-				}
+				if (strWalk==strEnd) return i;
+				else break;
 			}
-			if (strWalk>strEnd){
-				break;
-			}
-			if (*(subCrackedType++)!=sourceContainer.string[strWalk++]){
-				break;
-			}
+			if (strWalk>strEnd) break;
+			if (*(subCrackedType++)!=sourceContainer.string[strWalk++]) break;
 		}
 		i++;
 	}
-	return 0xFFFF;
+	return 0xFFFFu;
 }
 
 
-uint32_t nestedDesignatorBuffer[64];
+uint32_t designatorSourceStart;
+uint32_t designatorSourceEnd;
+char* designatedCrackedType;
+uint32_t baseDesignation;
+uint32_t designationOffsetTotal;
+bool doDesignationOffsetCalc;
 
-uint32_t insertDesignatorSizes(
-		int32_t entryIndex,
-		char* crackedType,
-		uint8_t nestLevel){
-	
-	struct InitializerMapEntry* ime=initializerMap.entries+entryIndex;
-	if (nestLevel==0){
-		for (uint16_t i=0;i<64;i++){
-			nestedDesignatorBuffer[i]=0xFFFFFFFF;
-		}
-	} else if (nestLevel>=64){
-		printInformativeMessageAtSourceContainerIndex(true,"Too many designators",ime->strStart,ime->strEnd);
-		exit(1);
-	}
-	char cts= crackedType[0];
-	if ((ime->typeOfEntry==5 & cts!='?' & cts!='!' & cts!='#') |
-		(ime->typeOfEntry==6 & cts!='<')){
-		
-		printInformativeMessageAtSourceContainerIndex(true,"This designator and the type do not match",ime->strStart,ime->strEnd);
-		exit(1);
-	}
-	assert(ime->typeOfEntry==5 | ime->typeOfEntry==6);
-	if (ime->typeOfEntry==5){
-		uint32_t arrayIndex=expressionToConstantValue("unsigned long",ime->expNode);
-		uint32_t suggestedLength=readHexInString(crackedType+1);
-		if (arrayIndex>=suggestedLength){
-			if (cts=='#'){
-				printInformativeMessageAtSourceContainerIndex(true,"This designator\'s index is out of bounds",ime->strStart,ime->strEnd);
+
+// fallbackIndex is used only if there are no designators
+void calcPotentialDesignatorAndSize(int32_t entryIndex,char* crackedType, uint32_t fallbackIndex){
+	bool hasSubEntry;
+	bool hasQualifier;
+	bool isArray;
+	bool isFirst=true;
+	char cts;
+	char* crackedTypeNQ;
+	char* subCrackedType;
+	uint32_t thisBaseDesignation=fallbackIndex;
+	designationOffsetTotal=0;
+	if (entryIndex==-1){
+		cts= crackedType[0];
+		if ((hasQualifier=(cts=='g' | cts=='f'))) cts= crackedType[1];
+		isArray=cts!='<';
+		crackedTypeNQ=crackedType+hasQualifier;
+		if (isArray){
+			uint32_t suggestedLength=readHexInString(crackedTypeNQ+1);
+			if (thisBaseDesignation>=suggestedLength){
+				if (cts=='#'){
+					printInformativeMessageAtSourceContainerIndex(true,"Array is too small for this list",designatorSourceStart,designatorSourceEnd);
+					exit(1);
+				}
+				*crackedTypeNQ='!';
+				writeHexInString(crackedTypeNQ+1,thisBaseDesignation+1);
+			}
+			subCrackedType=crackedTypeNQ+9;
+		} else {
+			subCrackedType = gotoMemberAtIndex(crackedTypeNQ,thisBaseDesignation);
+			if (subCrackedType==NULL){
+				printInformativeMessageAtSourceContainerIndex(true,"No more members to initialize",designatorSourceStart,designatorSourceEnd);
 				exit(1);
 			}
-			*crackedType='!';
-			writeHexInString(crackedType+1,arrayIndex+1);
 		}
-		if (ime->chainEntry!=-1){
-			insertDesignatorSizes(ime->chainEntry,crackedType+9,nestLevel+1);
-		}
-		nestedDesignatorBuffer[nestLevel]=arrayIndex;
-		return arrayIndex;
-	} else {
-		uint16_t memberIndex = findMemberIndexForName(crackedType,ime->strStart,ime->strEnd);
-		if (memberIndex==0xFFFF){
-			printInformativeMessageAtSourceContainerIndex(true,"No member of this name in this type",ime->strStart,ime->strEnd);
+		baseDesignation=thisBaseDesignation;
+		goto LabelForNoDesignators;
+	}
+	do {
+		struct InitializerMapEntry* ime=initializerMap.entries+entryIndex;
+		assert(ime->typeOfEntry==5 | ime->typeOfEntry==6);
+		cts= crackedType[0];
+		if ((hasQualifier=(cts=='g' | cts=='f'))) cts= crackedType[1];
+		if ((ime->typeOfEntry==5 & cts!='?' & cts!='!' & cts!='#') |
+			(ime->typeOfEntry==6 & cts!='<')){
+			
+			printInformativeMessageAtSourceContainerIndex(true,"This designator and the type do not match",ime->strStart,ime->strEnd);
 			exit(1);
 		}
-		if (ime->chainEntry!=-1){
-			insertDesignatorSizes(ime->chainEntry,gotoMemberAtIndex(crackedType,memberIndex),nestLevel+1);
+		crackedTypeNQ=crackedType+hasQualifier;
+		isArray=cts!='<';
+		if (isArray){
+			thisBaseDesignation=expressionToConstantValue("unsigned long",ime->expNode);
+			uint32_t suggestedLength=readHexInString(crackedTypeNQ+1);
+			if (thisBaseDesignation>=suggestedLength){
+				if (cts=='#'){
+					printInformativeMessageAtSourceContainerIndex(true,"This designator\'s index is out of bounds",ime->strStart,ime->strEnd);
+					exit(1);
+				}
+				*crackedTypeNQ='!';
+				writeHexInString(crackedTypeNQ+1,thisBaseDesignation+1);
+			}
+			subCrackedType=crackedTypeNQ+9;
+		} else {
+			thisBaseDesignation = findMemberIndexForName(crackedTypeNQ,ime->strStart,ime->strEnd);
+			if ((uint16_t)thisBaseDesignation==0xFFFFu){
+				printInformativeMessageAtSourceContainerIndex(true,"No member of this name in this type",ime->strStart,ime->strEnd);
+				exit(1);
+			}
+			subCrackedType=gotoMemberAtIndex(crackedTypeNQ,thisBaseDesignation);
 		}
-		nestedDesignatorBuffer[nestLevel]=memberIndex;
-		return memberIndex;
-	}
+		if (isFirst) baseDesignation=thisBaseDesignation;
+		entryIndex=ime->chainEntry; // these expressions are preparing for the potential next loop body
+		isFirst=false;
+		LabelForNoDesignators:
+		crackedType=subCrackedType;
+		if (doDesignationOffsetCalc){
+			if (isArray){
+				uint32_t unitSize;
+				{
+					char* unitType=advancedCrackedTypeToTypeString(crackedTypeNQ+9);
+					unitSize=getSizeofForTypeString(unitType,true);
+					cosmic_free(unitType);
+				}
+				designationOffsetTotal+=unitSize*thisBaseDesignation;
+			} else {
+				struct TypeMemberEntry* tmeArray;
+				{
+					char* unitType=advancedCrackedTypeToTypeString(crackedTypeNQ);
+					struct TypeSearchResult tsr;
+					char diffSU=*(crackedTypeNQ+1);
+					assert(diffSU=='j' | diffSU=='h');
+					assert(getIndexOfNthSpace(unitType,0)!=-1);
+					assert(getIndexOfNthSpace(unitType,1)==-1);
+					searchForType(&tsr,(getIndexOfNthSpace(unitType,0)+1)+unitType,diffSU=='h');
+					assert(tsr.didExist);
+					if (tsr.isGlobal) tmeArray=blockFrameArray.globalBlockFrame.globalTypeEntries[tsr.typeEntryIndex].arrayOfMemberEntries;
+					else tmeArray=blockFrameArray.entries[tsr.blockFrameEntryIndex].typeEntries[tsr.typeEntryIndex].arrayOfMemberEntries;
+					cosmic_free(unitType);
+				}
+				designationOffsetTotal+=tmeArray[thisBaseDesignation].offset;
+			}
+		}
+	} while (entryIndex!=-1);
+	designatedCrackedType=crackedType;
 }
+
+
 
 void initializerPreImplementList(
 		int32_t entryIndex,
 		char* crackedType){
 	
+	doDesignationOffsetCalc=false;
 	struct InitializerMapEntry* ime=initializerMap.entries+entryIndex;
 	struct InitializerMapEntry* imeChain=initializerMap.entries+ime->subEntry; // name is a little misleading at the beginning
 	int32_t chainIndex=ime->subEntry;
 	char cts= crackedType[0];
+	bool hasQualifier;
+	if ((hasQualifier=(cts=='g' | cts=='f'))) cts= crackedType[1];
 	bool isSU= cts=='<';
 	bool isArray= cts=='?' | cts=='!' | cts=='#';
 	bool isBase= cts=='z'|cts=='x'|cts=='c'|cts=='v'|cts=='b'|cts=='n'|cts=='m'|cts=='l'|cts=='k'|cts=='*'|cts=='(';
 	uint32_t walkingIndex=0;
 	if (isSU){
 		while (true){
-			if (imeChain->descriptionBranchEntry!=-1){
-				walkingIndex=insertDesignatorSizes(imeChain->descriptionBranchEntry,crackedType,0);
-			}
-			char* crackedTypeMember = gotoMemberAtIndex(crackedType,walkingIndex);
-			if (crackedTypeMember==NULL){
-				printInformativeMessageAtSourceContainerIndex(true,"No more members to initialize",imeChain->strStart,imeChain->strEnd);
-				exit(1);
-			}
+			designatedCrackedType=NULL;
+			designatorSourceStart=imeChain->strStart;
+			designatorSourceEnd=imeChain->strEnd;
+			calcPotentialDesignatorAndSize(imeChain->descriptionBranchEntry,crackedType,walkingIndex);
+			walkingIndex=baseDesignation;
+			assert(designatedCrackedType!=NULL);
 			if (imeChain->typeOfEntry==1){
-				initializerPreImplementList(chainIndex,crackedTypeMember);
+				initializerPreImplementList(chainIndex,designatedCrackedType);
 			}
 			if (imeChain->chainEntry!=-1){
 				chainIndex=imeChain->chainEntry;
@@ -728,21 +1057,14 @@ void initializerPreImplementList(
 		}
 	} else if (isArray){
 		while (true){
-			if (imeChain->descriptionBranchEntry!=-1){
-				walkingIndex=insertDesignatorSizes(imeChain->descriptionBranchEntry,crackedType,0);
-			} else {
-				uint32_t suggestedLength=readHexInString(crackedType+1);
-				if (walkingIndex>=suggestedLength){
-					if (cts=='#'){
-						printInformativeMessageAtSourceContainerIndex(true,"Array is too small for this list",ime->strStart,ime->strEnd);
-						exit(1);
-					}
-					*crackedType='!';
-					writeHexInString(crackedType+1,walkingIndex+1);
-				}
-			}
+			designatedCrackedType=NULL;
+			designatorSourceStart=imeChain->strStart;
+			designatorSourceEnd=imeChain->strEnd;
+			calcPotentialDesignatorAndSize(imeChain->descriptionBranchEntry,crackedType,walkingIndex);
+			walkingIndex=baseDesignation;
+			assert(designatedCrackedType!=NULL);
 			if (imeChain->typeOfEntry==1){
-				initializerPreImplementList(chainIndex,crackedType+9);
+				initializerPreImplementList(chainIndex,designatedCrackedType);
 			}
 			if (imeChain->chainEntry!=-1){
 				chainIndex=imeChain->chainEntry;
@@ -777,46 +1099,69 @@ void initializerImplementList(
 		char* crackedType,
 		bool isStatic){
 	
+	doDesignationOffsetCalc=true;
 	struct InitializerMapEntry* ime=initializerMap.entries+entryIndex;
 	struct InitializerMapEntry* imeChain=initializerMap.entries+ime->subEntry; // name is a little misleading at the beginning
 	int32_t chainIndex=ime->subEntry;
+	
 	char cts= crackedType[0];
+	bool hasQualifier;
+	if ((hasQualifier=(cts=='g' | cts=='f'))) cts= crackedType[1];
 	bool isSU= cts=='<';
 	bool isArray= cts=='?' | cts=='!' | cts=='#';
 	bool isBase= cts=='z'|cts=='x'|cts=='c'|cts=='v'|cts=='b'|cts=='n'|cts=='m'|cts=='l'|cts=='k'|cts=='*'|cts=='(';
 	uint32_t walkingIndex=0;
 	if (isSU){
+		bool isFirst=true;
 		while (true){
-			if (imeChain->descriptionBranchEntry!=-1){
-				walkingIndex=insertDesignatorSizes(imeChain->descriptionBranchEntry,crackedType,0);
-			}
-			char* crackedTypeMember = gotoMemberAtIndex(crackedType,walkingIndex);
-			assert(crackedTypeMember!=NULL);
+			designatedCrackedType=NULL;
+			designatorSourceStart=imeChain->strStart;
+			designatorSourceEnd=imeChain->strEnd;
+			calcPotentialDesignatorAndSize(imeChain->descriptionBranchEntry,crackedType,walkingIndex);
+			walkingIndex=baseDesignation;
+			assert(designatedCrackedType!=NULL);
+			uint32_t subOffset=memoryOffset+designationOffsetTotal;
+			bool isFirstAndLast=isFirst&(imeChain->chainEntry==-1);
 			if (imeChain->typeOfEntry==1){
-				initializerPreImplementList(chainIndex,crackedTypeMember);
+				initializerImplementList(rmfi,ib,subOffset,chainIndex,designatedCrackedType,isStatic);
+			} else {
+				char* subTypeString=advancedCrackedTypeToTypeString(designatedCrackedType);
+				if (doesThisTypeStringHaveAnIdentifierAtBeginning(subTypeString)){
+					applyToTypeStringRemoveIdentifierToSelf(subTypeString);
+				}
+				if (isStatic) {initializerImplementStaticExpression(chainIndex,rmfi,subTypeString,subOffset,isFirstAndLast);}
+				else {initializerImplementNonstaticExpression(chainIndex,ib,subTypeString,subOffset,true,isFirstAndLast);}
+				cosmic_free(subTypeString);
 			}
 			if (imeChain->chainEntry!=-1){
 				chainIndex=imeChain->chainEntry;
 				imeChain=initializerMap.entries+imeChain->chainEntry;
 				walkingIndex++;
+				isFirst=false;
 				continue;
 			}
 			break;
 		}
 	} else if (isArray){
 		while (true){
-			if (imeChain->descriptionBranchEntry!=-1){
-				walkingIndex=insertDesignatorSizes(imeChain->descriptionBranchEntry,crackedType,0);
-			} else {
-				uint32_t suggestedLength=readHexInString(crackedType+1);
-				if (walkingIndex>=suggestedLength){
-					assert(cts!='#');
-					*crackedType='!';
-					writeHexInString(crackedType+1,walkingIndex+1);
-				}
-			}
+			designatedCrackedType=NULL;
+			designatorSourceStart=imeChain->strStart;
+			designatorSourceEnd=imeChain->strEnd;
+			calcPotentialDesignatorAndSize(imeChain->descriptionBranchEntry,crackedType,walkingIndex);
+			walkingIndex=baseDesignation;
+			assert(designatedCrackedType!=NULL);
+			assert(walkingIndex<readHexInString(crackedType+1+hasQualifier));
+			uint32_t subOffset=memoryOffset+designationOffsetTotal;
 			if (imeChain->typeOfEntry==1){
-				initializerPreImplementList(chainIndex,crackedType+9);
+				initializerImplementList(rmfi,ib,subOffset,chainIndex,crackedType+9+hasQualifier,isStatic);
+			} else {
+				char* subTypeString=advancedCrackedTypeToTypeString(designatedCrackedType);
+				if (doesThisTypeStringHaveAnIdentifierAtBeginning(subTypeString)){
+					applyToTypeStringRemoveIdentifierToSelf(subTypeString);
+				}
+				if (isStatic) {initializerImplementStaticExpression(chainIndex,rmfi,subTypeString,subOffset,false);}
+				else {initializerImplementNonstaticExpression(chainIndex,ib,subTypeString,subOffset,true,false);}
+				cosmic_free(subTypeString);
 			}
 			if (imeChain->chainEntry!=-1){
 				chainIndex=imeChain->chainEntry;
@@ -830,18 +1175,17 @@ void initializerImplementList(
 		assert(imeChain->chainEntry==-1);
 		assert(imeChain->descriptionBranchEntry==-1);
 		if (imeChain->typeOfEntry==1){
-			initializerPreImplementList(ime->subEntry,crackedType);
+			initializerImplementList(rmfi,ib,memoryOffset,ime->subEntry,crackedType,isStatic);
+		} else {
+			char* unitType=advancedCrackedTypeToTypeString(crackedType);
+			if (isStatic) {initializerImplementStaticExpression(chainIndex,rmfi,unitType,memoryOffset,false);}
+			else {initializerImplementNonstaticExpression(chainIndex,ib,unitType,memoryOffset,true,false);}
+			cosmic_free(unitType);
 		}
 	} else {
 		assert(false);
 	}
 }
-
-
-
-
-
-
 
 
 
@@ -864,7 +1208,7 @@ bool initializerImplementRoot(
 		
 		char* crackedType = crackTypeString(*typeStringPtr);
 		if (crackedType==NULL){
-			printInformativeMessageAtSourceContainerIndex(true,concatStrings(concatStrings("typeString \'",*typeStringPtr),"\' is or contains an incomplete struct or union"),ime->strStart,0);
+			printInformativeMessageAtSourceContainerIndex(true,strMerge2(strMerge2("typeString \'",*typeStringPtr),"\' is or contains an incomplete struct or union"),ime->strStart,0);
 			exit(1);
 		}
 		for (int32_t i=0;crackedType[i];i++){
@@ -904,12 +1248,20 @@ bool initializerImplementRoot(
 		} else {
 			uint32_t temp=typeSize;
 			while (temp){
+				if (true){
 				insert_IB_load_word(ib,0);
 				insert_IB_STPI(ib,0);
 				insert_IB_load_dword(ib,typeSize-temp);
 				dualMergeIB(ib,&ib_i_32add,&ib_mem_word_write_n);
 				addVoidPop(ib);
 				temp-=2;
+				} else {
+				temp-=2;
+				insert_IB_load_word(ib,0);
+				insert_IB_STPI(ib,temp);
+				singleMergeIB(ib,&ib_mem_word_write_n);
+				addVoidPop(ib);
+				}
 			}
 		}
 		// this stuff will change
@@ -1046,7 +1398,7 @@ bool initializerImplementRoot(
 				printInformativeMessageAtSourceContainerIndex(true,"Initializing by expression to a struct or union of static storage\n    is not possible with the current implementation of constant expressions",ime->strStart,0);
 				exit(1);
 			}
-			initializerImplementStaticExpression(root,rmfi,*typeStringPtr,0);
+			initializerImplementStaticExpression(root,rmfi,*typeStringPtr,0,false);
 			return true;
 		} else {
 			/*
@@ -1063,7 +1415,7 @@ bool initializerImplementRoot(
 			
 			// pretty sure that initializerImplementNonstaticExpression() always initializes the memory
 			
-			initializerImplementNonstaticExpression(root,ib,*typeStringPtr,0);
+			initializerImplementNonstaticExpression(root,ib,*typeStringPtr,false,false,false);
 			return false;
 		}
 	}
