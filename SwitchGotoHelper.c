@@ -294,11 +294,7 @@ void resolveGoto(int32_t failIndex){
 
 // assumes that almost all other options have been checked
 bool isSectionLabel(int32_t start,int32_t end){
-	int32_t end2 = advanceToNonNewlineSpace(sourceContainer.string,end);
-	if (end2==-1){
-		printf("Error: unexpected source string terminate\n");
-		exit(1);
-	}
+	int32_t end2 = advanceToNonNewlineSpace(end);
 	return sourceContainer.string[end2]==':' && !isSegmentOfStringTypeLike(sourceContainer.string,start,end);
 }
 

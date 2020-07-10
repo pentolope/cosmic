@@ -191,6 +191,7 @@ the I_PHIE 'instruction', according to the optimizer, contains one register of o
 
 typedef struct CompressedInstructionBuffer{
 	uint8_t* byteCode;
+	uint32_t allocLen;
 } CompressedInstructionBuffer;
 
 
@@ -204,6 +205,8 @@ typedef struct InstructionBuffer{
 
 // for debug
 void printInstructionBufferWithMessageAndNumber(const InstructionBuffer*,const char*,const uint32_t);
+void printSingleInstructionOptCode(const InstructionSingle);
+
 
 struct InstructionBuffersOfFunctions{
 	CompressedInstructionBuffer* slots;
@@ -362,9 +365,6 @@ uint8_t instructionContentCatagory(enum InstructionTypeID id){
 		return 7;
 		case I_STOF:
 		return 8;
-		case I_RL2_:
-		case I_JJMP:
-		return 9;
 		case I_LABL:
 		case I_JTEN:
 		case I_SYCD:
@@ -376,6 +376,9 @@ uint8_t instructionContentCatagory(enum InstructionTypeID id){
 		case I_NSCW:
 		case I_ZNXB:
 		case I_ZNXW:
+		return 9;
+		case I_RL2_:
+		case I_JJMP:
 		return 10;
 		case I_FCST:
 		return 11;
@@ -387,174 +390,181 @@ uint8_t instructionContentCatagory(enum InstructionTypeID id){
 
 uint8_t getStorageDeltaForInstruction(enum InstructionTypeID id){
 	// if something changes, do not just change this, there are other places
-	switch (instructionContentCatagory(id)){
+	const uint8_t deltas[]={
+		[ 0]=1, // could be static
+		[ 1]=2,
+		[ 2]=2,
+		[ 3]=2,
+		[ 4]=3,
+		[ 5]=3,
+		[ 6]=3,
+		[ 7]=4,
+		[ 8]=4,
+		[ 9]=5,
+		[10]=6,
+		[11]=8
+	};
+	return deltas[instructionContentCatagory(id)];
+}
+
+// returns the delta
+// assumes that the space is avalible in byteCode
+uint8_t compressInstruction(uint8_t* byteCode,const InstructionSingle IS){
+	switch (instructionContentCatagory(byteCode[0]=IS.id)){
 		case 0:
 		return 1;
 		case 1:
 		case 2:
+		byteCode[1]=IS.arg.B.a_0;
+		return 2;
 		case 3:
+		byteCode[1]=IS.arg.BB.a_0|(IS.arg.BB.a_1*16);
 		return 2;
 		case 4:
+		byteCode[1]=IS.arg.BBB.a_0|(IS.arg.BBB.a_1*16);
+		byteCode[2]=IS.arg.BBB.a_2;
+		return 3;
 		case 5:
+		byteCode[1]=IS.arg.BB.a_0;
+		byteCode[2]=IS.arg.BB.a_1;
+		return 3;
 		case 6:
+		byteCode[1]=IS.arg.W.a_0&255U;
+		byteCode[2]=(IS.arg.W.a_0&(255U*256U))/256U;
 		return 3;
 		case 7:
+		byteCode[1]=IS.arg.BW.a_0;
+		byteCode[2]=IS.arg.BW.a_1&255U;
+		byteCode[3]=(IS.arg.BW.a_1&(255U*256U))/256U;
+		return 4;
 		case 8:
+		byteCode[1]=IS.arg.BBW.a_0|(IS.arg.BBW.a_1*16);
+		byteCode[2]=IS.arg.BBW.a_2&255U;
+		byteCode[3]=(IS.arg.BBW.a_2&(255U*256U))/256U;
 		return 4;
 		case 9:
+		byteCode[1]=(uint16_t)IS.arg.D.a_0&255U;
+		byteCode[2]=((uint16_t)IS.arg.D.a_0&(255U*256U))/256U;
+		byteCode[3]=*((uint16_t*)&IS.arg.D.a_0+1)&255U;
+		byteCode[4]=(*((uint16_t*)&IS.arg.D.a_0+1)&(255U*256U))/256U;
+		return 5;
 		case 10:
+		byteCode[1]=IS.arg.BBD.a_0|(IS.arg.BBD.a_1*16);
+		byteCode[2]=(uint16_t)IS.arg.BBD.a_2&255U;
+		byteCode[3]=((uint16_t)IS.arg.BBD.a_2&(255U*256U))/256U;
+		byteCode[4]=*((uint16_t*)&IS.arg.BBD.a_2+1)&255U;
+		byteCode[5]=(*((uint16_t*)&IS.arg.BBD.a_2+1)&(255U*256U))/256U;
 		return 6;
 		case 11:
+		byteCode[1]=IS.arg.BWD.a_0;
+		byteCode[2]=IS.arg.BWD.a_1&255U;
+		byteCode[3]=(IS.arg.BWD.a_1&(255U*256U))/256U;
+		byteCode[4]=(uint16_t)IS.arg.BWD.a_2&255U;
+		byteCode[5]=((uint16_t)IS.arg.BWD.a_2&(255U*256U))/256U;
+		byteCode[6]=*((uint16_t*)&IS.arg.BWD.a_2+1)&255U;
+		byteCode[7]=(*((uint16_t*)&IS.arg.BWD.a_2+1)&(255U*256U))/256U;
 		return 8;
 	}
-	assert(false); // invalid storage catagory
+	assert(false);
 	exit(1);
 }
 
+
 CompressedInstructionBuffer compressInstructionBuffer(const InstructionBuffer* ib){
 	CompressedInstructionBuffer cib;
-	uint32_t length=1;
-	for (uint32_t i=0;i<ib->numberOfSlotsTaken;i++){
-		uint16_t delta=0;
-		length+=getStorageDeltaForInstruction(ib->buffer[i].id);
+	cib.allocLen=1;
+	uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
+	for (uint32_t i=0;i<numberOfSlotsTaken;i++){
+		cib.allocLen+=getStorageDeltaForInstruction(ib->buffer[i].id);
 	}
-	cib.byteCode=cosmic_calloc(length+1,sizeof(uint8_t));
+	cib.byteCode=cosmic_malloc(cib.allocLen*sizeof(uint8_t));
 	uint8_t* byteCode=cib.byteCode;
-	uint32_t ic=0;
-	for (uint32_t i=0;i<ib->numberOfSlotsTaken;i++){
-		InstructionSingle IS=ib->buffer[i];
-		switch (instructionContentCatagory(byteCode[ic++]=IS.id)){
-			case 0:
-			break;
-			case 1:
-			case 2:
-			byteCode[ic++]=IS.arg.B.a_0;
-			break;
-			case 3:
-			byteCode[ic++]=IS.arg.BB.a_0|(IS.arg.BB.a_1*16);
-			break;
-			case 4:
-			byteCode[ic++]=IS.arg.BBB.a_0|(IS.arg.BBB.a_1*16);
-			byteCode[ic++]=IS.arg.BBB.a_2;
-			break;
-			case 5:
-			byteCode[ic++]=IS.arg.BB.a_0;
-			byteCode[ic++]=IS.arg.BB.a_1;
-			break;
-			case 6:
-			byteCode[ic++]=IS.arg.W.a_0&255U;
-			byteCode[ic++]=(IS.arg.W.a_0&(255U*256U))/256U;
-			break;
-			case 7:
-			byteCode[ic++]=IS.arg.BW.a_0;
-			byteCode[ic++]=IS.arg.BW.a_1&255U;
-			byteCode[ic++]=(IS.arg.BW.a_1&(255U*256U))/256U;
-			break;
-			case 8:
-			byteCode[ic++]=IS.arg.BBW.a_0|(IS.arg.BBW.a_1*16);
-			byteCode[ic++]=IS.arg.BBW.a_2&255U;
-			byteCode[ic++]=(IS.arg.BBW.a_2&(255U*256U))/256U;
-			break;
-			case 9:
-			byteCode[ic++]=(uint16_t)IS.arg.D.a_0&255U;
-			byteCode[ic++]=((uint16_t)IS.arg.D.a_0&(255U*256U))/256U;
-			byteCode[ic++]=*((uint16_t*)&IS.arg.D.a_0+1)&255U;
-			byteCode[ic++]=(*((uint16_t*)&IS.arg.D.a_0+1)&(255U*256U))/256U;
-			break;
-			case 10:
-			byteCode[ic++]=IS.arg.BBD.a_0|(IS.arg.BBD.a_1*16);
-			byteCode[ic++]=(uint16_t)IS.arg.BBD.a_2&255U;
-			byteCode[ic++]=((uint16_t)IS.arg.BBD.a_2&(255U*256U))/256U;
-			byteCode[ic++]=*((uint16_t*)&IS.arg.BBD.a_2+1)&255U;
-			byteCode[ic++]=(*((uint16_t*)&IS.arg.BBD.a_2+1)&(255U*256U))/256U;
-			break;
-			case 11:
-			byteCode[ic++]=IS.arg.BWD.a_0;
-			byteCode[ic++]=IS.arg.BWD.a_1&255U;
-			byteCode[ic++]=(IS.arg.BWD.a_1&(255U*256U))/256U;
-			byteCode[ic++]=(uint16_t)IS.arg.BWD.a_2&255U;
-			byteCode[ic++]=((uint16_t)IS.arg.BWD.a_2&(255U*256U))/256U;
-			byteCode[ic++]=*((uint16_t*)&IS.arg.BWD.a_2+1)&255U;
-			byteCode[ic++]=(*((uint16_t*)&IS.arg.BWD.a_2+1)&(255U*256U))/256U;
-			break;
-		}
+	for (uint32_t i=0;i<numberOfSlotsTaken;i++){
+		byteCode+=compressInstruction(byteCode,ib->buffer[i]);
 	}
+	*byteCode=0;
+	assert(cib.byteCode+(cib.allocLen-1)==byteCode);
 	return cib;
 }
 
+// returns the delta
+uint8_t decompressInstruction(const uint8_t* byteCode,InstructionSingle* IS_parent){
+	uint8_t delta=0;
+	InstructionSingle IS;
+	switch(instructionContentCatagory(IS.id=byteCode[0])){
+		case 0:
+		delta=1;
+		break;
+		case 1:
+		case 2:
+		IS.arg.B.a_0=(uint16_t)byteCode[1]&15U;
+		delta=2;
+		break;
+		case 3:
+		IS.arg.BB.a_0=(uint16_t)byteCode[1]&15U;
+		IS.arg.BB.a_1=(uint16_t)byteCode[1]/16U;
+		delta=2;
+		break;
+		case 4:
+		IS.arg.BBB.a_0=(uint16_t)byteCode[1]&15U;
+		IS.arg.BBB.a_1=(uint16_t)byteCode[1]/16U;
+		IS.arg.BBB.a_2=(uint16_t)byteCode[2]&15U;
+		delta=3;
+		break;
+		case 5:
+		IS.arg.BB.a_0=(uint16_t)byteCode[1]&15U;
+		IS.arg.BB.a_1=(uint16_t)byteCode[2];
+		delta=3;
+		break;
+		case 6:
+		IS.arg.W.a_0=(uint16_t)byteCode[1]|(uint16_t)byteCode[2]*256U;
+		delta=3;
+		break;
+		case 7:
+		IS.arg.BW.a_0=(uint16_t)byteCode[1]&15U;
+		IS.arg.BW.a_1=(uint16_t)byteCode[2]|(uint16_t)byteCode[3]*256U;
+		delta=4;
+		break;
+		case 8:
+		IS.arg.BBW.a_0=(uint16_t)byteCode[1]&15U;
+		IS.arg.BBW.a_1=(uint16_t)byteCode[1]/16U;
+		IS.arg.BBW.a_2=(uint16_t)byteCode[2]|(uint16_t)byteCode[3]*256U;
+		delta=4;
+		break;
+		case 9:
+		IS.arg.D.a_0=
+		(uint32_t)((uint16_t)byteCode[1]|(uint16_t)byteCode[2]*256U)|
+		(uint32_t)((uint16_t)byteCode[3]|(uint16_t)byteCode[4]*256U)*65536LU;
+		delta=5;
+		break;
+		case 10:
+		IS.arg.BBD.a_0=(uint16_t)byteCode[1]&15U;
+		IS.arg.BBD.a_1=(uint16_t)byteCode[1]/16U;
+		IS.arg.BBD.a_2=
+		(uint32_t)((uint16_t)byteCode[2]|(uint16_t)byteCode[3]*256U)|
+		(uint32_t)((uint16_t)byteCode[4]|(uint16_t)byteCode[5]*256U)*65536LU;
+		delta=6;
+		break;
+		case 11:
+		IS.arg.BWD.a_0=(uint16_t)byteCode[1];
+		IS.arg.BWD.a_1=(uint16_t)byteCode[2]|(uint16_t)byteCode[3]*256U;
+		IS.arg.BWD.a_2=
+		(uint32_t)((uint16_t)byteCode[4]|(uint16_t)byteCode[5]*256U)|
+		(uint32_t)((uint16_t)byteCode[6]|(uint16_t)byteCode[7]*256U)*65536LU;
+		delta=8;
+		break;
+	}
+	*IS_parent=IS;
+	return delta;
+}
 
 InstructionBuffer decompressInstructionBuffer(const CompressedInstructionBuffer cib){
 	InstructionBuffer ib;
 	initInstructionBuffer(&ib);
 	uint8_t* byteCode=cib.byteCode;
 	for (uint32_t i=0;byteCode[i];){
-		uint16_t delta=0;
 		InstructionSingle IS;
-		enum InstructionTypeID id=IS.id=byteCode[i];
-		switch(instructionContentCatagory(IS.id=byteCode[i])){
-			case 0:
-			delta=1;
-			break;
-			case 1:
-			case 2:
-			IS.arg.B.a_0=(uint16_t)byteCode[i+1]&15U;
-			delta=2;
-			break;
-			case 3:
-			IS.arg.BB.a_0=(uint16_t)byteCode[i+1]&15U;
-			IS.arg.BB.a_1=(uint16_t)byteCode[i+1]/16U;
-			delta=2;
-			break;
-			case 4:
-			IS.arg.BBB.a_0=(uint16_t)byteCode[i+1]&15U;
-			IS.arg.BBB.a_1=(uint16_t)byteCode[i+1]/16U;
-			IS.arg.BBB.a_2=(uint16_t)byteCode[i+2]&15U;
-			delta=3;
-			break;
-			case 5:
-			IS.arg.BB.a_0=(uint16_t)byteCode[i+1]&15U;
-			IS.arg.BB.a_1=(uint16_t)byteCode[i+2];
-			delta=3;
-			break;
-			case 6:
-			IS.arg.W.a_0=(uint16_t)byteCode[i+1]|(uint16_t)byteCode[i+2]*256U;
-			delta=3;
-			break;
-			case 7:
-			IS.arg.BW.a_0=(uint16_t)byteCode[i+1]&15U;
-			IS.arg.BW.a_1=(uint16_t)byteCode[i+2]|(uint16_t)byteCode[i+3]*256U;
-			delta=4;
-			break;
-			case 8:
-			IS.arg.BBW.a_0=(uint16_t)byteCode[i+1]&15U;
-			IS.arg.BBW.a_1=(uint16_t)byteCode[i+1]/16U;
-			IS.arg.BBW.a_2=(uint16_t)byteCode[i+2]|(uint16_t)byteCode[i+3]*256U;
-			delta=4;
-			break;
-			case 9:
-			IS.arg.D.a_0=
-			(uint32_t)((uint16_t)byteCode[i+1]|(uint16_t)byteCode[i+2]*256U)|
-			(uint32_t)((uint16_t)byteCode[i+3]|(uint16_t)byteCode[i+4]*256U)*65536LU;
-			delta=5;
-			break;
-			case 10:
-			IS.arg.BBD.a_0=(uint16_t)byteCode[i+1]&15U;
-			IS.arg.BBD.a_1=(uint16_t)byteCode[i+1]/16U;
-			IS.arg.BBD.a_2=
-			(uint32_t)((uint16_t)byteCode[i+2]|(uint16_t)byteCode[i+3]*256U)|
-			(uint32_t)((uint16_t)byteCode[i+4]|(uint16_t)byteCode[i+5]*256U)*65536LU;
-			delta=6;
-			break;
-			case 11:
-			IS.arg.BWD.a_0=(uint16_t)byteCode[i+1]&15U;
-			IS.arg.BWD.a_1=(uint16_t)byteCode[i+2]|(uint16_t)byteCode[i+3]*256U;
-			IS.arg.BWD.a_2=
-			(uint32_t)((uint16_t)byteCode[i+4]|(uint16_t)byteCode[i+5]*256U)|
-			(uint32_t)((uint16_t)byteCode[i+6]|(uint16_t)byteCode[i+7]*256U)*65536LU;
-			delta=8;
-			break;
-		}
-		i+=delta;
+		i+=decompressInstruction(byteCode+i,&IS);
 		addInstruction(&ib,IS);
 	}
 	return ib;
@@ -571,8 +581,139 @@ void addEntryToInstructionBuffersOfFunctions(InstructionBuffer* ib){
 	}
 	CompressedInstructionBuffer cib=compressInstructionBuffer(ib);
 	globalInstructionBuffersOfFunctions.slots[globalInstructionBuffersOfFunctions.numberOfSlotsTaken++]=cib;
+	{
+		InstructionBuffer test0=*ib;
+		InstructionBuffer test1=decompressInstructionBuffer(cib);
+		assert(test0.numberOfSlotsTaken==test1.numberOfSlotsTaken);
+		CompressedInstructionBuffer cib1=compressInstructionBuffer(&test1);
+		assert(cib1.allocLen==cib.allocLen);
+		uint16_t countUntilStart=0;
+		for (uint32_t i=0;i<cib.allocLen;i++){
+			//printf("%08X;%08X:%02X,%02X\n",cib.allocLen,i,cib.byteCode[i],cib1.byteCode[i]);
+			if (countUntilStart==0){
+				if (cib.byteCode[i]==0){
+					//printf("Safety skip!\n");
+					countUntilStart=1;
+				} else {
+					countUntilStart=getStorageDeltaForInstruction(cib.byteCode[i]);
+					InstructionSingle iiis0;
+					InstructionSingle iiis1;
+					decompressInstruction(cib.byteCode+i,&iiis0);
+					decompressInstruction(cib1.byteCode+i,&iiis1);
+					//printSingleInstructionOptCode(iiis0);printf("\n");
+					//printSingleInstructionOptCode(iiis1);printf("\n");
+				}
+			}
+			assert(cib.byteCode[i]==cib1.byteCode[i]);
+			countUntilStart--;
+		}
+		destroyInstructionBuffer(&test1);
+		cosmic_free(cib1.byteCode);
+	}
 	destroyInstructionBuffer(ib);
 }
+
+void applyLabelRenamesInAllCompressedInstructionBuffers(const uint32_t* fromArr,const uint32_t* toArr,const uint32_t arrLen){
+	if (arrLen==0) return;
+	for (uint32_t i0=0;i0<globalInstructionBuffersOfFunctions.numberOfSlotsTaken;i0++){
+		uint8_t* byteCode=globalInstructionBuffersOfFunctions.slots[i0].byteCode;
+		while (*byteCode!=0){
+			bool didChange=false;
+			enum InstructionTypeID id=*byteCode;
+			InstructionSingle IS;
+			uint8_t delta;
+			if (id==I_LABL | id==I_SYCL | id==I_JTEN | id==I_FCST){
+				delta=decompressInstruction(byteCode,&IS);
+				for (uint32_t i1=0;i1<arrLen;i1++){
+					if (IS.arg.D.a_0==fromArr[i1]){IS.arg.D.a_0=toArr[i1];didChange=true;break;}
+				}
+			} else if (id==I_JJMP){
+				delta=decompressInstruction(byteCode,&IS);
+				for (uint32_t i1=0;i1<arrLen;i1++){
+					if (IS.arg.BBD.a_2==fromArr[i1]){IS.arg.BBD.a_2=toArr[i1];didChange=true;break;}
+				}
+			} else {
+				delta=getStorageDeltaForInstruction(id);
+			}
+			if (didChange) compressInstruction(byteCode,IS);
+			byteCode+=delta;
+		}
+	}
+}
+
+void applyLabelRenamesInInstructionBuffer(InstructionBuffer* ib,const uint32_t* fromArr,const uint32_t* toArr,const uint32_t arrLen){
+	if (arrLen==0) return;
+	uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
+	InstructionSingle* buffer=ib->buffer;
+	for (uint32_t i=0;i<numberOfSlotsTaken;i++){
+		enum InstructionTypeID id=buffer[i].id;
+		uint32_t lablVal;
+		uint32_t* lablPtr;
+		if (id==I_LABL | id==I_SYCL | id==I_JTEN | id==I_FCST){
+			lablPtr=&buffer[i].arg.D.a_0;
+			Search:
+			lablVal=*lablPtr;
+			for (uint32_t i1=0;i1<arrLen;i1++){
+				if (lablVal==fromArr[i1]){*lablPtr=toArr[i1];break;}
+			}
+		} else if (id==I_JJMP){
+			lablPtr=&buffer[i].arg.BBD.a_2;
+			goto Search;
+		}
+	}
+}
+
+// label markoffs do not check LABL or FCST
+void doLabelMarkoffInAllCompressedInstructionBuffers(uint32_t* labelMarkoff,const uint32_t arrLen){
+	if (arrLen==0) return;
+	for (uint32_t i0=0;i0<globalInstructionBuffersOfFunctions.numberOfSlotsTaken;i0++){
+		uint8_t* byteCode=globalInstructionBuffersOfFunctions.slots[i0].byteCode;
+		while (*byteCode!=0){
+			enum InstructionTypeID id=*byteCode;
+			InstructionSingle IS;
+			uint32_t lablVal;
+			uint8_t delta;
+			if (id==I_SYCL | id==I_JTEN){
+				delta=decompressInstruction(byteCode,&IS);
+				lablVal=IS.arg.D.a_0;
+				Search:
+				for (uint32_t i1=0;i1<arrLen;i1++){
+					if (lablVal==labelMarkoff[i1]){labelMarkoff[i1]=0;break;}
+				}
+			} else if (id==I_JJMP){
+				delta=decompressInstruction(byteCode,&IS);
+				lablVal=IS.arg.BBD.a_2;
+				goto Search;
+			} else {
+				delta=getStorageDeltaForInstruction(id);
+			}
+			byteCode+=delta;
+		}
+	}
+}
+
+// label markoffs do not check LABL or FCST
+void doLabelMarkoffInInstructionBuffer(const InstructionBuffer* ib,uint32_t* labelMarkoff,const uint32_t arrLen){
+	if (arrLen==0) return;
+	uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
+	InstructionSingle* buffer=ib->buffer;
+	for (uint32_t i=0;i<numberOfSlotsTaken;i++){
+		enum InstructionTypeID id=buffer[i].id;
+		uint32_t lablVal;
+		if (id==I_SYCL | id==I_JTEN){
+			lablVal=buffer[i].arg.D.a_0;
+			Search:
+			for (uint32_t i1=0;i1<arrLen;i1++){
+				if (lablVal==labelMarkoff[i1]){labelMarkoff[i1]=0;break;}
+			}
+		} else if (id==I_JJMP){
+			lablVal=buffer[i].arg.BBD.a_2;
+			goto Search;
+		}
+	}
+}
+
+
 
 
 // these functions that follow are to avoid using InstructionSingle in expressionToInstructions

@@ -13,102 +13,78 @@
 
 
 // more specifically, findIndexOfTypicalStatementEnd() looks for an unenclosed semicolon and returns the index if it
-// if findIndexOfTypicalStatementEnd() fails in some way it returns -1
 // this doesn't work on some things such as 'if' and 'for' statements
-int32_t findIndexOfTypicalStatementEnd(char* string, int32_t indexToStartAt){
+int32_t findIndexOfTypicalStatementEnd(int32_t indexToStartAt){
 	int32_t i=indexToStartAt;
 	uint16_t enclosementLevel = 0;
-	while (string[i]){
-		char c = string[i];
-		if ((c==';') & (enclosementLevel==0)){
+	while (sourceContainer.string[i]){
+		char c = sourceContainer.string[i];
+		if (c==';' & enclosementLevel==0){
 			return i;
 		}
-		if ((c=='(') | (c=='[') | (c=='{')){
+		if (c=='(' | c=='[' | c=='{'){
 			enclosementLevel++;
-		} else if ((c==')') | (c==']') | (c=='}')){
+		} else if (c==')' | c==']' | c=='}'){
 			if (enclosementLevel==0){
-				printf("BAD TERMINATE (0.0)\n");
-				return -1;
+				err_11000("Expected ';' prior to this character",i);
+				goto UnableToFindEnd;
 			}
 			enclosementLevel--;
-		} else if ((c=='\'') | (c=='\"')){
-			i = getEndOfToken(string,i);
+		} else if (c=='\'' | c=='\"'){
+			int32_t backup=i;
+			i = getEndOfToken(sourceContainer.string,i);
 			if (i==-1){
-				printf("BAD TERMINATE (0.1)\n");
-				return -1;
+				err_11000("Unable to find the end of this string",backup);
+				goto UnableToFindEnd;
 			}
 			i--;
 		}
 		i++;
 	}
-	printf("BAD TERMINATE (0.2)\n");
-	return -1;
+	err_11000("Unexpected source termination",i-1);
+	UnableToFindEnd:
+	err_1101_("Unable to find the end of this statement",indexToStartAt);
+	return 0; // unreachable
 }
 
 
-// returns -1 if it fails
-int32_t findNextUnenclosedCommaOrEndBracket(char* string, int32_t indexToStartAt){
-	int32_t i=indexToStartAt;
-	uint16_t enclosementLevel = 0;
-	while (string[i]){
-		char c = string[i];
-		if (((c==',') | (c=='}')) & (enclosementLevel==0)){
-			return i;
-		}
-		if ((c=='(') | (c=='[') | (c=='{')){
-			enclosementLevel++;
-		} else if ((c==')') | (c==']') | (c=='}')){
-			if (enclosementLevel==0){
-				printf("BAD TERMINATE (1.0)\n");
-				return -1;
-			}
-			enclosementLevel--;
-		} else if ((c=='\'') | (c=='\"')){
-			i = getEndOfToken(string,i);
-			if (i==-1){
-				printf("BAD TERMINATE (1.1)\n");
-				return -1;
-			}
-		}
-	}
-	printf("BAD TERMINATE (1.2)\n");
-	return -1;
-}
 
 
-// if string terminates, returns -1
-int32_t advanceToNonNewlineSpace(char* string, int32_t index){
+
+int32_t advanceToNonNewlineSpace(int32_t index){
 	char c;
 	int32_t i=index;
-	while ((c=string[i])){
+	while ((c=sourceContainer.string[i])){
 		if ((c==' ') | (c=='\n')){
 			i++;
 		} else {
 			return i;
 		}
 	}
-	printf("BAD TERMINATE (2)\n");
-	return -1;
+	err_1101_("Unexpected source termination after here",index-1);
+	return 0; // unreachable
 }
 
-
-// if string terminates, returns -1
-int32_t parenEndWithLiteralSkip(char* string, int32_t indexAfterOpenParen){
+// if called with hasRecursed==false, then the value -1 will never be returned
+int32_t parenEndWithLiteralSkip(int32_t indexAfterOpenParen,bool hasRecursed){
 	int32_t i=indexAfterOpenParen;
 	char c;
-	while ((c=string[i])){
+	while ((c=sourceContainer.string[i])){
 		if (c==')'){
 			return i;
 		} else if (c=='('){
-			i=parenEndWithLiteralSkip(string,i+1)+1;
+			int32_t b=parenEndWithLiteralSkip(i+1,1);
+			i=b+1;
+			if (b==-1) break;
 		} else if ((c=='\"') | (c=='\'')){
-			i=getEndOfToken(string,i);
+			i=getEndOfToken(sourceContainer.string,i);
 		} else {
 			i++;
 		}
 	}
-	printf("BAD TERMINATE (3)\n");
-	exit(1);
+	--indexAfterOpenParen;
+	if (hasRecursed) err_11000("This parenthesis does not have a closing match",indexAfterOpenParen);
+	else err_1101_("This parenthesis does not have a closing match",indexAfterOpenParen);
 	return -1;
 }
 
@@ -167,7 +143,7 @@ void addFunctionParemetersAndInternalValuesToBlockFrame(char* typeStringOfFuncti
 						exit(1);
 					}
 					// TODO: support register keyword in function parameters. There are several places that would need to be handled at
-					if (addVariableToBlockFrame(tempTypeString,false,false)){
+					if (addVariableToBlockFrame(tempTypeString,0,false,false)){
 						printf("parameter name conflict for function\n");
 						exit(1);
 					}
@@ -182,12 +158,12 @@ void addFunctionParemetersAndInternalValuesToBlockFrame(char* typeStringOfFuncti
 	cosmic_free(internalTypeString);
 	bool didAddingAllInternalParametersNotSucceed = false;
 	if (isReturnValueNonVoid){
-		didAddingAllInternalParametersNotSucceed = addVariableToBlockFrame("__FUNCTION_RET_VALUE_PTR unsigned int",false,false);
+		didAddingAllInternalParametersNotSucceed = addVariableToBlockFrame("__FUNCTION_RET_VALUE_PTR unsigned int",0,false,false);
 	}
-	didAddingAllInternalParametersNotSucceed |= addVariableToBlockFrame("__FUNCTION_ARG_SIZE unsigned int",false,false);
-	didAddingAllInternalParametersNotSucceed |= addVariableToBlockFrame("__FUNCTION_CALLER_RET_STACK_ADDRESS unsigned int",false,false);
-	didAddingAllInternalParametersNotSucceed |= addVariableToBlockFrame("__FUNCTION_CALLER_FRAME_STACK_ADDRESS unsigned int",false,false);
-	didAddingAllInternalParametersNotSucceed |= addVariableToBlockFrame("__FUNCTION_RET_INSTRUCTION_ADDRESS unsigned long",false,false);
+	didAddingAllInternalParametersNotSucceed |= addVariableToBlockFrame("__FUNCTION_ARG_SIZE unsigned int",0,false,false);
+	didAddingAllInternalParametersNotSucceed |= addVariableToBlockFrame("__FUNCTION_CALLER_RET_STACK_ADDRESS unsigned int",0,false,false);
+	didAddingAllInternalParametersNotSucceed |= addVariableToBlockFrame("__FUNCTION_CALLER_FRAME_STACK_ADDRESS unsigned int",0,false,false);
+	didAddingAllInternalParametersNotSucceed |= addVariableToBlockFrame("__FUNCTION_RET_INSTRUCTION_ADDRESS unsigned long",0,false,false);
 	
 	if (didAddingAllInternalParametersNotSucceed){
 		printf("There was a parameter to that function with a reserved identifier\n");
@@ -252,13 +228,11 @@ int32_t functionStatementsWalk(
 		
 		int32_t endOfToken = getEndOfToken(sourceContainer.string,walkingIndex);
 		if (endOfToken==-1){
-			printf("token splitter failed in functionStatementsWalk()\n");
-			exit(1);
+			err_1101_("Couldn\'t find end of this token",walkingIndex);
 		}
 		if (firstCharacter=='}'){
 			if (stopAfterSingleExpression){
-				printf("Where is the start bracket for this end bracket?\n");
-				exit(1);
+				err_1101_("Expected expression",walkingIndex);
 			}
 			removeBlockFrame();
 			return walkingIndex;
@@ -272,13 +246,12 @@ int32_t functionStatementsWalk(
 				labelNumberForInlinedReturn,
 				false);
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"if")){
-			walkingIndex = advanceToNonNewlineSpace(sourceContainer.string,walkingIndex+2);
+			walkingIndex = advanceToNonNewlineSpace(walkingIndex+2);
 			if (sourceContainer.string[walkingIndex]!='('){
-				printf("expected \'(\'\n");
-				exit(1);
+				err_1101_("expected \'(\'",walkingIndex);
 			}
 			walkingIndex++;
-			int32_t otherParenIndex = parenEndWithLiteralSkip(sourceContainer.string,walkingIndex);
+			int32_t otherParenIndex = parenEndWithLiteralSkip(walkingIndex,0);
 			initInstructionBuffer(&instructionBufferLocalTemp_0);
 			initInstructionBuffer(&instructionBufferLocalTemp_1);
 			expressionToAssemblyWithCast(&instructionBufferLocalTemp_0,"_Bool",walkingIndex,otherParenIndex);
@@ -290,7 +263,7 @@ int32_t functionStatementsWalk(
 				labelNumberForContinue,
 				labelNumberForInlinedReturn,
 				true);
-			int32_t startOfNextStatement_1 = advanceToNonNewlineSpace(sourceContainer.string,endOfIfStatement_1+1);
+			int32_t startOfNextStatement_1 = advanceToNonNewlineSpace(endOfIfStatement_1+1);
 			int32_t endOfNextToken = getEndOfToken(sourceContainer.string,startOfNextStatement_1);
 			if (specificStringEqualCheck(sourceContainer.string,startOfNextStatement_1,endOfNextToken,"else")){
 				initInstructionBuffer(&instructionBufferLocalTemp_2);
@@ -315,17 +288,15 @@ int32_t functionStatementsWalk(
 			destroyInstructionBuffer(&instructionBufferLocalTemp_1);
 			destroyInstructionBuffer(&instructionBufferLocalTemp_0);
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"else")){
-			printf("keyword \'else\' encountered without a matching \'if\'\n");
-			exit(1);
+			err_1101_("keyword \'else\' encountered without a matching \'if\'",walkingIndex);
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"for")){
-			walkingIndex = advanceToNonNewlineSpace(sourceContainer.string,walkingIndex+3);
+			walkingIndex = advanceToNonNewlineSpace(walkingIndex+3);
 			if (sourceContainer.string[walkingIndex]!='('){
-				printf("expected \'(\'\n");
-				exit(1);
+				err_1101_("expected \'(\'",walkingIndex);
 			}
 			walkingIndex++;
-			int32_t otherParenIndex = parenEndWithLiteralSkip(sourceContainer.string,walkingIndex);
-			walkingIndex=advanceToNonNewlineSpace(sourceContainer.string,walkingIndex);
+			int32_t otherParenIndex = parenEndWithLiteralSkip(walkingIndex,0);
+			walkingIndex=advanceToNonNewlineSpace(walkingIndex);
 			initInstructionBuffer(&instructionBufferLocalTemp_0);
 			initInstructionBuffer(&instructionBufferLocalTemp_1);
 			initInstructionBuffer(&instructionBufferLocalTemp_2);
@@ -341,42 +312,35 @@ int32_t functionStatementsWalk(
 					bool usedStatic = false;
 					if (specificStringEqualCheck(sourceContainer.string,walkingIndex,walkingIndex+9,"register ")){
 						if (usedRegister){
-							printf("\'register\' keyword cannot be specified twice\n");
-							exit(1);
+							err_1101_("\'register\' keyword cannot be specified twice",walkingIndex);
 						}
 						usedRegister = true;
 						walkingIndex += 9;
 					}
 					if (specificStringEqualCheck(sourceContainer.string,walkingIndex,walkingIndex+7,"static ")){
 						if (usedStatic){
-							printf("\'static\' keyword cannot be specified twice\n");
-							exit(1);
+							err_1101_("\'static\' keyword cannot be specified twice",walkingIndex);
 						}
 						usedStatic = true;
 						walkingIndex += 7;
 					}
 					if (usedStatic){
-						printf("static not quite ready in functions\n");
-						exit(1);
+						err_1101_("static not quite ready in functions",walkingIndex);
 					}
 					if (sourceContainer.string[indexOfEndOfDeclaration]=='='){
-						int32_t indexOfStartOfInitializer = advanceToNonNewlineSpace(sourceContainer.string,indexOfEndOfDeclaration+1);
-						int32_t indexOfEndOfInitializer = findIndexOfTypicalStatementEnd(sourceContainer.string,indexOfStartOfInitializer);
-						if (indexOfStartOfInitializer==-1 | indexOfEndOfInitializer==-1){
-							printf("Could not find end to statement with declaration\n");
-							exit(1);
-						}
+						int32_t indexOfStartOfInitializer = advanceToNonNewlineSpace(indexOfEndOfDeclaration+1);
+						int32_t indexOfEndOfInitializer = findIndexOfTypicalStatementEnd(indexOfStartOfInitializer);
 						expressionToAssemblyWithInitializer(&instructionBufferLocalTemp_0,indexOfStartOfInitializer,indexOfEndOfInitializer,walkingIndex,indexOfEndOfDeclaration,usedRegister,usedStatic);
 						walkingIndex=indexOfEndOfInitializer;
 					} else {
 						char* typeString = fullTypeParseAndAdd(walkingIndex,indexOfEndOfDeclaration,false);
-						addVariableToBlockFrame(typeString,usedRegister,usedStatic);
+						addVariableToBlockFrame(typeString,walkingIndex,usedRegister,usedStatic);
 						cosmic_free(typeString);
 						walkingIndex=indexOfEndOfDeclaration;
 					}
 				} else {
 					// then assume the first statement is an expression
-					int32_t endingSemicolon = findIndexOfTypicalStatementEnd(sourceContainer.string,walkingIndex);
+					int32_t endingSemicolon = findIndexOfTypicalStatementEnd(walkingIndex);
 					if (walkingIndex!=endingSemicolon){
 						expressionToAssemblyWithCast(&instructionBufferLocalTemp_0,"void",walkingIndex,endingSemicolon);
 					}
@@ -384,30 +348,26 @@ int32_t functionStatementsWalk(
 				}
 				walkingIndex++;
 			} else if (sourceContainer.string[walkingIndex]==')'){
-				printf("Expected \';\' or expression\n");
-				exit(1);
+				err_1101_("Expected \';\' or expression",walkingIndex);
 			} else {
 				walkingIndex++;
 			}
-			walkingIndex=advanceToNonNewlineSpace(sourceContainer.string,walkingIndex);
+			walkingIndex=advanceToNonNewlineSpace(walkingIndex);
 			if (sourceContainer.string[walkingIndex]!=';'){
-				int32_t endingSemicolon = findIndexOfTypicalStatementEnd(sourceContainer.string,walkingIndex);
+				int32_t endingSemicolon = findIndexOfTypicalStatementEnd(walkingIndex);
 				expressionToAssemblyWithCast(&instructionBufferLocalTemp_1,"_Bool",walkingIndex,endingSemicolon);
 				walkingIndex=endingSemicolon+1;
 			} else if (sourceContainer.string[walkingIndex]==')'){
-				printf("Expected \';\' or expression\n");
-				exit(1);
+				err_1101_("Expected \';\' or expression",walkingIndex);
 			} else {
-				printf("Expression Required\n");
-				exit(1);
+				err_1101_("An expression is required here",walkingIndex);
 			}
-			walkingIndex=advanceToNonNewlineSpace(sourceContainer.string,walkingIndex);
+			walkingIndex=advanceToNonNewlineSpace(walkingIndex);
 			if (sourceContainer.string[walkingIndex]!=')'){
 				expressionToAssemblyWithCast(&instructionBufferLocalTemp_2,"void",walkingIndex,otherParenIndex);
 				walkingIndex=otherParenIndex+1;
 			} else if (sourceContainer.string[walkingIndex]==';'){
-				printf("Expected \')\' or expression\n");
-				exit(1);
+				err_1101_("Expected \')\' or expression",walkingIndex);
 			} else {
 				walkingIndex++;
 			}
@@ -442,40 +402,35 @@ int32_t functionStatementsWalk(
 			destroyInstructionBuffer(&instructionBufferLocalTemp_0);
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"break")){
 			if (labelNumberForBreak==0){
-				printf("\'break\' keyword has nothing to break to\n");
-				exit(1);
+				err_1101_("\'break\' keyword has nothing to break to",walkingIndex);
 			}
-			walkingIndex = advanceToNonNewlineSpace(sourceContainer.string,walkingIndex+5);
+			walkingIndex = advanceToNonNewlineSpace(walkingIndex+5);
 			if (sourceContainer.string[walkingIndex]!=';'){
-				printf("expected \';\'\n");
-				exit(1);
+				err_1101_("expected \';\'",walkingIndex);
 			}
 			insert_IB_address_label(parentInstructionBufferToInsertTo,labelNumberForBreak);
 			singleMergeIB(parentInstructionBufferToInsertTo,&ib_direct_jump);
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"continue")){
 			if (labelNumberForContinue==0){
-				printf("\'continue\' keyword has nothing to continue to\n");
-				exit(1);
+				err_1101_("\'continue\' keyword has nothing to continue to",walkingIndex);
 			}
-			walkingIndex = advanceToNonNewlineSpace(sourceContainer.string,walkingIndex+8);
+			walkingIndex = advanceToNonNewlineSpace(walkingIndex+8);
 			if (sourceContainer.string[walkingIndex]!=';'){
-				printf("expected \';\'\n");
-				exit(1);
+				err_1101_("expected \';\'",walkingIndex);
 			}
 			insert_IB_address_label(parentInstructionBufferToInsertTo,labelNumberForContinue);
 			singleMergeIB(parentInstructionBufferToInsertTo,&ib_direct_jump);
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"while")){
-			walkingIndex = advanceToNonNewlineSpace(sourceContainer.string,walkingIndex+5);
+			walkingIndex = advanceToNonNewlineSpace(walkingIndex+5);
 			if (sourceContainer.string[walkingIndex]!='('){
-				printf("expected \'(\'\n");
-				exit(1);
+				err_1101_("expected \'(\'",walkingIndex);
 			}
 			walkingIndex++;
-			int32_t otherParenIndex = parenEndWithLiteralSkip(sourceContainer.string,walkingIndex);
+			int32_t otherParenIndex = parenEndWithLiteralSkip(walkingIndex,0);
 			initInstructionBuffer(&instructionBufferLocalTemp_0);
 			initInstructionBuffer(&instructionBufferLocalTemp_1);
 			expressionToAssemblyWithCast(&instructionBufferLocalTemp_0,"_Bool",walkingIndex,otherParenIndex);
-			walkingIndex = advanceToNonNewlineSpace(sourceContainer.string,otherParenIndex+1);
+			walkingIndex = advanceToNonNewlineSpace(otherParenIndex+1);
 			uint32_t newBreakLabel=++globalLabelID;
 			uint32_t newContinueLabel=++globalLabelID;
 			walkingIndex = functionStatementsWalk(
@@ -491,7 +446,7 @@ int32_t functionStatementsWalk(
 			destroyInstructionBuffer(&instructionBufferLocalTemp_1);
 			destroyInstructionBuffer(&instructionBufferLocalTemp_0);
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"do")){
-			walkingIndex = advanceToNonNewlineSpace(sourceContainer.string,walkingIndex+2);
+			walkingIndex = advanceToNonNewlineSpace(walkingIndex+2);
 			initInstructionBuffer(&instructionBufferLocalTemp_0);
 			initInstructionBuffer(&instructionBufferLocalTemp_1);
 			uint32_t internalLabel=++globalLabelID;
@@ -505,39 +460,34 @@ int32_t functionStatementsWalk(
 					newContinueLabel,
 					labelNumberForInlinedReturn,
 					true);
-			walkingIndex = advanceToNonNewlineSpace(sourceContainer.string,walkingIndex+1);
+			walkingIndex = advanceToNonNewlineSpace(walkingIndex+1);
 			int32_t endOfNextToken = getEndOfToken(sourceContainer.string,walkingIndex);
 			if (!specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfNextToken,"while")){
-				printf("expected \'while\'\n");
-				exit(1);
+				err_1101_("expected \'while\'",walkingIndex);
 			}
-			walkingIndex = advanceToNonNewlineSpace(sourceContainer.string,walkingIndex+5);
+			walkingIndex = advanceToNonNewlineSpace(walkingIndex+5);
 			if (sourceContainer.string[walkingIndex]!='('){
-				printf("expected \'(\'\n");
-				exit(1);
+				err_1101_("expected \'(\'",walkingIndex);
 			}
 			walkingIndex++;
-			int32_t otherParenIndex = parenEndWithLiteralSkip(sourceContainer.string,walkingIndex);
+			int32_t otherParenIndex = parenEndWithLiteralSkip(walkingIndex,0);
 			expressionToAssemblyWithCast(&instructionBufferLocalTemp_0,"_Bool",walkingIndex,otherParenIndex);
-			walkingIndex = advanceToNonNewlineSpace(sourceContainer.string,otherParenIndex+1);
+			walkingIndex = advanceToNonNewlineSpace(otherParenIndex+1);
 			if (sourceContainer.string[walkingIndex]!=';'){
-				printf("expected \';\'\n");
-				exit(1);
+				err_1101_("expected \';\'",walkingIndex);
 			}
 			insert_IB_statement_do_while(parentInstructionBufferToInsertTo,&instructionBufferLocalTemp_0,&instructionBufferLocalTemp_1,internalLabel,newBreakLabel,newContinueLabel);
 			destroyInstructionBuffer(&instructionBufferLocalTemp_1);
 			destroyInstructionBuffer(&instructionBufferLocalTemp_0);
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"return")){
-			walkingIndex = advanceToNonNewlineSpace(sourceContainer.string,walkingIndex+6);
+			walkingIndex = advanceToNonNewlineSpace(walkingIndex+6);
 			if (doStringsMatch(returnTypeString,"void")){
 				if (sourceContainer.string[walkingIndex]!=';'){
-					printf("expected \';\'\n");
-					exit(1);
+					err_1101_("expected \';\'",walkingIndex);
 				}
 			} else {
 				if (sourceContainer.string[walkingIndex]==';'){
-					printf("expected expression\n");
-					exit(1);
+					err_1101_("expected expression here",walkingIndex);
 				}
 				if (labelNumberForInlinedReturn!=0){
 					// TODO
@@ -549,7 +499,7 @@ int32_t functionStatementsWalk(
 					printf("inlined functions are not ready yet\n");
 					exit(1);
 				} else {
-					int32_t endingSemicolon = findIndexOfTypicalStatementEnd(sourceContainer.string,walkingIndex);
+					int32_t endingSemicolon = findIndexOfTypicalStatementEnd(walkingIndex);
 					expressionToAssemblyWithReturn(parentInstructionBufferToInsertTo,walkingIndex,endingSemicolon,returnTypeString);
 					walkingIndex=endingSemicolon;
 				}
@@ -568,17 +518,15 @@ int32_t functionStatementsWalk(
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"switch")){
 			struct SwitchManagment packedSwitchManagment = packCurrentSwitchManagment();
 			currentSwitchManagment.inSwitch=true;
-			walkingIndex = advanceToNonNewlineSpace(sourceContainer.string,walkingIndex+6);
+			walkingIndex = advanceToNonNewlineSpace(walkingIndex+6);
 			if (sourceContainer.string[walkingIndex]!='('){
-				printf("expected \'(\'\n");
-				exit(1);
+				err_1101_("expected \'(\'",walkingIndex);
 			}
 			walkingIndex++;
-			int32_t otherParenIndex = parenEndWithLiteralSkip(sourceContainer.string,walkingIndex);
-			int32_t startBracketIndex = advanceToNonNewlineSpace(sourceContainer.string,otherParenIndex+1);
+			int32_t otherParenIndex = parenEndWithLiteralSkip(walkingIndex,0);
+			int32_t startBracketIndex = advanceToNonNewlineSpace(otherParenIndex+1);
 			if (sourceContainer.string[startBracketIndex]!='{'){
-				printf("expected \'{\'\n");
-				exit(1);
+				err_1101_("expected \'{\'",walkingIndex);
 			}
 			initInstructionBuffer(&instructionBufferLocalTemp_0);
 			initInstructionBuffer(&currentSwitchManagment.ibSwitchItem);
@@ -597,8 +545,7 @@ int32_t functionStatementsWalk(
 			);
 			
 			if (resolveSwitch()){
-				printf("At least one case is required per switch statement\n");
-				exit(1);
+				err_1101_("At least one case is required per switch statement",walkingIndex);
 			}
 			dualMergeIB(parentInstructionBufferToInsertTo,&currentSwitchManagment.ibFinal,&instructionBufferLocalTemp_0);
 			insert_IB_raw_label(parentInstructionBufferToInsertTo,newBreakLabel);
@@ -610,33 +557,28 @@ int32_t functionStatementsWalk(
 			unpackCurrentSwitchManagment(packedSwitchManagment);
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"case")){
 			if (!currentSwitchManagment.inSwitch){
-				printf("keyword \'case\' must be inside a switch\n");
-				exit(1);
+				err_1101_("keyword \'case\' must be inside a switch",walkingIndex);
 			}
-			int32_t tempWalkingIndex0=advanceToNonNewlineSpace(sourceContainer.string,walkingIndex+4);
+			int32_t tempWalkingIndex0=advanceToNonNewlineSpace(walkingIndex+4);
 			int32_t tempWalkingIndex1=tempWalkingIndex0;
 			{
 				char c;
 				while ((c=sourceContainer.string[tempWalkingIndex1]),(c!=':' & c!=0)){
 					if (c=='?'){
-						printf("ternaries are not allowed in case constant-expression\n");
-						exit(1);
+						err_1101_("ternaries are not allowed in case constant-expression",tempWalkingIndex1);
 					}
 					if (c=='\"'){
-						printf("string literals are not allowed in case constant-expression\n");
-						exit(1);
+						err_1101_("string literals are not allowed in case constant-expression",tempWalkingIndex1);
 					}
 					tempWalkingIndex1++;
 				}
 			}
 			if (sourceContainer.string[tempWalkingIndex1]!=':'){
-				printf("expected \':\' after keyword \'case\'\n");
-				exit(1);
+				err_1101_("expected \':\' after keyword \'case\'",tempWalkingIndex1);
 			}
 			int16_t expRoot=buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(sourceContainer.string,tempWalkingIndex0,tempWalkingIndex1,true);
 			if (expRoot==-1){
-				printf("expected const-expression after keyword \'case\'\n");
-				exit(1);
+				err_1101_("expected const-expression after keyword \'case\'",tempWalkingIndex0);
 			}
 			insert_IB_raw_label(
 				parentInstructionBufferToInsertTo,
@@ -651,17 +593,14 @@ int32_t functionStatementsWalk(
 			walkingIndex=tempWalkingIndex1;
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"default")){
 			if (!currentSwitchManagment.inSwitch){
-				printf("keyword \'default\' must be inside a switch\n");
-				exit(1);
+				err_1101_("keyword \'default\' must be inside a switch",walkingIndex);
 			}
-			int32_t tempWalkingIndex=advanceToNonNewlineSpace(sourceContainer.string,walkingIndex+7);
+			int32_t tempWalkingIndex=advanceToNonNewlineSpace(walkingIndex+7);
 			if (sourceContainer.string[tempWalkingIndex]!=':'){
-				printf("expected \':\' after keyword \'default\'\n");
-				exit(1);
+				err_1101_("expected \':\' after keyword \'default\'",tempWalkingIndex);
 			}
 			if (currentSwitchManagment.hasDefault){
-				printf("There cannot be two \'default\' for a switch\n");
-				exit(1);
+				err_1101_("There cannot be two \'default\' for a switch",walkingIndex);
 			}
 			currentSwitchManagment.hasDefault=true;
 			insert_IB_raw_label(
@@ -671,17 +610,15 @@ int32_t functionStatementsWalk(
 			walkingIndex=tempWalkingIndex;
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"typedef")){
 			
-			printf("typedef inside functions is not ready yet\n");
-			exit(1);
+			err_1101_("typedef inside functions is not ready yet",walkingIndex);
 			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"goto")){
 			
-			int32_t labelStart=advanceToNonNewlineSpace(sourceContainer.string,endOfToken);
+			int32_t labelStart=advanceToNonNewlineSpace(endOfToken);
 			int32_t labelEnd=getEndOfToken(sourceContainer.string,labelStart);
-			int32_t semiColon=advanceToNonNewlineSpace(sourceContainer.string,labelEnd);
+			int32_t semiColon=advanceToNonNewlineSpace(labelEnd);
 			if (sourceContainer.string[semiColon]!=';'){
-				printInformativeMessageAtSourceContainerIndex(true,"Expected \';\' after goto statement",semiColon,0);
-				exit(1);
+				err_1101_("Expected \';\' after goto statement",semiColon);
 			}
 			walkingIndex=semiColon;
 			insert_IB_address_label(parentInstructionBufferToInsertTo,addGotoOrLabel(copyStringSegmentToHeap(sourceContainer.string,labelStart,labelEnd),true));
@@ -691,7 +628,7 @@ int32_t functionStatementsWalk(
 			
 			int32_t labelStart=walkingIndex;
 			int32_t labelEnd=endOfToken;
-			int32_t colon=advanceToNonNewlineSpace(sourceContainer.string,endOfToken);
+			int32_t colon=advanceToNonNewlineSpace(endOfToken);
 			walkingIndex=labelEnd;
 			insert_IB_raw_label(parentInstructionBufferToInsertTo,addGotoOrLabel(copyStringSegmentToHeap(sourceContainer.string,labelStart,labelEnd),false));
 			
@@ -703,38 +640,32 @@ int32_t functionStatementsWalk(
 				bool usedStatic = false;
 				if (specificStringEqualCheck(sourceContainer.string,walkingIndex,walkingIndex+9,"register ")){
 					if (usedRegister){
-						printf("\'register\' keyword cannot be specified twice\n");
-						exit(1);
+						err_1101_("\'register\' keyword cannot be specified twice",walkingIndex);
 					}
 					usedRegister = true;
 					walkingIndex += 9;
 				}
 				if (specificStringEqualCheck(sourceContainer.string,walkingIndex,walkingIndex+7,"static ")){
 					if (usedStatic){
-						printf("\'static\' keyword cannot be specified twice\n");
-						exit(1);
+						err_1101_("\'static\' keyword cannot be specified twice",walkingIndex);
 					}
 					usedStatic = true;
 					walkingIndex += 7;
 				}
 				if (sourceContainer.string[indexOfEndOfDeclaration]=='='){
-					int32_t indexOfStartOfInitializer = advanceToNonNewlineSpace(sourceContainer.string,indexOfEndOfDeclaration+1);
-					int32_t indexOfEndOfInitializer = findIndexOfTypicalStatementEnd(sourceContainer.string,indexOfStartOfInitializer);
-					if (indexOfStartOfInitializer==-1 | indexOfEndOfInitializer==-1){
-						printf("Could not find end to statement with declaration\n");
-						exit(1);
-					}
+					int32_t indexOfStartOfInitializer = advanceToNonNewlineSpace(indexOfEndOfDeclaration+1);
+					int32_t indexOfEndOfInitializer = findIndexOfTypicalStatementEnd(indexOfStartOfInitializer);
 					expressionToAssemblyWithInitializer(parentInstructionBufferToInsertTo,indexOfStartOfInitializer,indexOfEndOfInitializer,walkingIndex,indexOfEndOfDeclaration,usedRegister,usedStatic);
 					walkingIndex=indexOfEndOfInitializer;
 				} else {
 					char* typeString = fullTypeParseAndAdd(walkingIndex,indexOfEndOfDeclaration,false);
-					addVariableToBlockFrame(typeString,usedRegister,usedStatic);
+					addVariableToBlockFrame(typeString,walkingIndex,usedRegister,usedStatic);
 					cosmic_free(typeString);
 					walkingIndex=indexOfEndOfDeclaration;
 				}
 			} else {
 				// then assume it is an expression
-				int32_t endingSemicolon = findIndexOfTypicalStatementEnd(sourceContainer.string,walkingIndex);
+				int32_t endingSemicolon = findIndexOfTypicalStatementEnd(walkingIndex);
 				if (walkingIndex!=endingSemicolon){
 					expressionToAssemblyWithCast(parentInstructionBufferToInsertTo,"void",walkingIndex,endingSemicolon);
 				}
@@ -748,8 +679,8 @@ int32_t functionStatementsWalk(
 		}
 		walkingIndex++;
 	}
-	printf("functionStatementsWalk() hit end of source string\n");
-	exit(1);
+	err_1101_("Unexpected source termination which parsing function at this segment",indexOfStart);
+	return 0; // unreachable
 }
 
 
@@ -767,9 +698,9 @@ int32_t functionStatementsWalk(
 void fileScopeStatementsWalk(){
 	int32_t walkingIndex = 0;
 	char firstCharacter;
-	
+	initInstructionBuffer(&global_static_data);
 	while ((firstCharacter=sourceContainer.string[walkingIndex])){
-		if ((firstCharacter==' ') | (firstCharacter=='\n')){
+		if (firstCharacter==' ' | firstCharacter=='\n'){
 			walkingIndex++;
 			continue;
 		}
@@ -779,8 +710,7 @@ void fileScopeStatementsWalk(){
 		#endif
 		int32_t endOfToken = getEndOfToken(sourceContainer.string,walkingIndex);
 		if (endOfToken==-1){
-			printf("file scope statement walk was using getEndOfToken() and it failed\n");
-			exit(1);
+			err_1101_("Couldn\'t find end of this token",walkingIndex);
 		}
 		if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"typedef")){
 			// then this is a typedef entry
@@ -794,12 +724,10 @@ void fileScopeStatementsWalk(){
 		} else if (isSegmentOfStringTypeLike(sourceContainer.string,walkingIndex,endOfToken)){
 			// then it is some sort of declaration
 			if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"auto")){
-				printf("keyword \'auto\' not allowed at file scope\n");
-				exit(1);
+				err_1101_("keyword \'auto\' not allowed at file scope",walkingIndex);
 			}
 			if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"register")){
-				printf("keyword \'register\' not allowed at file scope\n");
-				exit(1);
+				err_1101_("keyword \'register\' not allowed at file scope",walkingIndex);
 			}
 			bool hasStatic=false;
 			bool hasExtern=false;
@@ -826,8 +754,7 @@ void fileScopeStatementsWalk(){
 						startIndexForDeclaration+=7;
 						endOfToken=getEndOfToken(sourceContainer.string,startIndexForDeclaration);
 						if (endOfToken==-1){
-							printf("file scope statement walker was using getEndOfToken() while skipping storage class specifier and it failed\n");
-							exit(1);
+							err_1101_("Couldn\'t find end of this token",startIndexForDeclaration);
 						}
 						continue;
 					} else {
@@ -835,8 +762,7 @@ void fileScopeStatementsWalk(){
 					}
 				}
 				if (staticCount>1 | externCount>1 | (staticCount!=0 & externCount!=0)){
-					printf("error related to storage class specifiers\n");
-					exit(1);
+					err_1101_("storage class specifier list is invalid for this declaration",startIndexForDeclaration);
 				}
 				hasStatic=staticCount!=0;
 				hasExtern=externCount!=0;
@@ -861,32 +787,25 @@ void fileScopeStatementsWalk(){
 					}
 					applyToTypeStringArrayDecayToSelf(typeString);
 					uint8_t retValForAddingFunction = addGlobalFunction(typeString,isDefinitionBeingGiven);
-					if (retValForAddingFunction==1){
-						printf("function declaration has type conflicts with previous declaration\n");
-						exit(1);
-					} else if (retValForAddingFunction==2){
-						printf("function was already defined\n");
-						exit(1);
-					} else if (retValForAddingFunction==3){
-						printf("that identifier is already used for a global variable, it cannot be used for a function\n");
-						exit(1);
-					} else if (retValForAddingFunction==4){
-						printf("function definitions must have identifiers for all parameters\n");
-						exit(1);
+					if (retValForAddingFunction!=0){
+						if (retValForAddingFunction==1){
+							err_1101_("function declaration has type conflicts with previous declaration",gotoFailIndex);
+						} else if (retValForAddingFunction==2){
+							err_1101_("function was already defined",gotoFailIndex);
+						} else if (retValForAddingFunction==3){
+							err_1101_("that identifier is already used for a global variable, it cannot be used for a function",gotoFailIndex);
+						} else if (retValForAddingFunction==4){
+							err_1101_("function definitions must have identifiers for all parameters",gotoFailIndex);
+						}
+						assert(false);
 					}
 					if (isDefinitionBeingGiven){
 						InstructionBuffer instructionBufferForFunction;
 						InstructionSingle instructionSingle;
 						struct IdentifierSearchResult identifierSearchResult;
 						searchForIdentifier(&identifierSearchResult,typeString,true,false,false,false,true);
-						if (!identifierSearchResult.didExist){
-							printf("Function could not find it\'s own entry\n");
-							exit(1);
-						}
-						if (blockFrameArray.numberOfValidSlots!=0){
-							printf("blockFrameArray.numberOfValidSlots should equal 0 at the start of a function statement walk\n");
-							exit(1);
-						}
+						assert(identifierSearchResult.didExist);
+						assert(blockFrameArray.numberOfValidSlots==0);
 						addBlockFrame();
 						initInstructionBuffer(&instructionBufferForFunction);
 						instructionSingle.id = I_FCST;
@@ -911,10 +830,7 @@ void fileScopeStatementsWalk(){
 						
 						//printf("Finished Function Walk\n");
 						removeBlockFrame();
-						if (blockFrameArray.numberOfValidSlots!=0){
-							printf("Internal Error: blockFrameArray.numberOfValidSlots should equal 0 at the end of a function statement walk\n");
-							exit(1);
-						}
+						assert(blockFrameArray.numberOfValidSlots==0);
 						instructionSingle.id = I_RET_; // ensure implicit return exists at the end
 						addInstruction(&instructionBufferForFunction,instructionSingle);
 						instructionSingle.id = I_FCEN;
@@ -943,8 +859,7 @@ printInstructionBufferWithMessageAndNumber(&instructionBufferForFunction,typeStr
 				} else {
 					// then this isn't a function declaration, so it must be a variable declaration
 					if (hasInline){
-						printf("Global variables cannot use inline keyword\n");
-						exit(1);
+						err_1101_("Global variables cannot use inline keyword",gotoFailIndex);
 					}
 					bool isInitializationBeingGiven;
 					if (sourceContainer.string[endIndexForDeclaration]=='='){
@@ -952,68 +867,47 @@ printInstructionBufferWithMessageAndNumber(&instructionBufferForFunction,typeStr
 					} else if (sourceContainer.string[endIndexForDeclaration]==';'){
 						isInitializationBeingGiven = false;
 					} else {
-						printf("It seems that a variable was being declared at file scope, but something went wrong when trying to figure out if it had an initalizer\n");
-						exit(1);
+						err_1101_("It seems that a variable was being declared at file scope,\n  but something went wrong when trying to figure out if it had an initalizer",gotoFailIndex);
 					}
 					int32_t indexOfSemicolon = endIndexForDeclaration;
 					uint8_t retValForAddingVariable;
+					uint32_t labelID=++globalLabelID;
 					if (isInitializationBeingGiven){
-						indexOfSemicolon = findIndexOfTypicalStatementEnd(sourceContainer.string,endIndexForDeclaration);
-						if (indexOfSemicolon==-1){
-							printf("statement end detect failed for variable at file scope\n");
-							exit(1);
-						}
+						indexOfSemicolon = findIndexOfTypicalStatementEnd(endIndexForDeclaration);
 						walkingIndex = indexOfSemicolon+1;
 						int32_t startOfInitializer = endIndexForDeclaration+1;
 						char c = sourceContainer.string[startOfInitializer];
 						while (c==' ' | c=='\n'){
 							c = sourceContainer.string[++startOfInitializer];
 						}
-						struct RawMemoryForInitializer rmfi={0};
 						char* typeStringNI = applyToTypeStringRemoveIdentifierToNew(typeString);
 						char* typeStringIdentifier = applyToTypeStringGetIdentifierToNew(typeString);
 						cosmic_free(typeString);
 						int32_t initRoot = initializerMapRoot(startOfInitializer,indexOfSemicolon);
-						if (!initializerImplementRoot(&rmfi,NULL,initRoot,&typeStringNI,true)){
-							printf("Internal Error: how did that not crash?");
-							exit(1);
+						if (!initializerImplementRoot(&global_static_data,initRoot,labelID,&typeStringNI,true)){
+							assert(false);
 						}
 						typeString=strMerge3(typeStringIdentifier," ",typeStringNI);
 						cosmic_free(typeStringIdentifier);
 						cosmic_free(typeStringNI);
-						retValForAddingVariable = addGlobalVariable(typeString,0,hasStatic,hasExtern,true);
-						
-						/*
-						TODO: implement the rmfi (except that I probably will remove that and do it a different way)
-						
-						
-						
-						*/
-						if (rmfi.mem==NULL){
-							// this should not happen after initializers are fully supported
-						} else {
-							cosmic_free(rmfi.mem);
-							cosmic_free(rmfi.isSet);
-						}
+						retValForAddingVariable = addGlobalVariable(typeString,0,labelID,gotoFailIndex,hasStatic,hasExtern,true);
 					} else {
-						retValForAddingVariable = addGlobalVariable(typeString,0,hasStatic,hasExtern,false);
+						retValForAddingVariable = addGlobalVariable(typeString,0,labelID,gotoFailIndex,hasStatic,hasExtern,false);
 					}
 					if (retValForAddingVariable==1){
-						printf("identifier collision at file scope for variable, a variable was already declared with the same identifier\n");
-						exit(1);
+						err_1101_("identifier collision at file scope for variable, a variable was already declared with the same identifier",gotoFailIndex);
 					} else if (retValForAddingVariable==2){
-						printf("identifier collision at file scope for variable, a function was already declared with the same identifier\n");
-						exit(1);
+						err_1101_("identifier collision at file scope for variable, a function was already declared with the same identifier",gotoFailIndex);
 					}
 				}
 			}
 			cosmic_free(typeString);
 		} else {
-			// technically, it is possible for an initalizer to occur. We should add a check for something like a global variable being the first token
-			printf("Unknown start at file scope\n");
-			exit(1);
+			// technically, it is possible for an initalizer without a declaration to occur. We should add a check for something like a global variable being the first token
+			err_1111_("Unknown starting token at file scope",walkingIndex,endOfToken);
 		}
 	}
+	//printInstructionBufferWithMessageAndNumber(&global_static_data,"global static data printout",0);
 }
 
 

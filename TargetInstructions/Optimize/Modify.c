@@ -76,9 +76,10 @@ void doLabelRename(InstructionBuffer* ib, uint32_t from, uint32_t to){
 	uint32_t i = ib->numberOfSlotsTaken;
 	while (i--!=0){
 		ISP = &(buffer[i]);
-		if (ISP->id==I_LABL | ISP->id==I_SYCL | ISP->id==I_JTEN | ISP->id==I_FCST){
+		enum InstructionTypeID id=ISP->id;
+		if (id==I_LABL | id==I_SYCL | id==I_JTEN | id==I_FCST){
 			if (ISP->arg.D.a_0==from) ISP->arg.D.a_0=to;
-		} else if (ISP->id==I_JJMP){
+		} else if (id==I_JJMP){
 			if (ISP->arg.BBD.a_2==from) ISP->arg.BBD.a_2=to;
 		}
 	}

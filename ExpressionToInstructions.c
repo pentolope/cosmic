@@ -890,7 +890,8 @@ void applyAutoTypeConversion_Identifier(ExpressionTreeNode* thisNode){
 		thisNode->post.extraPtr = gfep;
 		thisNode->post.extraVal = gfep->labelID;
 		thisNode->post.typeString = applyToTypeStringRemoveIdentifierToNew(gfep->typeString);
-		applyPrependWithInputReplace("const ",&thisNode->post.typeString);
+		
+		applyPrependWithInputReplace("const ",&thisNode->post.typeString); // is this really what I want to do here?
 	} else {
 		assert(false);
 		exit(1);
@@ -904,6 +905,9 @@ void applyAutoTypeConversion_Constant(ExpressionTreeNode* thisNode){
 		if (sourceContainer.string[startIndex]=='L'){
 			startIndex++;
 			isWideLiteral=true;
+			
+			printInformativeMessageForExpression(true,"Wide literals are not currently supported",thisNode);
+			exit(1);
 		}
 		if (sourceContainer.string[startIndex]=='\"'){
 			if (sourceContainer.isStringForPreprocesser){
@@ -912,71 +916,20 @@ void applyAutoTypeConversion_Constant(ExpressionTreeNode* thisNode){
 				thisNode->post.typeString=copyStringToHeapString("unsigned long");
 			} else {
 				thisNode->post.operatorTypeID=2;
-				thisNode->post.extraVal = addEntryForInitData(
-					startIndex,false,isWideLiteral,false);
+				thisNode->post.extraVal = addEntryForStringData(
+					startIndex,thisNode->endIndexInString,isWideLiteral);
 				thisNode->post.typeString=copyStringToHeapString("const * const char");
 			}
 		} else if (sourceContainer.string[startIndex]=='\''){
-			startIndex++;
-			uint8_t c0 = (uint8_t)(sourceContainer.string[startIndex]);
-			uint16_t valueToSet = c0;
-			if (c0=='\\'){
-				uint8_t c1 = (uint8_t)(sourceContainer.string[startIndex+1]);
-				if (c1=='0'){
-					uint8_t c2 = (uint8_t)(sourceContainer.string[startIndex+2]);
-					uint8_t c3 = (uint8_t)(sourceContainer.string[startIndex+3]);
-					c2 = ucharAsciiAsNumberDigit(c2,true,false);
-					c3 = ucharAsciiAsNumberDigit(c3,true,false);
-					if (c2==200 | c3==200){
-						printInformativeMessageAtSourceContainerIndex(
-							true,"Escape sequence number not in octal range",startIndex,startIndex+4);
-						exit(1);
-					}
-					valueToSet=c2*8+c3;
-				} else if (c1=='x'){
-					uint8_t c2 = (uint8_t)(sourceContainer.string[startIndex+2]);
-					uint8_t c3 = (uint8_t)(sourceContainer.string[startIndex+3]);
-					c2 = ucharAsciiAsNumberDigit(c2,false,true);
-					c3 = ucharAsciiAsNumberDigit(c3,false,true);
-					if (c2==200 | c3==200){
-						printInformativeMessageAtSourceContainerIndex(
-							true,"Escape sequence number not in hexadecimal range",startIndex,startIndex+4);
-						exit(1);
-					}
-					if (isWideLiteral){
-						uint8_t c4 = (uint8_t)(sourceContainer.string[startIndex+4]);
-						uint8_t c5 = (uint8_t)(sourceContainer.string[startIndex+5]);
-						c4 = ucharAsciiAsNumberDigit(c4,false,true);
-						c5 = ucharAsciiAsNumberDigit(c5,false,true);
-						if (c4==200 | c5==200){
-							printInformativeMessageAtSourceContainerIndex(
-								true,"Escape sequence number not in hexadecimal range",startIndex,startIndex+6);
-							exit(1);
-						}
-						printf("Unimplemented Error: wide character literals are not currently supported\n");
-						exit(1);
-						// not implemented further, as it is currently not supported
-					} else {
-						valueToSet=c2*16+c3;
-					}
-				}else if (c1=='a') valueToSet= 7;
-				else if (c1=='b')  valueToSet= 8;
-				else if (c1=='f')  valueToSet=12;
-				else if (c1=='n')  valueToSet=10;
-				else if (c1=='r')  valueToSet=13;
-				else if (c1=='t')  valueToSet= 9;
-				else if (c1=='v')  valueToSet=11;
-				else if (c1=='\'') valueToSet=39;
-				else if (c1=='\"') valueToSet=34;
-				else if (c1=='\\') valueToSet=92;
-				else if (c1=='?')  valueToSet=63;
-				else{
-					printInformativeMessageAtSourceContainerIndex(
-						true,"Unrecognized escape sequence for character literal",startIndex,startIndex+1);
-					exit(1);
-				}
+			uint32_t length=findLengthOfDataOfStringLiteral(startIndex,thisNode->endIndexInString,isWideLiteral);
+			// length includes the 'null terminator', which isn't used for character literals
+			if (length>3){
+				printInformativeMessageForExpression(true,"Character literal is too long",thisNode);
+				exit(1);
 			}
-			thisNode->post.extraVal=valueToSet;
+			uint8_t data[3]={0};
+			writeStringLiteralData(data,startIndex,thisNode->endIndexInString,3,isWideLiteral);
+			thisNode->post.extraVal=(data[1]<<8)|(data[0]<<0);
 			thisNode->post.operatorTypeID=1;
 			thisNode->post.typeString=copyStringToHeapString("const int");
 		} else {
@@ -2588,51 +2541,36 @@ void expressionToAssemblyWithInitializer(
 		printInformativeMessageAtSourceContainerIndex(true,"Cannot use 'register' and 'static' at the same time",startIndexForDeclaration,0);
 		exit(1);
 	}
-	if (usedStatic){
-		printInformativeMessageAtSourceContainerIndex(true,"Static in functions is not ready yet",startIndexForDeclaration,0);
-		exit(1);
-	}
 	int32_t initializerRoot=initializerMapRoot(startIndexForInitializer,endIndexForInitializer);
-	uint8_t initalizerCatagory=initializerMap.entries[initializerRoot].typeOfEntry;
-	
-	
 	char* typeString = fullTypeParseAndAdd(startIndexForDeclaration,endIndexForDeclaration,false);
 	char* typeStringNI = applyToTypeStringRemoveIdentifierToNew(typeString); // what about potentially having multiple identifiers?
 	char* identifier = applyToTypeStringGetIdentifierToNew(typeString);
 	cosmic_free(typeString);
 	InstructionBuffer ibTemp;
-	struct RawMemoryForInitializer rmfi={0};
 	initInstructionBuffer(&ibTemp);
-	// this is not finished
-	if (initializerImplementRoot(&rmfi,&ibTemp,initializerRoot,&typeStringNI,usedStatic)){
-		
-		
-		cosmic_free(rmfi.mem);
-		cosmic_free(rmfi.isSet);
-	} else {
-		
-	}
+	uint32_t labelID=0;
+	if (usedStatic) labelID=++globalLabelID;
+	bool gotStatic=initializerImplementRoot(&ibTemp,initializerRoot,labelID,&typeStringNI,usedStatic);
+	assert(usedStatic==gotStatic);
 	typeString=strMerge3(identifier," ",typeStringNI);
-	
-	addVariableToBlockFrame(typeString,usedRegister,usedStatic);
-	struct IdentifierSearchResult isr;
-	searchForIdentifier(&isr,identifier,false,true,true,false,false);
-	if (!isr.didExist | isr.typeOfResult!=IdentifierSearchResultIsVariable){
-		printf("Internal Error: could not find variable after adding to blockframe\n");
-		exit(1);
+	addVariableToBlockFrame(typeString,startIndexForDeclaration,usedRegister,usedStatic);
+	if (gotStatic){
+		singleMergeIB(&global_static_data,&ibTemp);
+	} else {
+		struct IdentifierSearchResult isr;
+		searchForIdentifier(&isr,identifier,false,true,true,false,false);
+		if (!isr.didExist | isr.typeOfResult!=IdentifierSearchResultIsVariable){
+			printf("Internal Error: could not find variable after adding to blockframe\n");
+			exit(1);
+		}
+		uint16_t revOffset = getReversedOffsetForLocalVariable(&isr.reference.variableReference);
+		convertSTPI_STPA(&ibTemp,revOffset);
+		singleMergeIB(ib_to,&ibTemp);
 	}
-	// the following doesn't work for global, which it would be if it was static
-	uint16_t revOffset = getReversedOffsetForLocalVariable(&isr.reference.variableReference);
-	
-	
-	convertSTPI_STPA(&ibTemp,revOffset);
-	singleMergeIB(ib_to,&ibTemp);
 	destroyInstructionBuffer(&ibTemp);
 	cosmic_free(typeString);
 	cosmic_free(identifier);
 	cosmic_free(typeStringNI);
-	
-	
 }
 
 

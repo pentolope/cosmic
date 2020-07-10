@@ -59,6 +59,7 @@ struct BlockFrameArray{
 			uint32_t labelID; // number given when this entry is created that is able to identify the start location in data section of assembly output
 			uint32_t staticLinkbackID; // if 0, then this is not a linkback entry. Otherwise, this value is the one used to access this variable, and it cannot be recognized by the identifier
 			uint32_t thisSizeof; // because of how this is used, this number shall always be word alligned
+			uint32_t indexOfDeclaration;
 			bool usedStatic;
 			bool usedExtern; 
 			bool hadInitializer;
@@ -115,7 +116,7 @@ uint32_t addBlockFrame(){
 		}
 	}
 	uint32_t thisBlockIndex = blockFrameArray.numberOfValidSlots++;
-	setMemoryToZero(&(blockFrameArray.entries[thisBlockIndex]),sizeof(struct BlockFrameEntry));
+	memZero(&(blockFrameArray.entries[thisBlockIndex]),sizeof(struct BlockFrameEntry));
 	return thisBlockIndex;
 }
 
@@ -364,6 +365,8 @@ return value description:
 uint8_t addGlobalVariable(
 		const char* typeString,
 		uint32_t staticLinkbackID,
+		uint32_t labelID,
+		uint32_t indexOfDeclaration,
 		bool usedStatic,
 		bool usedExtern,
 		bool hadInitializer){
@@ -412,9 +415,10 @@ uint8_t addGlobalVariable(
 		globalVariableEntryPtr->usedExtern = usedExtern;
 		globalVariableEntryPtr->typeString = copyStringToHeapString(typeString);
 		globalVariableEntryPtr->staticLinkbackID = staticLinkbackID;
-		globalVariableEntryPtr->labelID = ++globalLabelID;
+		globalVariableEntryPtr->labelID = labelID;
 		globalVariableEntryPtr->thisSizeof = thisSizeof;
 		globalVariableEntryPtr->hadInitializer=hadInitializer;
+		globalVariableEntryPtr->indexOfDeclaration=indexOfDeclaration;
 		globalVariableEntryPtr->isCurrentlyTentative = false; // this will change when tentative declarations become supported
 	}
 	return 0;
@@ -563,6 +567,7 @@ isRegister is if the keyword was specified.
 */
 bool addVariableToBlockFrame(
 		const char* typeString,
+		uint32_t indexOfDeclaration,
 		bool isRegister,
 		bool isStatic){
 
@@ -623,7 +628,7 @@ bool addVariableToBlockFrame(
 		blockFrameVariableEntryPtr->staticLinkbackID = thisStaticID;
 		
 		// the variable is now sufficently set up to call this function with no problems
-		addGlobalVariable(typeString,thisStaticID,true,false,true); 
+		addGlobalVariable(typeString,thisStaticID,++globalLabelID,indexOfDeclaration,true,false,true); 
 		// the global entry is added in addition to the auto scope entry.
 		// Also, because thisStaticID!=0, the global and local entry can't be accessed normally
 		// hasInitializer is true because then it will behave well with tentative declaration logic
@@ -1018,6 +1023,7 @@ char* breakDownTypeAndAdd(char* typeString, bool addToGlobal){
 			}
 			copyDownForInPlaceEdit(internalString);
 			length = strlen(internalString);
+			assert(internalString[length-1]==' ');
 			internalString[--length]=0; // the last character is a space, this removes it
 		}
 	}
@@ -1034,21 +1040,22 @@ char* fullTypeParseAndAdd(int32_t startIndex,int32_t endIndex,bool addToGlobal){
 	return typeString_2;
 }
 
-char* fullTypeParseAvoidAdd(int32_t startIndex,int32_t endIndex){
-	char* typeString_1 = convertType(startIndex,endIndex);
-	for (uint32_t i=0;typeString_1[i];i++){
-		if (typeString_1[i]=='{'){
+
+void ensureNoNewDefinitions(char* typeString,int32_t startIndex,int32_t endIndex){
+	for (uint32_t i=0;typeString[i];i++){
+		if (typeString[i]=='{'){
 			err_1111_("This type descriptor should not be defining a new type\n",startIndex,endIndex);
 		}
 	}
+}
+
+char* fullTypeParseAvoidAdd(int32_t startIndex,int32_t endIndex){
+	char* typeString_1 = convertType(startIndex,endIndex);
+	ensureNoNewDefinitions(typeString_1,startIndex,endIndex);
 	bool didAllocateAnotherString;
 	char* typeString_2 = resolveTypdefsInTypeString(typeString_1,&didAllocateAnotherString);
 	if (didAllocateAnotherString) cosmic_free(typeString_1);
-	for (uint32_t i=0;typeString_2[i];i++){
-		if (typeString_2[i]=='{'){
-			err_1111_("This type descriptor should not be defining a new type\n",startIndex,endIndex);
-		}
-	}
+	ensureNoNewDefinitions(typeString_2,startIndex,endIndex);
 	return typeString_2;
 }
 

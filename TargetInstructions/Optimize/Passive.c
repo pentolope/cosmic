@@ -409,20 +409,14 @@ uint16_t findLengthOfSymbolicCalc(const InstructionBuffer* ib,const uint32_t tar
 	return length;
 }
 
-bool doesRegListContain(const uint8_t* regList,const uint8_t item){
+// assumes regList is at maxiumum 4 items, and will contain 16 for all 4 items
+static inline bool doesRegListContain(const uint8_t* regList,const uint8_t item){
 	return regList[0]==item | regList[1]==item | regList[2]==item | regList[3]==item;
-	// older code (which is more general-purpose) is below
-	uint8_t itemInRegList;
-	while ((itemInRegList=*(regList++))!=16){
-		if (itemInRegList==item) return true;
-	}
-	return false;
 }
 
-bool doRegListsHaveCommon(const uint8_t* regList0,const uint8_t* regList1){
+static inline bool doRegListsHaveCommon(const uint8_t* regList0,const uint8_t* regList1){
 	if (regList0[0]==16 | regList1[0]==16) return false;
 	if (regList0[1]==16 & regList1[1]==16) return regList0[0]==regList1[0];
-	// older code (which is more general-purpose) is below
 	uint8_t itemInRegList0;
 	while ((itemInRegList0=*(regList0++))!=16){
 		if (doesRegListContain(regList1,itemInRegList0)) return true;

@@ -13,6 +13,588 @@ There is constant and static expression walking and evaluation in this file too
 */
 
 
+void applyFinalizeToGlobalStaticData(){
+	if (globalStringLiteralEntries.numberOfValidEntries!=0){
+		for (uint32_t i0=1;i0<globalStringLiteralEntries.numberOfValidEntries;i0++){
+			uint32_t i1=i0;
+			while (i1!=0){
+				struct StringLiteralEntry* sle_ptr_1=globalStringLiteralEntries.entries+(i1-0);
+				struct StringLiteralEntry* sle_ptr_2=globalStringLiteralEntries.entries+(i1-1);
+				if (sle_ptr_2->lengthOfData<=sle_ptr_1->lengthOfData) break;
+				struct StringLiteralEntry sle;
+				sle=*sle_ptr_2;
+				*sle_ptr_2=*sle_ptr_1;
+				*sle_ptr_1=sle;
+				i1--;
+			}
+		}
+		for (uint32_t i0=1;i0<globalStringLiteralEntries.numberOfValidEntries;i0++){
+			uint32_t i1=i0;
+			while (i1!=0){
+				struct StringLiteralEntry* sle_ptr_1=globalStringLiteralEntries.entries+(i1-0);
+				struct StringLiteralEntry* sle_ptr_2=globalStringLiteralEntries.entries+(i1-1);
+				if (sle_ptr_2->lengthOfData!=sle_ptr_1->lengthOfData) break;
+				uint8_t stringCompareResult = stringDataCompare(sle_ptr_1->data,sle_ptr_2->data,sle_ptr_2->lengthOfData);
+				if (stringCompareResult!=1) break;
+				struct StringLiteralEntry sle;
+				sle=*sle_ptr_2;
+				*sle_ptr_2=*sle_ptr_1;
+				*sle_ptr_1=sle;
+				i1--;
+			}
+		}
+		{
+		uint32_t* labelRenamesFrom;
+		uint32_t* labelRenamesTo;
+		{
+		uint32_t sizeForAllocation=(globalStringLiteralEntries.numberOfValidEntries-1)*sizeof(uint32_t);
+		labelRenamesFrom=cosmic_malloc(sizeForAllocation);
+		labelRenamesTo=cosmic_malloc(sizeForAllocation);
+		}
+		uint32_t labelRenamesCount=0;
+		for (uint32_t i0=1;i0<globalStringLiteralEntries.numberOfValidEntries;i0++){
+			struct StringLiteralEntry* sle_ptr_1=globalStringLiteralEntries.entries+(i0-0);
+			struct StringLiteralEntry* sle_ptr_2=globalStringLiteralEntries.entries+(i0-1);
+			while (i0<globalStringLiteralEntries.numberOfValidEntries){
+				if (sle_ptr_2->lengthOfData!=sle_ptr_1->lengthOfData) break;
+				uint8_t stringCompareResult = stringDataCompare(sle_ptr_1->data,sle_ptr_2->data,sle_ptr_2->lengthOfData);
+				if (stringCompareResult!=0) break;
+				labelRenamesFrom[labelRenamesCount]=sle_ptr_1->label;
+				labelRenamesTo[labelRenamesCount]=sle_ptr_2->label;
+				labelRenamesCount++;
+				cosmic_free(sle_ptr_1->data);
+				for (uint32_t i1=i0+1;i1<globalStringLiteralEntries.numberOfValidEntries;i1++){
+					globalStringLiteralEntries.entries[i1-1]=globalStringLiteralEntries.entries[i1-0];
+				}
+				globalStringLiteralEntries.numberOfValidEntries--;
+			}
+		}
+		applyLabelRenamesInAllCompressedInstructionBuffers(labelRenamesFrom,labelRenamesTo,labelRenamesCount);
+		applyLabelRenamesInInstructionBuffer(&global_static_data,labelRenamesFrom,labelRenamesTo,labelRenamesCount);
+		cosmic_free(labelRenamesFrom);
+		cosmic_free(labelRenamesTo);
+		}
+	}
+	RemoveUnusedStart:;
+	{
+	InstructionSingle* buffer=global_static_data.buffer;
+	uint32_t labelCount=0;
+	uint32_t i0;
+	for (i0=0;i0<global_static_data.numberOfSlotsTaken;i0++){
+		if (buffer[i0].id==I_LABL) labelCount++;
+	}
+	uint32_t labelTotal=labelCount;
+	if (labelTotal==0) goto RemoveUnusedEnd;
+	uint32_t* labelMarkoff=cosmic_malloc(labelTotal*sizeof(uint32_t));
+	labelCount=0;
+	for (i0=0;i0<global_static_data.numberOfSlotsTaken;i0++){
+		if (buffer[i0].id==I_LABL) labelMarkoff[labelCount++]=buffer[i0].arg.D.a_0;
+	}
+	doLabelMarkoffInAllCompressedInstructionBuffers(labelMarkoff,labelCount);
+	doLabelMarkoffInInstructionBuffer(&global_static_data,labelMarkoff,labelCount);
+	uint32_t i1;
+	labelCount=0;
+	for (i1=0;i1<labelTotal;i1++){
+		if (labelMarkoff[i1]!=0){
+			// then unused
+			for (i0=0;i0<global_static_data.numberOfSlotsTaken;i0++){
+				if (buffer[i0].id==I_LABL){
+					if (labelCount==i1){
+						uint32_t unusedLabelNumber=buffer[i0].arg.D.a_0;
+						bool foundVariable=false;
+						for (uint32_t i2=0;i2<blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots;i2++){
+							if (blockFrameArray.globalBlockFrame.globalVariableEntries[i2].labelID==unusedLabelNumber){
+								if (!blockFrameArray.globalBlockFrame.globalVariableEntries[i2].usedStatic){
+									// if the declaration used static, then it cannot be verified that this can be removed, it may be used elsewhere at link time
+									goto ContinueUnusedSearch;
+								}
+								err_010_0("This static variable is effectively unused. It\'s data is being removed. Remove the keyword 'static' to avoid removal.",blockFrameArray.globalBlockFrame.globalVariableEntries[i2].indexOfDeclaration);
+								foundVariable=true;
+								break;
+							}
+						}
+						assert(foundVariable);
+						assert(i0!=0 && (buffer[i0-1].id==I_NSNB | buffer[i0-1].id==I_NSCB));
+						uint32_t bytesLeft=buffer[i0-1].arg.D.a_0;
+						buffer[i0-1].id=I_NOP_;
+						while (bytesLeft!=0){
+							enum InstructionTypeID id=buffer[i0].id;
+							if (id==I_SYDB | id==I_BYTE){bytesLeft-=1;}
+							else if (id==I_SYDW | id==I_WORD){assert(bytesLeft>=2);bytesLeft-=2;}
+							else if (id==I_SYDD | id==I_DWRD){assert(bytesLeft>=4);bytesLeft-=4;}
+							else if (id==I_ZNXB){assert(bytesLeft>=buffer[i0].arg.D.a_0);bytesLeft-=buffer[i0].arg.D.a_0;}
+							buffer[i0++].id=I_NOP_;
+							if (i0>=global_static_data.numberOfSlotsTaken){
+								assert(bytesLeft==0);
+								break;
+							}
+						}
+						removeNop(&global_static_data);
+						cosmic_free(labelMarkoff);
+						goto RemoveUnusedStart;
+					} else {
+						labelCount++;
+					}
+				}
+			}
+		}
+		ContinueUnusedSearch:;
+	}
+	}
+	RemoveUnusedEnd:;
+	if (globalStringLiteralEntries.numberOfValidEntries!=0){
+		{
+		bool didStringRemoveAtLeastOne=false;
+		uint32_t* stringLabelMarkoff=cosmic_malloc(globalStringLiteralEntries.numberOfValidEntries*sizeof(uint32_t));
+		uint32_t i0;
+		for (i0=0;i0<globalStringLiteralEntries.numberOfValidEntries;i0++){
+			stringLabelMarkoff[i0]=globalStringLiteralEntries.entries[i0].label;
+		}
+		doLabelMarkoffInAllCompressedInstructionBuffers(stringLabelMarkoff,globalStringLiteralEntries.numberOfValidEntries);
+		doLabelMarkoffInInstructionBuffer(&global_static_data,stringLabelMarkoff,globalStringLiteralEntries.numberOfValidEntries);
+		for (i0=globalStringLiteralEntries.numberOfValidEntries;i0--!=0;){
+			if (stringLabelMarkoff[i0]!=0){
+				didStringRemoveAtLeastOne=true;
+				cosmic_free(globalStringLiteralEntries.entries[i0].data);
+				for (uint32_t i1=i0+1;i1<globalStringLiteralEntries.numberOfValidEntries;i1++){
+					globalStringLiteralEntries.entries[i1-1]=globalStringLiteralEntries.entries[i1-0];
+				}
+				globalStringLiteralEntries.numberOfValidEntries--;
+			}
+		}
+		cosmic_free(stringLabelMarkoff);
+		if (didStringRemoveAtLeastOne) goto RemoveUnusedStart;
+		}
+		// todo: allow string literals to be stored inside of other string literals (put that here)
+		{
+		InstructionBuffer ib_temp;
+		initInstructionBuffer(&ib_temp);
+		uint32_t totalByteCount=0;
+		for (uint32_t i0=0;i0<globalStringLiteralEntries.numberOfValidEntries;i0++){
+			totalByteCount+=globalStringLiteralEntries.entries[i0].lengthOfData;
+		}
+		InstructionSingle IS_temp;
+		IS_temp.id=I_NSCB;
+		IS_temp.arg.D.a_0=totalByteCount;
+		addInstruction(&ib_temp,IS_temp);
+		for (uint32_t i0=0;i0<globalStringLiteralEntries.numberOfValidEntries;i0++){
+			struct StringLiteralEntry sle=globalStringLiteralEntries.entries[i0];
+			IS_temp.id=I_LABL;
+			IS_temp.arg.D.a_0=sle.label;
+			addInstruction(&ib_temp,IS_temp);
+			IS_temp.id=I_BYTE;
+			for (uint32_t i1=0;i1<sle.lengthOfData;i1++){
+				IS_temp.arg.B.a_0=sle.data[i1];
+				addInstruction(&ib_temp,IS_temp);
+			}
+		}
+		dataBytecodeReduction(&ib_temp);
+		singleMergeIB(&global_static_data,&ib_temp);
+		destroyInstructionBuffer(&ib_temp);
+		}
+	}
+	dataBytecodeReduction(&global_static_data); // probably won't find anything, but it doesn't really hurt to try
+}
+
+
+
+struct MemoryOrganizerForInitializer{
+	uint32_t size;
+	bool* isSet; // isSet[location] is if the byte is set at location
+	InstructionBuffer ib;
+};
+
+void initMemoryOrganizerForInitializer(
+		struct MemoryOrganizerForInitializer* mofi,
+		uint32_t size){
+	
+	mofi->size=size;
+	mofi->isSet=cosmic_calloc(size,sizeof(bool));
+	initInstructionBuffer(&mofi->ib);
+}
+
+// finalizes the MemoryOrganizerForInitializer into a single InstructionBuffer without LOFF
+// the MemoryOrganizerForInitializer is destroyed
+InstructionBuffer finalizeMemoryOrganizerForInitializer(
+		struct MemoryOrganizerForInitializer* mofi_ptr,
+		uint32_t labelNumber,bool isConst){
+	
+	assert(labelNumber!=0);
+	struct MemoryOrganizerForInitializer mofi=*mofi_ptr;
+	cosmic_free(mofi.isSet);
+	InstructionBuffer ib_destination;
+	InstructionSingle IS_temp;
+	initInstructionBuffer(&ib_destination);
+	IS_temp.id=isConst?I_NSCB:I_NSNB;
+	IS_temp.arg.D.a_0=mofi.size;
+	addInstruction(&ib_destination,IS_temp);
+	IS_temp.id=I_LABL;
+	IS_temp.arg.D.a_0=labelNumber;
+	addInstruction(&ib_destination,IS_temp);
+	bool didFind;
+	uint32_t lowestOffset;
+	uint32_t locationOfLowestOffset;
+	uint32_t currentOffset=0;
+	InstructionSingle* IS_ptr_end=mofi.ib.buffer+mofi.ib.numberOfSlotsTaken;
+	goto TransitionLoopStart;
+	do {
+		if (currentOffset!=lowestOffset){
+			IS_temp.id=I_ZNXB;
+			IS_temp.arg.D.a_0=lowestOffset-currentOffset;
+			currentOffset=lowestOffset;
+			addInstruction(&ib_destination,IS_temp);
+		}
+		mofi.ib.buffer[locationOfLowestOffset++].id=I_NOP_;
+		assert(locationOfLowestOffset<mofi.ib.numberOfSlotsTaken);
+		{
+			enum InstructionTypeID data_type=mofi.ib.buffer[locationOfLowestOffset].id;
+			if (data_type==I_BYTE | data_type==I_SYDB){
+				currentOffset+=1;
+			} else if (data_type==I_WORD | data_type==I_SYDW){
+				currentOffset+=2;
+			} else {
+				assert(data_type==I_DWRD | data_type==I_SYDD);
+				currentOffset+=4;
+			}
+		}
+		do {
+			InstructionSingle* IS_ptr=mofi.ib.buffer+locationOfLowestOffset;
+			if (IS_ptr->id==I_NOP_){
+				do {
+					if (++locationOfLowestOffset<mofi.ib.numberOfSlotsTaken) goto TransitionLoopStart;
+					IS_ptr=mofi.ib.buffer+locationOfLowestOffset;
+				} while (IS_ptr->id!=I_NOP_);
+			}
+			if (IS_ptr->id==I_LOFF) goto TransitionLoopStart;
+			addInstruction(&ib_destination,*IS_ptr);
+			IS_ptr->id=I_NOP_;
+		} while (++locationOfLowestOffset<mofi.ib.numberOfSlotsTaken);
+		TransitionLoopStart:
+		didFind=false;
+		lowestOffset=0;
+		locationOfLowestOffset=0;
+		for (uint32_t i=0;i<mofi.ib.numberOfSlotsTaken;i++){
+			InstructionSingle* IS_ptr=mofi.ib.buffer+i;
+			if (IS_ptr->id==I_LOFF){
+				if (!didFind | IS_ptr->arg.D.a_0<lowestOffset){
+					didFind=true;
+					lowestOffset=IS_ptr->arg.D.a_0;
+					locationOfLowestOffset=i;
+				}
+			}
+		}
+	} while (didFind);
+	if (mofi.size!=currentOffset){
+		IS_temp.id=I_ZNXB;
+		IS_temp.arg.D.a_0=mofi.size-currentOffset;
+		currentOffset=mofi.size;
+		addInstruction(&ib_destination,IS_temp);
+	}
+	destroyInstructionBuffer(&mofi.ib);
+	dataBytecodeReduction(&ib_destination);
+	return ib_destination;
+}
+
+
+/*
+the instruction buffer that is given should have LOFF as first instruction
+the instruction buffer that is given will be destroyed (deallocated)
+returns 0 for no error
+returns 1 for memory overwrite failure
+returns 2 for alignment failure
+returns 3 for value stack overflow
+if return value is not zero, the InstructionBuffer is not destroyed
+*/
+uint8_t setUnitInitializer(
+		struct MemoryOrganizerForInitializer* mofi,
+		InstructionBuffer* ib){
+	
+	assert(ib->buffer[0].id==I_LOFF);
+	uint8_t expectedResultWordSize;
+	enum InstructionTypeID data_type=ib->buffer[1].id;
+	{
+		uint32_t location=ib->buffer[0].arg.D.a_0;
+		bool* isSet=mofi->isSet+location;
+		if (data_type==I_BYTE | data_type==I_SYDB){
+			if (*(isSet+0)) return 1;
+			*(isSet+0)=1;
+			expectedResultWordSize=1;
+		} else if (data_type==I_WORD | data_type==I_SYDW){
+			if ((location&1)!=0) return 2;
+			if (*(isSet+0) | *(isSet+1)) return 1;
+			*(isSet+0)=1;*(isSet+1)=1;
+			expectedResultWordSize=1;
+		} else {
+			assert(data_type==I_DWRD | data_type==I_SYDD);
+			if ((location&1)!=0) return 2;
+			if (*(isSet+0) | *(isSet+1) | *(isSet+2) | *(isSet+3)) return 1;
+			*(isSet+0)=1;*(isSet+1)=1;*(isSet+2)=1;*(isSet+3)=1;
+			expectedResultWordSize=2;
+		}
+	}
+	if (data_type!=I_BYTE & data_type!=I_WORD & data_type!=I_DWRD){
+		// todo: test value computations. especially dword, I'm not completely sure that the 2 words don't get switched at some point
+		ConstOptStart:;
+		uint16_t valueStack[100];
+		bool isValueStackConst[100];
+		int16_t valueStackLocation=0;
+		InstructionSingle* IS_ptr=ib->buffer+2;
+		assert(IS_ptr->id!=I_SYDE);
+		do {
+			if (valueStackLocation>97) return 3;
+			bool isResultConstant; // is false for constant loads
+			switch (IS_ptr->id){
+				case I_SYCB:
+				valueStack[valueStackLocation]=IS_ptr->arg.B.a_0;
+				isValueStackConst[valueStackLocation]=true;
+				valueStackLocation+=1;
+				isResultConstant=false;
+				break;
+				case I_SYCW:
+				valueStack[valueStackLocation]=IS_ptr->arg.W.a_0;
+				isValueStackConst[valueStackLocation]=true;
+				valueStackLocation+=1;
+				isResultConstant=false;
+				break;
+				case I_SYCD:
+				valueStack[valueStackLocation+0]=IS_ptr->arg.D.a_0>>16;
+				valueStack[valueStackLocation+1]=IS_ptr->arg.D.a_0>> 0;
+				isValueStackConst[valueStackLocation+0]=true;
+				isValueStackConst[valueStackLocation+1]=true;
+				valueStackLocation+=2;
+				isResultConstant=false;
+				break;
+				case I_SYCL:
+				isValueStackConst[valueStackLocation+0]=false;
+				isValueStackConst[valueStackLocation+1]=false;
+				valueStackLocation+=2;
+				isResultConstant=false;
+				break;
+				case I_SYC1:
+				case I_SYC3:
+				case I_SYC5:
+				case I_SYC7:
+				case I_SYC9:
+				case I_SYCY:
+				case I_SYCU:
+				case I_SYCQ:
+				isResultConstant=isValueStackConst[valueStackLocation-1]&isValueStackConst[valueStackLocation-2]&isValueStackConst[valueStackLocation-3]&isValueStackConst[valueStackLocation-4];
+				valueStackLocation-=4;
+				isValueStackConst[valueStackLocation+0]=false;
+				isValueStackConst[valueStackLocation+1]=false;
+				valueStackLocation+=2;
+				break;
+				case I_SYC0:
+				case I_SYC2:
+				case I_SYC4:
+				case I_SYC6:
+				case I_SYC8:
+				case I_SYCX:
+				case I_SYCA:
+				case I_SYCO:
+				case I_SYCT:
+				case I_SYCM:
+				isResultConstant=isValueStackConst[valueStackLocation-1]&isValueStackConst[valueStackLocation-2];
+				valueStackLocation-=2;
+				isValueStackConst[valueStackLocation]=false;
+				valueStackLocation+=1;
+				break;
+				case I_SYCZ:
+				case I_SYCS:
+				isResultConstant=isValueStackConst[valueStackLocation-1];
+				valueStackLocation-=1;
+				isValueStackConst[valueStackLocation+0]=false;
+				isValueStackConst[valueStackLocation+1]=false;
+				valueStackLocation+=2;
+				break;
+				case I_SYCC:
+				case I_SYCN:
+				isResultConstant=isValueStackConst[valueStackLocation-1];
+				isValueStackConst[valueStackLocation-1]=false;
+				break;
+				default:;assert(false);
+			}
+			assert(valueStackLocation>=0);
+			if (isResultConstant){
+				//printInstructionBufferWithMessageAndNumber(ib,"Identified constant operation",0);
+				int16_t deltaToDestroy;
+				{
+					const enum InstructionTypeID id_that_is_const=IS_ptr->id;
+					uint16_t constValues[4];
+					uint32_t constValues32[2];
+					bool resultIsDword=false;
+					if (id_that_is_const==I_SYCZ | 
+						id_that_is_const==I_SYCS){
+						
+						resultIsDword=true;
+						deltaToDestroy=1;
+						valueStackLocation-=1;
+						constValues[0]=valueStack[valueStackLocation-1];
+					} else if (
+						id_that_is_const==I_SYCC | 
+						id_that_is_const==I_SYCN){
+						
+						deltaToDestroy=1;
+						constValues[0]=valueStack[valueStackLocation-1];
+					} else if (
+						id_that_is_const==I_SYC1 | 
+						id_that_is_const==I_SYC3 | 
+						id_that_is_const==I_SYC5 | 
+						id_that_is_const==I_SYC7 | 
+						id_that_is_const==I_SYC9 | 
+						id_that_is_const==I_SYCY | 
+						id_that_is_const==I_SYCU | 
+						id_that_is_const==I_SYCQ){
+						
+						resultIsDword=true;
+						deltaToDestroy=4;
+						valueStackLocation+=2;
+						constValues[0]=valueStack[valueStackLocation-4];
+						constValues[1]=valueStack[valueStackLocation-3];
+						constValues[2]=valueStack[valueStackLocation-2];
+						constValues[3]=valueStack[valueStackLocation-1];
+						constValues32[0]=(constValues[1]<<16)|(constValues[0]<< 0);
+						constValues32[1]=(constValues[3]<<16)|(constValues[2]<< 0);
+					} else {
+						deltaToDestroy=2;
+						valueStackLocation+=1;
+						constValues[0]=valueStack[valueStackLocation-2];
+						constValues[1]=valueStack[valueStackLocation-1];
+					}
+					switch (id_that_is_const){
+						case I_SYC1:
+						constValues32[0]+=constValues32[1];
+						break;
+						case I_SYC3:
+						constValues32[0]-=constValues32[1];
+						break;
+						case I_SYC5:
+						constValues32[0]*=constValues32[1];
+						break;
+						case I_SYC7:
+						constValues32[0]/=constValues32[1];
+						break;
+						case I_SYC9:
+						constValues32[0]%=constValues32[1];
+						break;
+						case I_SYCY:
+						constValues32[0]^=constValues32[1];
+						break;
+						case I_SYCU:
+						constValues32[0]&=constValues32[1];
+						break;
+						case I_SYCQ:
+						constValues32[0]|=constValues32[1];
+						break;
+						case I_SYC0:
+						constValues[0]+=constValues[1];
+						break;
+						case I_SYC2:
+						constValues[0]-=constValues[1];
+						break;
+						case I_SYC4:
+						constValues[0]*=constValues[1];
+						break;
+						case I_SYC6:
+						constValues[0]/=constValues[1];
+						break;
+						case I_SYC8:
+						constValues[0]%=constValues[1];
+						break;
+						case I_SYCX:
+						constValues[0]^=constValues[1];
+						break;
+						case I_SYCA:
+						constValues[0]&=constValues[1];
+						break;
+						case I_SYCO:
+						constValues[0]|=constValues[1];
+						break;
+						case I_SYCZ:
+						constValues32[0]=constValues[0];
+						break;
+						case I_SYCS:
+						constValues32[0] =((uint32_t)0xFFFF0000lu*((constValues[0]&0xA000u)!=0))|constValues[0];
+						break;
+						case I_SYCC:
+						constValues[0]&=0xFFu;
+						constValues[0]|=0xFF00u*((constValues[0]&0x00A0u)!=0);
+						break;
+						case I_SYCN:
+						constValues[0]=constValues[0]!=0;					
+						break;
+						case I_SYCM:
+						constValues[0]=(constValues[0]|constValues[1])!=0;
+						case I_SYCT:
+						break;
+						default:;assert(false);
+					}
+					if (resultIsDword){
+						IS_ptr->id=I_SYCD;
+						IS_ptr->arg.D.a_0=constValues32[0];
+					} else {
+						IS_ptr->id=I_SYCW;
+						IS_ptr->arg.W.a_0=constValues[0];
+					}
+				}
+				//printInstructionBufferWithMessageAndNumber(ib,"After Assignment before removal",0);
+				while (deltaToDestroy!=0){
+					assert(deltaToDestroy>0);
+					--IS_ptr;
+					assert(IS_ptr>ib->buffer);
+					if (IS_ptr->id==I_SYCD){
+						if (deltaToDestroy==1){
+							printf("I don\'t think this should happen\n");
+						}
+						deltaToDestroy-=2;
+					} else {
+						assert(IS_ptr->id==I_SYCW | IS_ptr->id==I_SYCB);
+						deltaToDestroy-=1;
+					}
+					IS_ptr->id=I_NOP_;
+				}
+				//printInstructionBufferWithMessageAndNumber(ib,"After removal",0);
+				removeNop(ib);
+				goto ConstOptStart;
+			}
+		} while ((++IS_ptr)->id!=I_SYDE);
+		assert(expectedResultWordSize==valueStackLocation);
+		IS_ptr=ib->buffer+2;
+		do {
+			if (IS_ptr->id==I_SYCW){
+				if ((IS_ptr->arg.W.a_0&0xFF00u)==0){
+					uint8_t b=IS_ptr->arg.W.a_0;
+					IS_ptr->id=I_SYCB;
+					IS_ptr->arg.B.a_0=b;
+				}
+			}
+		} while ((IS_ptr++)->id!=I_SYDE);
+		if (ib->numberOfSlotsTaken==4){
+			IS_ptr=ib->buffer+1;
+			if ((IS_ptr+1)->id!=I_SYCL & (IS_ptr+2)->id==I_SYDE){
+				const enum InstructionTypeID id0=IS_ptr->id;
+				if      (id0==I_SYDB) IS_ptr->id=I_BYTE;
+				else if (id0==I_SYDW) IS_ptr->id=I_WORD;
+				else if (id0==I_SYDD) IS_ptr->id=I_DWRD;
+				else goto SimpleOptExit;
+				uint32_t val;
+				ib->numberOfSlotsTaken=2;
+				const InstructionSingle IS_temp=*(IS_ptr+1);
+				if      (IS_temp.id==I_SYCB)    val=IS_temp.arg.B.a_0;
+				else if (IS_temp.id==I_SYCW)    val=IS_temp.arg.W.a_0;
+				else{assert(IS_temp.id==I_SYCD);val=IS_temp.arg.D.a_0;}
+				if      (id0==I_SYDB) IS_ptr->arg.B.a_0=val;
+				else if (id0==I_SYDW) IS_ptr->arg.W.a_0=val;
+				else                  IS_ptr->arg.D.a_0=val;
+			}
+		}
+		SimpleOptExit:;
+	}
+	singleMergeIB(&mofi->ib,ib);
+	destroyInstructionBuffer(ib);
+	return 0;
+}
+
 
 // not all operators are done yet
 void applyConstantOperator(ExpressionTreeNode* thisNode){
@@ -73,11 +655,11 @@ void applyConstantOperator(ExpressionTreeNode* thisNode){
 		break;
 		case 59:{
 			if (operatorTypeID==1){
-				printInformativeMessageForExpression(true,"Global variables are not quite ready to be in constant expressions",thisNode);
-				//exit(1);
+				printInformativeMessageForExpression(true,"Global variables cannot be in constant expressions",thisNode);
+				exit(1);
 			} else if (operatorTypeID==2){
 				printInformativeMessageForExpression(true,"Local variables cannot be in constant expressions",thisNode);
-				//exit(1);
+				exit(1);
 			} else if (operatorTypeID==3){
 				*thisConstVal=extraVal;
 			} else { //operatorTypeID==4
@@ -90,7 +672,8 @@ void applyConstantOperator(ExpressionTreeNode* thisNode){
 			if (operatorTypeID==1){
 				*thisConstVal=extraVal;
 			} else {
-				printInformativeMessageForExpression(false,"You need to implement the updates to do this!",thisNode);
+				printInformativeMessageForExpression(false,"String literals cannot be in constant expressions",thisNode);
+				exit(1);
 			}
 		}
 		break;
@@ -324,7 +907,7 @@ uint32_t expressionToConstantValue(const char* typeStringCast,int16_t nodeIndex)
 	return cvtp.value;
 }
 
-void expressionToSymbolicRoot(InstructionBuffer* parent_ib,const char* typeStringCast,uint32_t offset,int16_t nodeIndex, bool potentialNoWarn){
+void expressionToSymbolicRoot(struct MemoryOrganizerForInitializer* mofi,const char* typeStringCast,uint32_t offset,int16_t nodeIndex, bool potentialNoWarn){
 	assert(!doSymbolicConstantGenForExp);
 	doSymbolicConstantGenForExp=true;
 	ExpressionTreeNode* thisNode=expressionTreeGlobalBuffer.expressionTreeNodes+nodeIndex;
@@ -335,6 +918,7 @@ void expressionToSymbolicRoot(InstructionBuffer* parent_ib,const char* typeStrin
 	}
 	expressionToSymbolic(nodeIndex);
 	applyTypeCast(thisNode,typeStringCast,15*!(potentialNoWarn && shouldAvoidWarningsForInitializerExpressionElement(thisNode)));
+	cosmic_free(thisNode->post.typeString);
 	InstructionBuffer* ib=&thisNode->ib;
 	InstructionBuffer ibTemp;
 	initInstructionBuffer(&ibTemp);
@@ -342,7 +926,6 @@ void expressionToSymbolicRoot(InstructionBuffer* parent_ib,const char* typeStrin
 	writeIS.id=I_LOFF;
 	writeIS.arg.D.a_0=offset;
 	addInstruction(&ibTemp,writeIS);
-	//printf("typeString:`%s`\n",typeStringCast);
 	if (sizeOfCastType==1){
 		writeIS.id=I_SYDB;
 	} else if (sizeOfCastType==2){
@@ -357,14 +940,17 @@ void expressionToSymbolicRoot(InstructionBuffer* parent_ib,const char* typeStrin
 	destroyInstructionBuffer(ib);
 	writeIS.id=I_SYDE;
 	addInstruction(&ibTemp,writeIS);
-	
-	//printInformativeMessageForExpression(false,"output for this expression follows:",thisNode);
-	//printInstructionBufferWithMessageAndNumber(&ibTemp,"output",0);
-	
-	//printf("test exit!\n");
-	//exit(0);
-	destroyInstructionBuffer(&ibTemp);
-	cosmic_free(thisNode->post.typeString);
+	uint8_t errorCode=setUnitInitializer(mofi,&ibTemp);
+	if (errorCode!=0){
+		if (errorCode==1){
+			printInformativeMessageForExpression(true,"Overwrites data previously set inside this initializer",thisNode);
+		} else if (errorCode==2){
+			printInformativeMessageForExpression(true,"Data alignment error",thisNode);
+		} else {
+			printInformativeMessageForExpression(true,"This expression is too large",thisNode);
+		}
+		exit(1);
+	}
 	doSymbolicConstantGenForExp=false;
 }
 
@@ -717,7 +1303,7 @@ char* getTypeStringOfFirstNonStructUnionMember(const char* typeString){
 
 void initializerImplementStaticExpression(
 		int32_t entryIndex,
-		struct RawMemoryForInitializer* rmfi,
+		struct MemoryOrganizerForInitializer* mofi,
 		const char* typeStringCast,
 		uint32_t memoryOffset,
 		bool potentialNoWarn){
@@ -725,28 +1311,10 @@ void initializerImplementStaticExpression(
 	if (isTypeStringOfStructOrUnion(stripQualifiersC(typeStringCast,NULL,NULL))){
 		// this causes static initizations of structs/unions from expression -> initializing that struct/union 's first member from expression
 		char* firstMemberTypeString=getTypeStringOfFirstNonStructUnionMember(typeStringCast);
-		initializerImplementStaticExpression(entryIndex,rmfi,firstMemberTypeString,memoryOffset,true);
+		initializerImplementStaticExpression(entryIndex,mofi,firstMemberTypeString,memoryOffset,true);
 		cosmic_free(firstMemberTypeString);
 	} else {
-		struct InitializerMapEntry* ime=initializerMap.entries+entryIndex;
-		/*
-		struct ConstValueTypePair cvtp;
-		expressionToConstantBase(&cvtp,typeStringCast,ime->expNode,potentialNoWarn);
-		bool didSetFail;
-		if (cvtp.size==1){
-			didSetFail=setByteRawMemoryForInitializer(rmfi,1,memoryOffset,cvtp.value);
-		} else if (cvtp.size==2){
-			didSetFail=setWordRawMemoryForInitializer(rmfi,2,memoryOffset,cvtp.value);
-		} else if (cvtp.size==4){
-			didSetFail=setDwordRawMemoryForInitializer(rmfi,4,memoryOffset,cvtp.value);
-		} else {
-			assert(false); //bad size
-		}
-		if (didSetFail){
-			printf("Warning: data overlap in initializer\n");
-		}
-		*/
-		expressionToSymbolicRoot(NULL,typeStringCast,memoryOffset,ime->expNode,potentialNoWarn); // todo: remove null
+		expressionToSymbolicRoot(mofi,typeStringCast,memoryOffset,initializerMap.entries[entryIndex].expNode,potentialNoWarn); // todo: remove null
 	}
 }
 
@@ -1092,7 +1660,7 @@ void initializerPreImplementList(
 }
 
 void initializerImplementList(
-		struct RawMemoryForInitializer* rmfi,
+		struct MemoryOrganizerForInitializer* mofi,
 		InstructionBuffer* ib,
 		uint32_t memoryOffset,
 		int32_t entryIndex,
@@ -1103,7 +1671,6 @@ void initializerImplementList(
 	struct InitializerMapEntry* ime=initializerMap.entries+entryIndex;
 	struct InitializerMapEntry* imeChain=initializerMap.entries+ime->subEntry; // name is a little misleading at the beginning
 	int32_t chainIndex=ime->subEntry;
-	
 	char cts= crackedType[0];
 	bool hasQualifier;
 	if ((hasQualifier=(cts=='g' | cts=='f'))) cts= crackedType[1];
@@ -1123,13 +1690,13 @@ void initializerImplementList(
 			uint32_t subOffset=memoryOffset+designationOffsetTotal;
 			bool isFirstAndLast=isFirst&(imeChain->chainEntry==-1);
 			if (imeChain->typeOfEntry==1){
-				initializerImplementList(rmfi,ib,subOffset,chainIndex,designatedCrackedType,isStatic);
+				initializerImplementList(mofi,ib,subOffset,chainIndex,designatedCrackedType,isStatic);
 			} else {
 				char* subTypeString=advancedCrackedTypeToTypeString(designatedCrackedType);
 				if (doesThisTypeStringHaveAnIdentifierAtBeginning(subTypeString)){
 					applyToTypeStringRemoveIdentifierToSelf(subTypeString);
 				}
-				if (isStatic) {initializerImplementStaticExpression(chainIndex,rmfi,subTypeString,subOffset,isFirstAndLast);}
+				if (isStatic) {initializerImplementStaticExpression(chainIndex,mofi,subTypeString,subOffset,isFirstAndLast);}
 				else {initializerImplementNonstaticExpression(chainIndex,ib,subTypeString,subOffset,true,isFirstAndLast);}
 				cosmic_free(subTypeString);
 			}
@@ -1153,13 +1720,13 @@ void initializerImplementList(
 			assert(walkingIndex<readHexInString(crackedType+1+hasQualifier));
 			uint32_t subOffset=memoryOffset+designationOffsetTotal;
 			if (imeChain->typeOfEntry==1){
-				initializerImplementList(rmfi,ib,subOffset,chainIndex,crackedType+9+hasQualifier,isStatic);
+				initializerImplementList(mofi,ib,subOffset,chainIndex,crackedType+9+hasQualifier,isStatic);
 			} else {
 				char* subTypeString=advancedCrackedTypeToTypeString(designatedCrackedType);
 				if (doesThisTypeStringHaveAnIdentifierAtBeginning(subTypeString)){
 					applyToTypeStringRemoveIdentifierToSelf(subTypeString);
 				}
-				if (isStatic) {initializerImplementStaticExpression(chainIndex,rmfi,subTypeString,subOffset,false);}
+				if (isStatic) {initializerImplementStaticExpression(chainIndex,mofi,subTypeString,subOffset,false);}
 				else {initializerImplementNonstaticExpression(chainIndex,ib,subTypeString,subOffset,true,false);}
 				cosmic_free(subTypeString);
 			}
@@ -1175,10 +1742,10 @@ void initializerImplementList(
 		assert(imeChain->chainEntry==-1);
 		assert(imeChain->descriptionBranchEntry==-1);
 		if (imeChain->typeOfEntry==1){
-			initializerImplementList(rmfi,ib,memoryOffset,ime->subEntry,crackedType,isStatic);
+			initializerImplementList(mofi,ib,memoryOffset,ime->subEntry,crackedType,isStatic);
 		} else {
 			char* unitType=advancedCrackedTypeToTypeString(crackedType);
-			if (isStatic) {initializerImplementStaticExpression(chainIndex,rmfi,unitType,memoryOffset,false);}
+			if (isStatic) {initializerImplementStaticExpression(chainIndex,mofi,unitType,memoryOffset,false);}
 			else {initializerImplementNonstaticExpression(chainIndex,ib,unitType,memoryOffset,true,false);}
 			cosmic_free(unitType);
 		}
@@ -1188,15 +1755,15 @@ void initializerImplementList(
 }
 
 
-
-// returns true if it used RawMemoryForInitializer, otherwise it used InstructionBuffer
+// returns true if it inserted initialization data into InstructionBuffer, otherwise it inserted assembly
 bool initializerImplementRoot(
-		struct RawMemoryForInitializer* rmfi,
 		InstructionBuffer* ib,
 		int32_t root,
+		uint32_t labelNumber,
 		char** typeStringPtr,
 		bool isStatic){
 	
+	struct MemoryOrganizerForInitializer mofi;
 	char* localTypeString=stripQualifiers(*typeStringPtr,NULL,NULL);
 	struct InitializerMapEntry* ime=initializerMap.entries+root;
 	bool useExpressionForString=false;
@@ -1238,16 +1805,19 @@ bool initializerImplementRoot(
 				break;
 			}
 		}
-		
-		
 		uint32_t typeSize = getSizeofForTypeString(*typeStringPtr,true);
 		assert(typeSize!=0); // sizeof failure not expected
 		typeSize+=typeSize&1;
 		if (isStatic){
-			initRawMemoryForInitializer(rmfi,typeSize);
+			initMemoryOrganizerForInitializer(&mofi,typeSize);
+			initializerImplementList(&mofi,NULL,0,root,crackedType,true);
+			InstructionBuffer ib_temp=finalizeMemoryOrganizerForInitializer(&mofi,labelNumber,false);
+			singleMergeIB(ib,&ib_temp);
+			destroyInstructionBuffer(&ib_temp);
 		} else {
 			uint32_t temp=typeSize;
 			while (temp){
+				// todo: switch to false and see if it generates identical code with the optimizer (if it does then false is more efficient)
 				if (true){
 				insert_IB_load_word(ib,0);
 				insert_IB_STPI(ib,0);
@@ -1263,9 +1833,8 @@ bool initializerImplementRoot(
 				addVoidPop(ib);
 				}
 			}
+			initializerImplementList(NULL,ib,0,root,crackedType,false);
 		}
-		// this stuff will change
-		initializerImplementList(rmfi,ib,0,root,crackedType,isStatic);
 		cosmic_free(crackedType);
 		return isStatic;
 	} else if (initializerMap.typeOfInit==2 &!useExpressionForString){
@@ -1273,115 +1842,58 @@ bool initializerImplementRoot(
 			printInformativeMessageAtSourceContainerIndex(true,"Initializer invalid for declared type",ime->strStart,ime->strEnd);
 			exit(1);
 		}
-		uint32_t walkingIndex = 0;
-		int32_t start;
-		bool isWideLiteral=false;
-		if (sourceContainer.string[ime->strStart]=='L'){
-			start=ime->strStart+2;
-			isWideLiteral=true;
-		} else {
-			start=ime->strStart+1;
-		}
-		for (int32_t i=start;i<ime->strEnd;i++){
-			uint8_t c0 = (uint8_t)(sourceContainer.string[i]);
-			uint8_t valueToSet = c0;
-			if (c0=='\\'){
-				uint8_t c1 = (uint8_t)(sourceContainer.string[i+1]);
-				if (c1=='0'){
-					uint8_t c2 = (uint8_t)(sourceContainer.string[i+2]);
-					uint8_t c3 = (uint8_t)(sourceContainer.string[i+3]);
-					c2 = ucharAsciiAsNumberDigit(c2,true,false);
-					c3 = ucharAsciiAsNumberDigit(c3,true,false);
-					if (c2==200 | c3==200){
-						printf("escape sequence number not in octal range\n");
-						exit(1);
-					}
-					valueToSet=c2*8+c3;
-					i+=2;
-				} else if (c1=='x'){
-					uint8_t c2 = (uint8_t)(sourceContainer.string[i+2]);
-					uint8_t c3 = (uint8_t)(sourceContainer.string[i+3]);
-					c2 = ucharAsciiAsNumberDigit(c2,false,true);
-					c3 = ucharAsciiAsNumberDigit(c3,false,true);
-					if (c2==200 | c3==200){
-						printf("escape sequence number not in hexadecimal range\n");
-						exit(1);
-					}
-					if (isWideLiteral){
-						uint8_t c4 = (uint8_t)(sourceContainer.string[i+4]);
-						uint8_t c5 = (uint8_t)(sourceContainer.string[i+5]);
-						c4 = ucharAsciiAsNumberDigit(c4,false,true);
-						c5 = ucharAsciiAsNumberDigit(c5,false,true);
-						if (c4==200 | c5==200){
-							printf("escape sequence number not in hexadecimal range\n");
-							exit(1);
-						}
-						// not implemented further, as it is currently not supported
-						i+=2;
-					} else {
-						valueToSet=c2*16+c3;
-					}
-					i+=2;
-				} else if (c1=='a'){
-					valueToSet=7;
-				} else if (c1=='b'){
-					valueToSet=8;
-				} else if (c1=='f'){
-					valueToSet=12;
-				} else if (c1=='n'){
-					valueToSet=10;
-				} else if (c1=='r'){
-					valueToSet=13;
-				} else if (c1=='t'){
-					valueToSet=9;
-				} else if (c1=='v'){
-					valueToSet=11;
-				} else if (c1=='\''){
-					valueToSet=39;
-				} else if (c1=='\"'){
-					valueToSet=34;
-				} else if (c1=='\\'){
-					valueToSet=92;
-				} else if (c1=='?'){
-					valueToSet=63;
-				} else {
-					printf("unrecognized escape sequence for string literal\n");
-					exit(1);
-				}
-				i+=1;
-			}
-			if (setByteRawMemoryForInitializer(rmfi,1,walkingIndex++,valueToSet)){
-				printf("Internal Error\n");
-				exit(1);
-			}
+		bool isWideLiteral=sourceContainer.string[ime->strStart]=='L';
+		if (isWideLiteral){
+			printInformativeMessageAtSourceContainerIndex(true,"Wide string literals not ready yet",ime->strStart,ime->strEnd);
+			exit(1);
 		}
 		int32_t enclosementIndex=getIndexOfMatchingEnclosement(localTypeString,0);
 		char* temp=stripQualifiers(localTypeString+enclosementIndex+2,NULL,NULL);
 		if (!doStringsMatch(temp,"char") & !doStringsMatch(temp,"unsigned char")){
-			printInformativeMessageAtSourceContainerIndex(true,"String literal is trying to initialize a type that isn\'t a char[] or char* (sign and qualifiers don\'t matter)",ime->strStart,ime->strEnd);
+			printInformativeMessageAtSourceContainerIndex(true,"String literal is trying to initialize a type that isn\'t a char[] or char*",ime->strStart,ime->strEnd);
 			exit(1);
 		}
+		uint32_t suggestedLength=findLengthOfDataOfStringLiteral(ime->strStart+isWideLiteral,ime->strEnd,isWideLiteral);
+		uint8_t* data=cosmic_malloc(suggestedLength*sizeof(uint8_t));
+		writeStringLiteralData(data,ime->strStart+isWideLiteral,ime->strEnd,suggestedLength,isWideLiteral);
+		uint32_t typeSize;
 		if (enclosementIndex==2){
-			setByteRawMemoryForInitializer(rmfi,1,walkingIndex++,0); // won't fail
-			if (setByteRawMemoryForInitializer(rmfi,1,walkingIndex++,0)){
-				printf("Internal Error\n");
-				exit(1);
-			}
-			char* new=insertSizeToEmptySizedArrayForTypeStringToNew(*typeStringPtr,0,rmfi->size);
+			localTypeString=insertSizeToEmptySizedArrayForTypeStringToNew(localTypeString,0,suggestedLength);
 			cosmic_free(*typeStringPtr);
-			*typeStringPtr=new;
+			*typeStringPtr=localTypeString;
+			typeSize=suggestedLength;
+			assert(suggestedLength==getSizeofForTypeString(localTypeString,true));
 		} else {
-			uint32_t typeSize=getSizeofForTypeString(localTypeString,true);
+			typeSize=getSizeofForTypeString(localTypeString,true);
 			assert(typeSize!=0); // typeString corruption
-			if (typeSize<rmfi->size){
+			if (typeSize<suggestedLength-1){
 				printInformativeMessageAtSourceContainerIndex(true,"String literal is too large for the indicated array size",ime->strStart,ime->strEnd);
 				exit(1);
 			}
-			while (typeSize!=rmfi->size){
-				setByteRawMemoryForInitializer(rmfi,1,walkingIndex++,0); // won't fail
+		}
+		InstructionSingle IS_temp;
+		if (isStatic){
+			IS_temp.id=I_NSNB;
+			IS_temp.arg.D.a_0=typeSize;
+			addInstruction(ib,IS_temp);
+			IS_temp.id=I_LABL;
+			IS_temp.arg.D.a_0=labelNumber;
+			addInstruction(ib,IS_temp);
+			IS_temp.id=I_BYTE;
+			for (uint32_t i=0;i<typeSize;i++){
+				IS_temp.arg.B.a_0=data[i];
+				addInstruction(ib,IS_temp);
+			}
+		} else {
+			for (uint32_t i=0;i<typeSize;i++){
+				insert_IB_load_byte(ib,data[i]);
+				insert_IB_STPI(ib,i);
+				singleMergeIB(ib,&ib_mem_byte_write_n);
+				addVoidPop(ib);
 			}
 		}
-		return true;
+		cosmic_free(data);
+		return isStatic;
 	} else {
 		if (localTypeString[0]=='['){
 			printInformativeMessageAtSourceContainerIndex(true,"Cannot initialize array with expression",ime->strStart,ime->strEnd);
@@ -1398,48 +1910,18 @@ bool initializerImplementRoot(
 				printInformativeMessageAtSourceContainerIndex(true,"Initializing by expression to a struct or union of static storage\n    is not possible with the current implementation of constant expressions",ime->strStart,0);
 				exit(1);
 			}
-			initializerImplementStaticExpression(root,rmfi,*typeStringPtr,0,false);
+			initMemoryOrganizerForInitializer(&mofi,typeSize);
+			initializerImplementStaticExpression(root,&mofi,*typeStringPtr,0,false);
+			InstructionBuffer ib_temp=finalizeMemoryOrganizerForInitializer(&mofi,labelNumber,false);
+			singleMergeIB(ib,&ib_temp);
+			destroyInstructionBuffer(&ib_temp);
 			return true;
 		} else {
-			/*
-			uint32_t temp=typeSize;
-			while (temp){
-				insert_IB_load_word(ib,0);
-				insert_IB_STPI(ib,0);
-				insert_IB_load_dword(ib,typeSize-temp);
-				dualMergeIB(ib,&ib_i_32add,&ib_mem_word_write_n);
-				addVoidPop(ib);
-				temp-=2;
-			}
-			*/
-			
-			// pretty sure that initializerImplementNonstaticExpression() always initializes the memory
-			
 			initializerImplementNonstaticExpression(root,ib,*typeStringPtr,false,false,false);
 			return false;
 		}
 	}
-	
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

@@ -29,6 +29,7 @@ linux
 *.ilk
 *.pdb
 callgrind.out.*
+*.ink
 out.txt
 out*.txt
 trimOut.py

@@ -13,7 +13,7 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 			err_00__1(strMerge3(
 				"sizeof failed on type `",
 				stringInternal,
-				"` by \"had identifier with identifier rejection\""));
+				"` by \"identifier related corruption\""));
 			goto End;
 		}
 		applyToTypeStringRemoveIdentifierToSelf(stringInternal);
@@ -47,15 +47,12 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 			ret=8;goto End;
 		}
 		if (doStringsMatch(stringInternal,"void")){
-			err_00__0("sizeof failed because getting the size of `void` is not allowed");
+			err_10_00("sizeof failed because getting the size of `void` is not allowed");
 			goto End; // void gives the error value of 0
 		}
 	} else {
 		if (isSectionOfStringEquivalent(stringInternal,0,"* ")){
 			ret=4;goto End; // pointers are always 4
-		}
-		if (isSectionOfStringEquivalent(stringInternal,0,"( ")){
-			ret=4;goto End; // not sure when this would come up, but I think that should be 4 (same as pointer)
 		}
 		if (isSectionOfStringEquivalent(stringInternal,0,"[ ")){
 			int32_t indexOfOtherBrace = getIndexOfMatchingEnclosement(stringInternal,0);
@@ -63,7 +60,7 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 				// indexOfOtherBrace<0 is if the bracket match failed
 				// indexOfOtherBrace==2 is if there is nothing inside the brackets
 				// (indexOfOtherBrace+2)>=strlen(stringInternal) is if there is nothing after the brackets
-				err_00__1(strMerge3(
+				err_10_01(strMerge3(
 					"sizeof failed on type `",
 					stringInternal,
 					"` by \"array brackets invalid\""));
@@ -72,8 +69,17 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 			struct NumberParseResult numberParseResult;
 			parseNumber(&numberParseResult,stringInternal,2,indexOfOtherBrace-1);
 			if ((numberParseResult.errorCode!=0) | (numberParseResult.typeOfDecimal!=0)){
-				// todo: change to hex format for type string array sizes
-				printf("Info: sizeof failed on type `%s` by \"unable to parse number for array size\"\n",stringInternal);
+				err_10_01(strMerge3(
+					"sizeof failed on type `",
+					stringInternal,
+					"` by \"unable to parse number for array size\""));
+				goto End;
+			}
+			if (numberParseResult.valueUnion.value==0){
+				err_10_01(strMerge3(
+					"sizeof failed on type `",
+					stringInternal,
+					"` by \"array size cannot be zero\""));
 				goto End;
 			}
 			ret = getSizeofForTypeString(stringInternal+(indexOfOtherBrace+2),true) * numberParseResult.valueUnion.value;
@@ -93,16 +99,16 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 					err_10_01(strMerge3(
 						"sizeof failed on type `",
 						stringInternal,
-						"` by \"struct/union corruption\""));
+						"` by \"struct or union related corruption\""));
 					goto End;
 				}
 				struct TypeSearchResult typeSearchResult;
 				searchForType(&typeSearchResult,stringInternalSkipStart,typeOfThis);
 				if (!typeSearchResult.didExist){
-					err_00__1(strMerge3(
+					err_10_01(strMerge3(
 						"sizeof failed on type `",
 						stringInternal,
-						"` by \"incomplete type\""));
+						"` by \"incomplete struct or union\""));
 					goto End;
 				}
 				ret=typeSearchResult.isGlobal?
@@ -128,11 +134,15 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 		if (doStringsMatch(stringInternal,"long double")){
 			ret=8;goto End;
 		}
+		if (isSectionOfStringEquivalent(stringInternal,0,"( ")){
+			err_10_00("sizeof failed because getting the size of a function is not allowed (use a pointer to a function instead)");
+			goto End;
+		}
 	}
 	err_10_01(strMerge3(
 		"sizeof failed on type `",
 		stringInternal,
-		"` by \"corruption\""));
+		"` by \"unrecognizable corruption\""));
 	End:
 	cosmic_free(stringInternal);
 	return ret;

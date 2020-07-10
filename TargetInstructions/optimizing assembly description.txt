@@ -49,7 +49,7 @@ $ - B
 : - D
 
 
---list of opt-codes and their argument prefixes:
+--list of op-codes and their argument prefixes:
 
 
 NOP_
@@ -171,7 +171,7 @@ SYCT
 
 
 
---list of opt-codes by argument types
+--list of op-codes by argument types
 
 
 NOP_
@@ -285,7 +285,7 @@ SYCL @
 
 
 
---list of opt-codes and their description:
+--list of op-codes and their description:
 
 
 NOP_ - no operation / no data. Used inside the optimizer as a temporary placeholder. 
@@ -449,7 +449,7 @@ FCEN - indicates the end of a function is here (the instruction above is the las
 
 
 
--- the following opt-codes are for symbolic constant data being loaded into registers, and may appear in code segments but not data segments
+-- the following op-codes are for symbolic constant data being loaded into registers, and may appear in code segments but not data segments
 
 
 SYRB - performs a BL1_ using the symbolic calculation that follows
@@ -458,28 +458,29 @@ SYRD - performs a RL2_ using the symbolic calculation that follows
 SYRE - ends the symbolic calculation for SYRB,SYRW,SYRD
 
 
--- the following opt-codes are for symbolic constant data in data segments, and may appear in data segments but not code segments
+-- the following op-codes are for symbolic constant data in data segments, and may appear in data segments but not code segments
 
 
-NSNB - the indicated number of bytes that are next cannot be split up, and the bytes are non-constant
-NSCB - the indicated number of bytes that are next cannot be split up, and the bytes are     constant
-ZNXB - places the indicated number of 0 bytes at location
+NSNB - the indicated number of bytes that are next cannot be split up, and the bytes are non-constant. No allignment is enforced.
+NSCB - the indicated number of bytes that are next cannot be split up, and the bytes are     constant. No allignment is enforced.
+ZNXB - places the indicated number of 0 bytes at location. No allignment is enforced.
 
-NSNW - the indicated number of words that are next cannot be split up, and the words are non-constant
-NSCW - the indicated number of words that are next cannot be split up, and the words are     constant
-ZNXW - places the indicated number of 0 words at location
+NSNW - the indicated number of words that are next cannot be split up, and the words are non-constant. Word allignment is enforced.
+NSCW - the indicated number of words that are next cannot be split up, and the words are     constant. Word allignment is enforced.
+ZNXW - places the indicated number of 0 words at location. Word allignment is enforced.
 
 BYTE - places the given  byte at location. No allignment is enforced.
-WORD - places the given  word at location. Word allignment is enforced (will be padded with zeros on backend).
-DWRD - places the given dword at location. Word allignment is enforced (will be padded with zeros on backend).
+WORD - places the given  word at location. Word allignment is enforced.
+DWRD - places the given dword at location. Word allignment is enforced.
 
 SYDB - places the result of the symbolic calculation that follows as a byte
 SYDW - places the result of the symbolic calculation that follows as a word
 SYDD - places the result of the symbolic calculation that follows as a double word
 SYDE - ends the symbolic calculation for SYDB,SYDW,SYDD
 
+------ Note that "Word allignment is enforced" means that if that op-code is specified and the data is not currently alligned, an error will be thrown.
 
--- the following opt-codes are for symbolic calculations, and may appear in data and code segments. they are not runtime instructions.
+-- the following op-codes are for symbolic calculations, and may appear in data and code segments. they are not runtime instructions.
 
 
 SYCB - push constant byte as word (to symbolic stack)
@@ -493,10 +494,10 @@ SYC2 -  word subtraction
 SYC3 - dword subtraction
 SYC4 -  word multiplication
 SYC5 - dword multiplication
-SYC6 -  word division
-SYC7 - dword division
-SYC8 -  word remainder
-SYC9 - dword remainder
+SYC6 -  word division  (unsigned)
+SYC7 - dword division  (unsigned)
+SYC8 -  word remainder (unsigned)
+SYC9 - dword remainder (unsigned)
 SYCX -  word bitwise xor
 SYCY - dword bitwise xor
 SYCA -  word bitwise and

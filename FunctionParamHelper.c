@@ -55,9 +55,7 @@ void analyseFunctionTypeString(
 		for (uint16_t i=0;i<functionTypeAnalysis->numberOfParameters;i++){
 			uint32_t endIndex = nextUnshieldedEndForFunctionTypeString(typeStringInternal,walkingIndex);
 			char* s = copyStringSegmentToHeap(typeStringInternal,walkingIndex+1,endIndex);
-			if (s[strlen(s)-1]==' '){
-				s[strlen(s)-1]=26;
-			}
+			if (s[strlen(s)-1]==' ') s[strlen(s)-1]=26;
 			if (s[0]==' ') s[0]=26;
 			copyDownForInPlaceEdit(s);
 			applyToTypeStringArrayDecayToSelf(s);

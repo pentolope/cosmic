@@ -2,32 +2,19 @@
 
 #include "Common.c"
 
-// this file is to have the stuff in it for managing raw data (and being able to save space when parts are the same and unmodifiable)
-
-
-
-struct DataLiteralEntries{
-	struct DataLiteralEntry{
+struct {
+	struct StringLiteralEntry{
 		uint32_t label;
-		int32_t startIndex; // this refers to the start index in the source string (it will not include the L for wide string literals)
-		bool isInitializer; // this refers to {} and never strings
-		bool isModifiable;
-		bool isWideStringLiteral;
 		uint32_t lengthOfData; // in bytes, may not be word alligned
-		uint16_t* data;
-		// DON'T DO THE COMMENT BELOW
-		/*
-		for data, each element is one byte,
-		(data[i]&0x00FF) will get the i'th byte
-		((data[i]&0x0100)!=0) will get if the i'th byte has been set
-		((data[i]&0x0200)!=0) will get if the i'th byte is modifiable
-		((data[i]&0x0400)!=0) will get if the i'th byte must be word alligned
-		((data[i]&0x0800)!=0) will get if the i'th byte is part of a 4 byte sequence of a symbolic label number
-		*/		
+		bool isWideLiteral;
+		uint8_t* data;
 	}* entries;
-	int32_t numberOfValidEntries;
-	int32_t numberOfAllocatedSlots;
-} globalDataLiteralEntries;
+	uint32_t numberOfValidEntries;
+	uint32_t numberOfAllocatedSlots;
+} globalStringLiteralEntries;
+
+InstructionBuffer global_static_data={0};
+
 
 
 // only one of asOctal and asHex should be true, obviously
@@ -51,18 +38,18 @@ uint32_t findLengthOfDataOfStringLiteral(int32_t indexOfFirstQuote, int32_t inde
 		printf("Wide literals not completely supported yet\n");
 		exit(1);
 	}
-	uint32_t numberOfCharactersLong = indexOfLastQuote-indexOfFirstQuote;
+	uint32_t numberOfCharactersLong = (indexOfLastQuote-indexOfFirstQuote)-1;
 	for (int32_t i=indexOfFirstQuote+1;i<indexOfLastQuote;i++){
 		uint8_t c0 = (uint8_t)(sourceContainer.string[i]);
 		if (c0=='\\'){
 			uint8_t c1 = (uint8_t)(sourceContainer.string[i+1]);
 			if (c1=='0'){
-				numberOfCharactersLong-=3;
+				numberOfCharactersLong-=3,i+=3;
 			} else if (c1=='x'){
-				if (isWideLiteral) numberOfCharactersLong-=5;
-				else numberOfCharactersLong-=3;
+				if (isWideLiteral) numberOfCharactersLong-=5,i+=5;
+				else numberOfCharactersLong-=3,i+=3;
 			} else {
-				numberOfCharactersLong-=1;
+				numberOfCharactersLong-=1,i+=1;
 			}
 		}
 	}
@@ -70,10 +57,14 @@ uint32_t findLengthOfDataOfStringLiteral(int32_t indexOfFirstQuote, int32_t inde
 }
 
 
-void fillDataLiteralEntry(struct DataLiteralEntry* dataLiteralEntry, int32_t indexOfFirstQuote, int32_t indexOfLastQuote, bool isWideLiteral){
-	uint32_t numberOfCharactersLong = findLengthOfDataOfStringLiteral(indexOfFirstQuote,indexOfLastQuote,isWideLiteral);
-	dataLiteralEntry->lengthOfData = numberOfCharactersLong;
-	dataLiteralEntry->data = cosmic_calloc(numberOfCharactersLong,1);
+void writeStringLiteralData(
+		uint8_t* dataDestination, 
+		int32_t indexOfFirstQuote, 
+		int32_t indexOfLastQuote, 
+		uint32_t dataDestinationSize, 
+		bool isWideLiteral){
+	
+	assert(dataDestinationSize>=findLengthOfDataOfStringLiteral(indexOfFirstQuote,indexOfLastQuote,isWideLiteral));
 	uint32_t walkingIndex = 0;
 	for (int32_t i=indexOfFirstQuote+1;i<indexOfLastQuote;i++){
 		uint8_t c0 = (uint8_t)(sourceContainer.string[i  ]);
@@ -86,8 +77,7 @@ void fillDataLiteralEntry(struct DataLiteralEntry* dataLiteralEntry, int32_t ind
 				c2 = ucharAsciiAsNumberDigit(c2,true,false);
 				c3 = ucharAsciiAsNumberDigit(c3,true,false);
 				if (c2==200 | c3==200){
-					printf("escape sequence number not in octal range\n");
-					exit(1);
+					err_1101_("escape sequence not in octal range",i);
 				}
 				valueToSet=c2*8+c3;
 				i+=2;
@@ -97,8 +87,7 @@ void fillDataLiteralEntry(struct DataLiteralEntry* dataLiteralEntry, int32_t ind
 				c2 = ucharAsciiAsNumberDigit(c2,false,true);
 				c3 = ucharAsciiAsNumberDigit(c3,false,true);
 				if (c2==200 | c3==200){
-					printf("escape sequence number not in hexadecimal range\n");
-					exit(1);
+					err_1101_("escape sequence not in hexadecimal range",i);
 				}
 				if (isWideLiteral){
 					uint8_t c4 = (uint8_t)(sourceContainer.string[i+4]);
@@ -106,8 +95,7 @@ void fillDataLiteralEntry(struct DataLiteralEntry* dataLiteralEntry, int32_t ind
 					c4 = ucharAsciiAsNumberDigit(c4,false,true);
 					c5 = ucharAsciiAsNumberDigit(c5,false,true);
 					if (c4==200 | c5==200){
-						printf("escape sequence number not in hexadecimal range\n");
-						exit(1);
+						err_1101_("escape sequence not in hexadecimal range",i);
 					}
 					// not implemented further, as it is currently not supported
 					i+=2;
@@ -138,36 +126,131 @@ void fillDataLiteralEntry(struct DataLiteralEntry* dataLiteralEntry, int32_t ind
 			} else if (c1=='?'){
 				valueToSet=63;
 			} else {
-				printf("unrecognized escape sequence for string literal\n");
-				exit(1);
+				err_1101_("unknown escape sequence",i);
 			}
 			i+=1;
 		}
-		dataLiteralEntry->data[walkingIndex++]=valueToSet;
+		dataDestination[walkingIndex++]=valueToSet;
 	}
+	dataDestination[walkingIndex-1]=0;
+	assert(walkingIndex<=dataDestinationSize);
+	assert(walkingIndex==findLengthOfDataOfStringLiteral(indexOfFirstQuote,indexOfLastQuote,isWideLiteral));
 }
 
-// returns the label number, if the target is a string then startIndex should be at the quote and never the prefix
-uint32_t addEntryForInitData(int32_t startIndex, bool isInitializer, bool isWideStringLiteral, bool isModifiable){
-	if (globalDataLiteralEntries.numberOfValidEntries>=globalDataLiteralEntries.numberOfAllocatedSlots){
-		globalDataLiteralEntries.numberOfAllocatedSlots += 50;
-		globalDataLiteralEntries.entries = cosmic_realloc(globalDataLiteralEntries.entries,sizeof(struct DataLiteralEntry)*globalDataLiteralEntries.numberOfAllocatedSlots);
+// returns the label number
+// this is only for unmodifiable strings
+uint32_t addEntryForStringData(int32_t indexOfFirstQuote, int32_t indexOfLastQuote, bool isWideLiteral){
+	if (globalStringLiteralEntries.numberOfValidEntries>=globalStringLiteralEntries.numberOfAllocatedSlots){
+		globalStringLiteralEntries.numberOfAllocatedSlots += 50;
+		globalStringLiteralEntries.entries = cosmic_realloc(globalStringLiteralEntries.entries,sizeof(struct StringLiteralEntry)*globalStringLiteralEntries.numberOfAllocatedSlots);
 	}
-	struct DataLiteralEntry* thisEntry = globalDataLiteralEntries.entries+globalDataLiteralEntries.numberOfValidEntries++;
-	{
-		const struct DataLiteralEntry n={0};
-		*thisEntry=n;
+	struct StringLiteralEntry sle;
+	struct StringLiteralEntry* sle_ptr = globalStringLiteralEntries.entries+globalStringLiteralEntries.numberOfValidEntries++;
+	sle.isWideLiteral=isWideLiteral;
+	sle.lengthOfData=findLengthOfDataOfStringLiteral(indexOfFirstQuote,indexOfLastQuote,isWideLiteral);
+	sle.data=cosmic_malloc(sle.lengthOfData);
+	writeStringLiteralData(sle.data,indexOfFirstQuote,indexOfLastQuote,sle.lengthOfData,isWideLiteral);
+	sle.label = ++globalLabelID;
+	*sle_ptr=sle;
+	return sle.label;
+}
+
+
+void dataBytecodeReduction(InstructionBuffer* ib){
+	ReductionOptFullRestart:;
+	bool didApplySingle=false;
+	bool isThisWordMisaligned=false;
+	uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
+	uint32_t i_this=0;
+	uint32_t i_next=1;
+	InstructionSingle* ptr_this=ib->buffer;
+	InstructionSingle* ptr_next=ptr_this+1;
+	while (i_next<numberOfSlotsTaken){
+		InstructionSingle IS_this=*ptr_this;
+		InstructionSingle IS_next=*ptr_next;
+		if (IS_this.id==I_BYTE & IS_next.id==I_BYTE & isThisWordMisaligned==0){
+			ptr_next->id=I_WORD;
+			ptr_next->arg.W.a_0=((uint16_t)IS_next.arg.B.a_0<<8)|((uint16_t)IS_this.arg.B.a_0);
+			ptr_this->id=I_NOP_;
+			numberOfSlotsTaken=ib->numberOfSlotsTaken;
+			didApplySingle=true;goto ReductionOptSingleRestart;
+		}
+		if (IS_next.id==I_WORD & IS_this.id==I_WORD){
+			ptr_next->id=I_DWRD;
+			ptr_next->arg.D.a_0=((uint32_t)IS_next.arg.W.a_0<<16)|((uint32_t)IS_this.arg.W.a_0);
+			ptr_this->id=I_NOP_;
+			numberOfSlotsTaken=ib->numberOfSlotsTaken;
+			didApplySingle=true;goto ReductionOptSingleRestart;
+		}
+		if (IS_next.id==I_ZNXB){
+			if (IS_this.id==I_ZNXB){
+				ptr_next->arg.D.a_0+=ptr_this->arg.D.a_0;
+				ptr_this->id=I_NOP_;
+				numberOfSlotsTaken=ib->numberOfSlotsTaken;
+				didApplySingle=true;goto ReductionOptSingleRestart;
+			}
+			if (IS_this.id==I_BYTE & IS_this.arg.B.a_0==0){
+				ptr_next->arg.D.a_0++;
+				ptr_this->id=I_NOP_;
+				numberOfSlotsTaken=ib->numberOfSlotsTaken;
+				didApplySingle=true;goto ReductionOptSingleRestart;
+			}
+			if (IS_this.id==I_WORD & (IS_this.arg.W.a_0&0xFF00u)==0u){
+				ptr_this->id=I_BYTE;
+				ptr_this->arg.B.a_0=ptr_this->arg.W.a_0;
+				ptr_next->arg.D.a_0++;
+				didApplySingle=true;goto ReductionOptSingleRestart;
+			}
+			if (IS_this.id==I_DWRD & (IS_this.arg.D.a_0&0xFFFF0000lu)==0lu){
+				ptr_this->id=I_WORD;
+				ptr_this->arg.W.a_0=ptr_this->arg.D.a_0;
+				ptr_next->arg.D.a_0+=2;
+				didApplySingle=true;goto ReductionOptSingleRestart;
+			}
+		}
+		if (IS_this.id==I_ZNXB){
+			if (IS_next.id==I_BYTE & IS_next.arg.B.a_0==0){
+				ptr_this->arg.D.a_0++;
+				ptr_next->id=I_NOP_;
+				numberOfSlotsTaken=ib->numberOfSlotsTaken;
+				didApplySingle=true;goto ReductionOptSingleRestart;
+			}
+			if (IS_next.id==I_WORD & (IS_next.arg.W.a_0&0x00FFu)==0u){
+				ptr_next->id=I_BYTE;
+				ptr_next->arg.B.a_0=ptr_next->arg.W.a_0>>8;
+				ptr_this->arg.D.a_0++;
+				didApplySingle=true;goto ReductionOptSingleRestart;
+			}
+			if (IS_next.id==I_DWRD & (IS_next.arg.D.a_0&0x0000FFFFlu)==0u){
+				ptr_next->id=I_WORD;
+				ptr_next->arg.W.a_0=ptr_next->arg.D.a_0>>16;
+				ptr_this->arg.D.a_0+=2;
+				didApplySingle=true;goto ReductionOptSingleRestart;
+			}
+		}
+		if      (IS_this.id==I_BYTE | IS_this.id==I_SYDB) isThisWordMisaligned^=1;
+		else if (IS_this.id==I_ZNXB) isThisWordMisaligned^=IS_this.arg.D.a_0&1;
+		else if (IS_this.id!=I_LABL & IS_this.id!=I_NOP_ & isThisWordMisaligned){
+			assert(false);
+		}
+		i_this=i_next++;
+		ptr_this=ptr_next++;
+		ReductionOptSingleRestart:;
 	}
-	uint32_t label = ++globalLabelID;
-	thisEntry->label = label;
-	thisEntry->startIndex=startIndex;
-	thisEntry->isInitializer=isInitializer;
-	thisEntry->isWideStringLiteral=isWideStringLiteral;
-	thisEntry->isModifiable=isModifiable;
-	return label;
+	if (didApplySingle) {removeNop(ib);goto ReductionOptFullRestart;}
 }
 
 
 
+
+// returns 0 if equal, 1 if s0 is lower, 2 if s1 is lower
+uint8_t stringDataCompare(uint8_t* s0,uint8_t* s1,uint32_t length){
+	for (uint32_t i=0;i<length;i++){
+		char c0=s0[i];
+		char c1=s1[i];
+		if (c0!=c1) return (c0>c1)+1;
+	}
+	return 0;
+}
 
 

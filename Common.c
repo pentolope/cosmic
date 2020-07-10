@@ -204,10 +204,9 @@ void checkArchitecture(){
 	}
 }
 
-void setMemoryToZero(void* ptr, uint32_t numberOfBytes){
-	uint8_t* internalPtr = (uint8_t*)ptr;
+void memZero(void* ptr, uint32_t numberOfBytes){
 	for (uint32_t i=0;i<numberOfBytes;i++){
-		internalPtr[i]=0;
+		((uint8_t*)ptr)[i]=0;
 	}
 }
 
@@ -232,74 +231,13 @@ SourceContainer sourceContainer;
 
 
 
-
-
-struct RawMemoryForInitializer{
-	uint32_t size;
-	uint8_t* mem;
-	bool* isSet;
-};
-
-// doesn't need to be done, but it does ensure the size is accounted for. Should not be done on one that is already initialized
-void initRawMemoryForInitializer(
-		struct RawMemoryForInitializer* rmfi,
-		uint32_t size){
-	
-	rmfi->size=size;
-	rmfi->mem=cosmic_malloc(size*sizeof(uint8_t));
-	rmfi->isSet=cosmic_malloc(size*sizeof(bool));
-	setMemoryToZero(rmfi->mem,size);
-	setMemoryToZero(rmfi->isSet,size);
-}
-
-// returns true if it failed
-bool setByteRawMemoryForInitializer(
-		struct RawMemoryForInitializer* rmfi,
-		uint32_t unitSize, uint32_t location, uint8_t byte){
-	
-	if (rmfi->size<=location){
-		uint32_t previousSize=rmfi->size;
-		do rmfi->size+=unitSize;
-		while (rmfi->size<=location);
-		rmfi->mem  =  cosmic_realloc(rmfi->mem,  rmfi->size);
-		rmfi->isSet = cosmic_realloc(rmfi->isSet,rmfi->size);
-		setMemoryToZero(rmfi->mem+previousSize  ,rmfi->size-previousSize);
-		setMemoryToZero(rmfi->isSet+previousSize,rmfi->size-previousSize);
-	}
-	if (rmfi->isSet[location]) return true;
-	rmfi->mem[location]=byte;
-	return false;
-}
-
-bool setWordRawMemoryForInitializer(
-		struct RawMemoryForInitializer* rmfi,
-		uint32_t unitSize, uint32_t location, uint16_t word){
-	
-	bool didFail=false;
-	didFail|=setByteRawMemoryForInitializer(rmfi,unitSize,location  ,((uint8_t*)(&word))[0]);
-	didFail|=setByteRawMemoryForInitializer(rmfi,unitSize,location+1,((uint8_t*)(&word))[1]);
-	return didFail;
-}
-
-bool setDwordRawMemoryForInitializer(
-		struct RawMemoryForInitializer* rmfi,
-		uint32_t unitSize, uint32_t location, uint32_t dword){
-	
-	bool didFail=false;
-	didFail|=setWordRawMemoryForInitializer(rmfi,unitSize,location  ,((uint16_t*)(&dword))[0]);
-	didFail|=setWordRawMemoryForInitializer(rmfi,unitSize,location+2,((uint16_t*)(&dword))[1]);
-	return didFail;
-}
-
 bool doStringsMatch(const char* string1,const char* string2){
 	int32_t i=0;
 	char c1;
 	char c2;
 	while ((c1=string1[i])!=0 & (c2=string2[i])!=0){
 		i++;
-		if (c1!=c2){
-			return false;
-		}
+		if (c1!=c2) return false;
 	}
 	return c1==c2;
 }

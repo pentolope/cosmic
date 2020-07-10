@@ -124,8 +124,16 @@ void crackTypeNames(char* string){
 	}
 }
 
+void removeDupeSpaces(char* string){
+	for (int32_t i=1;string[i];i++){
+		if (string[i-1]==' ' & string[i]==' '){
+			string[i-1]=26;
+		}
+	}
+	copyDownForInPlaceEdit(string);
+}
 
-// will always allocate
+// will always allocate, will never give an identifier in it's return type string
 char* advancedCrackedTypeToTypeString(char* crackedType){
 	char* sub;
 	char* this;
@@ -182,7 +190,42 @@ char* advancedCrackedTypeToTypeString(char* crackedType){
 		return this;
 		}
 		case '(':
-		printf("Hit paren!\n");
+		{
+		this=copyStringToHeapString("( ");
+		char c;
+		bool isFirst=true;
+		while ((c=crackedType[1])!=')'){
+			{
+			assert(c!=0);
+			sub=advancedCrackedTypeToTypeString(++crackedType);
+			char* temp;
+			temp=strMerge4(this,isFirst?" ":" , ",sub," ");
+			isFirst=false;
+			cosmic_free(this);
+			cosmic_free(sub);
+			this=temp;
+			}
+			{
+			char c;
+			while ((c=*crackedType)!=','){
+				assert(c!=0);
+				if (c=='('){
+					assert(getIndexOfMatchingEnclosement(crackedType,0)!=-1);
+					crackedType=getIndexOfMatchingEnclosement(crackedType,0)+crackedType;
+				} else if (c==')'){
+					crackedType--;
+					break;
+				}
+				crackedType++;
+			}
+			}
+		}
+		sub=strMerge2(this,")");
+		cosmic_free(this);
+		this=sub;
+		removeDupeSpaces(this);
+		return this;
+		}
 	}
 	printf("Internal Error: invalid crackedCharacter\n");
 	exit(1);
@@ -221,7 +264,6 @@ void removeSpaces(char* string){
 	}
 	copyDownForInPlaceEdit(string);
 }
-
 
 int32_t findUncrackedStructOrUnion(char* string){
 	for (int32_t i=0;string[i];i++){
@@ -276,8 +318,10 @@ void splitUncrackedStructUnion(char** stringPtr){
 	}
 }
 
-// fixFunctionParams() removes identifiers from function parameters (functions can occur if there are function pointers)
-void fixFunctionParams(char** stringPtr){
+
+
+
+void fixFunctionParamsSub(char** stringPtr){
 	char* string=*stringPtr;
 	for (int32_t i0=0;string[i0];i0++){
 		if (string[i0]=='('){
@@ -303,7 +347,7 @@ void fixFunctionParams(char** stringPtr){
 					cosmic_free(t8);
 					t8=t6;
 					char* t9=copyStringSegmentToHeap(t2,next+1,strlen(t2));
-					fixFunctionParams(&t8);
+					fixFunctionParamsSub(&t8);
 					t6=strMerge3(t7,t8,t9);
 					cosmic_free(t7);
 					cosmic_free(t8);
@@ -353,13 +397,15 @@ void fixFunctionParams(char** stringPtr){
 	}
 }
 
-void removeDupeSpaces(char* string){
-	for (int32_t i=1;string[i];i++){
-		if (string[i-1]==' ' & string[i]==' '){
-			string[i-1]=26;
-		}
-	}
-	copyDownForInPlaceEdit(string);
+
+/*
+fixFunctionParams() removes identifiers from function parameters
+I think this would work on type strings in addition to it's usage in crackTypeString()
+It cannot be used on fully cracked type strings, however.
+*/
+void fixFunctionParams(char** stringPtr){
+	fixFunctionParamsSub(stringPtr);
+	removeDupeSpaces(*stringPtr);
 }
 
 // returns a new string. it is kinda like a type string, but it is in a very different format.
@@ -372,7 +418,6 @@ char* crackTypeString(char* typeStringIn){
 		if (stringWorking==NULL) return NULL;
 	}
 	fixFunctionParams(&stringWorking);
-	removeDupeSpaces(stringWorking);
 	splitUncrackedStructUnion(&stringWorking);
 	crackArraysAndEnum(stringWorking);
 	crackTypeNames(stringWorking);
@@ -380,8 +425,6 @@ char* crackTypeString(char* typeStringIn){
 	removeSpaces(stringWorking);
 	return stringWorking;
 }
-
-
 
 
 

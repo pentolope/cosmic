@@ -1,9 +1,13 @@
-FCST :00000002
+FCST $0A #000A :00000002
+I_PHIE %2
+I_PHIE %3
+I_PHIE %4
+I_PHIE %5
 BL1_ %6 $00
 BL1_ %7 $00
 BL1_ %7 $00
 BL1_ %9 $00
-RL1_ %C $FFFF
+RL1_ %C #FFFF
 ADDC %4 %4 %4
 MOV_ %D %F
 ADDC %5 %5 %5
@@ -740,5 +744,7 @@ AND_ %A %A %E
 AND_ %B %B %E
 OR__ %6 %6 %A
 OR__ %7 %7 %B
+I_PHIS %6
+I_PHIS %7
 RET_
 FCEN
