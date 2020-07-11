@@ -212,12 +212,13 @@ char* giveNumbersToSingleEnumList(char* string, int32_t indexOfEnum){
 		enumEnumerators[enumeratorIndex].number = 0;
 		enumEnumerators[enumeratorIndex].didHaveNumberAlreadyThere = false;
 		for (int32_t i=enumEnumerators[enumeratorIndex].startIndex;i<endBracketIndex;i++){
-			if (string[i]=='='){
+			char c=string[i];
+			if (c=='='){
 				enumEnumerators[enumeratorIndex].didHaveNumberAlreadyThere = true;
 				enumEnumerators[enumeratorIndex].number = numberInterpreterForEnumEnumerationNormalizer(string,i+2);
 				break;
 			}
-			if (string[i]==',' | string[i]=='}'){
+			if (c==',' | c=='}'){
 				break; // this data was already placed as default
 			}
 		}
@@ -287,7 +288,7 @@ char* giveNumbersForAllEnumEnumerators(char* string){
 
 
 
-uint32_t uniqueAnonymousCounter;
+
 
 // the input string has cosmic_realloc() called on it, which is then returned
 char* giveNameToSingleAnonymous(char* string, int32_t startIndexAtBracket, uint8_t typeOfStructure){
@@ -310,6 +311,7 @@ char* giveNameToSingleAnonymous(char* string, int32_t startIndexAtBracket, uint8
 	for (int32_t i=0;i<14;i++){
 		string[i+startIndexAtBracket]=literalToInsert[i];
 	}
+	static uint32_t uniqueAnonymousCounter;
 	writeHexInString(string+(startIndexAtBracket+14),++uniqueAnonymousCounter);
 	return string;
 }

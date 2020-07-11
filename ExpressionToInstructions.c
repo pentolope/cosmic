@@ -2313,8 +2313,8 @@ void expressionToAssembly(
 		functionTypeAnalysis.params[i].noIdentifierTypeString should be used, never functionTypeAnalysis.params[i].typeString
 		*/
 		struct FunctionTypeAnalysis* functionTypeAnalysis,
-		uint16_t paramIndex){
-	
+		uint16_t paramIndex)
+{
 	ExpressionTreeNode* thisNode = expressionTreeGlobalBuffer.expressionTreeNodes+nodeIndex;
 	uint8_t oID = thisNode->operatorID;
 	#ifdef EXP_TO_ASSEMBLY_DEBUG
@@ -2442,7 +2442,8 @@ void expressionToAssemblyWithCast(
 		InstructionBuffer *ib_to,
 		const char* castTypeString,
 		int32_t startIndexForExpression,
-		int32_t endIndexForExpression){
+		int32_t endIndexForExpression)
+{
 	int16_t indexOfRoot = buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(sourceContainer.string,startIndexForExpression,endIndexForExpression,true);
 	bool isVoidCast=doStringsMatch("void",castTypeString);
 	if (indexOfRoot==-1){
@@ -2526,8 +2527,7 @@ void expressionToAssemblyWithReturn(
 #include "InitializerMapping.c"
 
 
-// this is for declarations with some sort of initialization
-// this will probably be able to handle initializations at file scope
+// this is for declarations with some sort of initialization that are inside functions
 void expressionToAssemblyWithInitializer(
 		InstructionBuffer *ib_to,
 		int32_t startIndexForInitializer,
@@ -2548,29 +2548,29 @@ void expressionToAssemblyWithInitializer(
 	cosmic_free(typeString);
 	InstructionBuffer ibTemp;
 	initInstructionBuffer(&ibTemp);
-	uint32_t labelID=0;
-	if (usedStatic) labelID=++globalLabelID;
-	bool gotStatic=initializerImplementRoot(&ibTemp,initializerRoot,labelID,&typeStringNI,usedStatic);
+	// the label of 0 is used as a temporary value, if it is static it will be renamed
+	bool gotStatic=initializerImplementRoot(&ibTemp,initializerRoot,0,&typeStringNI,usedStatic);
 	assert(usedStatic==gotStatic);
 	typeString=strMerge3(identifier," ",typeStringNI);
 	addVariableToBlockFrame(typeString,startIndexForDeclaration,usedRegister,usedStatic);
+	struct IdentifierSearchResult isr;
+	searchForIdentifier(&isr,identifier,false,true,true,false,false);
+	assert(isr.didExist);
 	if (gotStatic){
+		struct GlobalVariableEntry* globalVariableEntry=
+			blockFrameArray.globalBlockFrame.globalVariableEntries+
+			isr.reference.variableReference.variableEntryIndex;
+		doLabelRename(&ibTemp,0,globalVariableEntry->labelID);
 		singleMergeIB(&global_static_data,&ibTemp);
 	} else {
-		struct IdentifierSearchResult isr;
-		searchForIdentifier(&isr,identifier,false,true,true,false,false);
-		if (!isr.didExist | isr.typeOfResult!=IdentifierSearchResultIsVariable){
-			printf("Internal Error: could not find variable after adding to blockframe\n");
-			exit(1);
-		}
 		uint16_t revOffset = getReversedOffsetForLocalVariable(&isr.reference.variableReference);
 		convertSTPI_STPA(&ibTemp,revOffset);
 		singleMergeIB(ib_to,&ibTemp);
 	}
 	destroyInstructionBuffer(&ibTemp);
-	cosmic_free(typeString);
-	cosmic_free(identifier);
 	cosmic_free(typeStringNI);
+	cosmic_free(identifier);
+	cosmic_free(typeString);
 }
 
 

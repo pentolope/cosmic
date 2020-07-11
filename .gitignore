@@ -32,6 +32,7 @@ callgrind.out.*
 *.ink
 out.txt
 out*.txt
+a.out
 trimOut.py
 optTesting.py
 

@@ -53,8 +53,8 @@ err_00__1 [warning,no start,------,no exit,   free]
 err_10_00 [  error,no start,------,no exit,no free]
 err_10_01 [  error,no start,------,no exit,   free]
 err_10_1_ [  error,no start,------,   exit,-------]
-err_010_0 [warning,   start,------,no exit,no free]
-err_010_1 [warning,   start,------,no exit,   free]
+err_010_0 [warning,   start,no end,no exit,no free]
+err_010_1 [warning,   start,no end,no exit,   free]
 err_011_0 [warning,   start,   end,no exit,no free]
 err_011_1 [warning,   start,   end,no exit,   free]
 err_11000 [  error,   start,no end,no exit,no free]
@@ -85,22 +85,8 @@ void err_1111_(const char* message,int32_t s,int32_t e){printInformativeMessageA
 
 
 
-
-
-#if 0
-const char* startFileName="\"input1.c\"";
-#else
-const char* startFileName="\"Main.c\"";
-#endif
-
-
 // this is for valgrind testing. if defined it will null out the entire exp buffer when clearing previous expressions
 //#define FORCE_EXP_BUFFER_NULL
-
-// this is debug for valgrind
-uint32_t statementCountCutoff=60;
-uint32_t statementCount;
-bool isStatementCutoffActive=false;
 
 
 #define ERR_MSG_LEN 60 // controls the length of error messages
@@ -135,14 +121,8 @@ COMPILE_EXP_DEBUG_PRINTOUT tells ExpressionParser to explain how the expression 
 
 
 struct CompileSettings{
-	uint8_t optLevel;
-	/*
-	range is 0->4 inclusive. The value is one higher then the argument supplied (at time of writting arguments are ignored, but it will be this)
-	this is currently not really used.
-	*/
+	uint8_t optLevel; // range is 0->4 inclusive. The value is one higher then the argument supplied
 	bool noColor; // used to disable color printing if desired
-	
-	bool warnForZeroCastInStructOrUnionInInitializer;
 	
 	bool hasGivenConstDivByZeroWarning; 
 	// if the optimizer detects a constant division by zero, it sets this and prints a warning if the flag wasn't set
@@ -150,9 +130,7 @@ struct CompileSettings{
 	bool hasGivenOutOfBoundsStackAccessWarning; 
 	// if the optimizer detects an out of bounds stack access, it sets this and prints a warning if the flag wasn't set
 } compileSettings = {
-	.optLevel=2,
-	.noColor=false,
-	.warnForZeroCastInStructOrUnionInInitializer=false
+	.optLevel=1
 };
 
 
@@ -423,17 +401,17 @@ struct TypedefEntry{
 
 struct TypedefEntries{
 	struct TypedefEntry *entries;
-	int32_t numberOfAllocatedSlots;
+	uint32_t numberOfAllocatedSlots;
 } globalTypedefEntries;
 
 
 void expandGlobalTypedefEntries(){
-	int32_t previousNumberOfSlots = globalTypedefEntries.numberOfAllocatedSlots;
+	uint32_t previousNumberOfSlots = globalTypedefEntries.numberOfAllocatedSlots;
 	globalTypedefEntries.numberOfAllocatedSlots += 30;
 	globalTypedefEntries.entries = cosmic_realloc(
 		globalTypedefEntries.entries,
 		sizeof(struct TypedefEntry)*globalTypedefEntries.numberOfAllocatedSlots);
-	for (int32_t i=previousNumberOfSlots;i<globalTypedefEntries.numberOfAllocatedSlots;i++){
+	for (uint32_t i=previousNumberOfSlots;i<globalTypedefEntries.numberOfAllocatedSlots;i++){
 		globalTypedefEntries.entries[i].isThisSlotTaken = false;
 	}
 }
@@ -460,7 +438,7 @@ int32_t addTypedefEntry(const char* typeSpecifierToInsert){
 	} while (true);
 }
 
-void removeTypedefEntry(const int32_t indexOfTypedefEntry){
+void removeTypedefEntry(const uint32_t indexOfTypedefEntry){
 	struct TypedefEntry* typedefEntryPtr = &(globalTypedefEntries.entries[indexOfTypedefEntry]);
 	assert(typedefEntryPtr->isThisSlotTaken);
 	typedefEntryPtr->isThisSlotTaken = false;
@@ -469,12 +447,12 @@ void removeTypedefEntry(const int32_t indexOfTypedefEntry){
 
 // returns -1 if it is not there
 int32_t indexOfTypedefEntryForSectionOfString(const char* string,const int32_t startIndex,const int32_t endIndex){
-	int32_t lengthOfThisSection = endIndex-startIndex;
-	for (int32_t i=0;i<globalTypedefEntries.numberOfAllocatedSlots;i++){
+	uint32_t lengthOfThisSection = endIndex-startIndex;
+	for (uint32_t i=0;i<globalTypedefEntries.numberOfAllocatedSlots;i++){
 		if (globalTypedefEntries.entries[i].isThisSlotTaken && 
 			globalTypedefEntries.entries[i].lengthOfIdentifier==lengthOfThisSection){
 			char *thisTypeSpecifier = globalTypedefEntries.entries[i].typeSpecifier;
-			int32_t i2 = 0;
+			uint32_t i2 = 0;
 			bool isEqual = true;
 			while (thisTypeSpecifier[i2]!=' '){
 				if (thisTypeSpecifier[i2]!=string[startIndex+i2]){

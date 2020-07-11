@@ -61,7 +61,7 @@ struct BlockFrameArray{
 			uint32_t thisSizeof; // because of how this is used, this number shall always be word alligned
 			uint32_t indexOfDeclaration;
 			bool usedStatic;
-			bool usedExtern; 
+			bool usedExtern;
 			bool hadInitializer;
 			bool isCurrentlyTentative;
 		} *globalVariableEntries;
@@ -87,6 +87,10 @@ struct BlockFrameArray{
 			const char* typeString; // must have identifier
 			struct FunctionTypeAnalysis functionTypeAnalysis; // this is the version without singular void parameter and 
 			uint32_t labelID; // number given when this entry is created that is able to identify the start location in assembly output
+			uint32_t indexOfDeclaration; // is one of the prototypes if !hasBeenDefined, otherwise it is the definition location
+			bool usedStatic;
+			bool usedExtern;
+			bool usedInline;
 			bool hasBeenDefined;
 			bool usesVaArgs;
 		} *globalFunctionEntries;
@@ -170,9 +174,8 @@ struct IdentifierSearchResult{
 	bool didExist;
 	enum IdentifierSearchResultEnum{
 		IdentifierSearchResultIsVariable,
-		IdentifierSearchResultIsType,
 		IdentifierSearchResultIsTypeMember,
-		IdentifierSearchResultIsFunction,
+		IdentifierSearchResultIsFunction
 	} typeOfResult;
 	union {
 		struct VariableReference{
@@ -180,12 +183,6 @@ struct IdentifierSearchResult{
 			uint32_t variableEntryIndex;
 			bool isGlobal;
 		} variableReference;
-		
-		struct TypeReference{
-			uint32_t blockFrameEntryIndex; // if isGlobal==true, this value is not used
-			uint32_t typeEntryIndex;
-			bool isGlobal;
-		} typeReference;
 		
 		struct TypeMemberReference{ // needed for enum values
 			uint32_t blockFrameEntryIndex; // if isGlobal==true, this value is not used
@@ -223,13 +220,12 @@ bool areIdentifierStringsEquivalent(const char* string1,const char* string2){
 
 
 /*
-remember to pass the pointer to the struct that will be filled with the result.
 for the string "identifier", a type string with an identifier may be used. Termination will occur at a space or null.
 searchGlobal==false will make this function not search global variables, types, and functions.
 searchGlobal==true will make this function search local and global variables, types, and functions.
 however, even if searchGlobal==false, the "isGlobal" boolean will be true if the variable inside a BlockFrame is a static variable.
 */
-void searchForIdentifier(struct IdentifierSearchResult *identifierSearchResult,const char* identifier, bool searchGlobal, bool searchLocal, bool searchVariables, bool searchTypes, bool searchFunctions){
+void searchForIdentifier(struct IdentifierSearchResult *isr,const char* identifier, bool searchGlobal, bool searchLocal, bool searchVariables, bool searchTypes, bool searchFunctions){
 	if (searchLocal){
 		// the order BlockFrameEntries are searched in does matter (for block overriden identifiers), it should be from end to start
 		uint32_t i=blockFrameArray.numberOfValidSlots;
@@ -240,20 +236,20 @@ void searchForIdentifier(struct IdentifierSearchResult *identifierSearchResult,c
 					struct BlockFrameVariableEntry* tempBlockFrameVariableEntryPtr = &(tempBlockFrameEntryPtr->variableEntries[j]);
 					if (areIdentifierStringsEquivalent(tempBlockFrameVariableEntryPtr->typeString,identifier)){
 						if (tempBlockFrameVariableEntryPtr->staticLinkbackID==0){
-							identifierSearchResult->didExist = true;
-							identifierSearchResult->typeOfResult = IdentifierSearchResultIsVariable;
-							identifierSearchResult->reference.variableReference.blockFrameEntryIndex = i;
-							identifierSearchResult->reference.variableReference.variableEntryIndex = j;
-							identifierSearchResult->reference.variableReference.isGlobal = false;
+							isr->didExist = true;
+							isr->typeOfResult = IdentifierSearchResultIsVariable;
+							isr->reference.variableReference.blockFrameEntryIndex = i;
+							isr->reference.variableReference.variableEntryIndex = j;
+							isr->reference.variableReference.isGlobal = false;
 							return;
 						} else {
 							for (uint32_t k=0;k<blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots;k++){
 								struct GlobalVariableEntry* tempGlobalVariableEntryPtr = &(blockFrameArray.globalBlockFrame.globalVariableEntries[k]);
 								if (tempGlobalVariableEntryPtr->staticLinkbackID==tempBlockFrameVariableEntryPtr->staticLinkbackID){
-									identifierSearchResult->didExist = true;
-									identifierSearchResult->typeOfResult = IdentifierSearchResultIsVariable;
-									identifierSearchResult->reference.variableReference.variableEntryIndex = k;
-									identifierSearchResult->reference.variableReference.isGlobal = true;
+									isr->didExist = true;
+									isr->typeOfResult = IdentifierSearchResultIsVariable;
+									isr->reference.variableReference.variableEntryIndex = k;
+									isr->reference.variableReference.isGlobal = true;
 									return;
 								}
 							}
@@ -271,12 +267,12 @@ void searchForIdentifier(struct IdentifierSearchResult *identifierSearchResult,c
 						for (uint16_t k=0;k<tempBlockFrameTypeEntryPtr->numberOfMemberEntries;k++){
 							struct TypeMemberEntry* tempTypeMemberEntryPtr = &(tempBlockFrameTypeEntryPtr->arrayOfMemberEntries[k]);
 							if (areIdentifierStringsEquivalent(tempTypeMemberEntryPtr->typeString,identifier)){
-								identifierSearchResult->didExist = true;
-								identifierSearchResult->typeOfResult = IdentifierSearchResultIsTypeMember;
-								identifierSearchResult->reference.typeMemberReference.blockFrameEntryIndex = i;
-								identifierSearchResult->reference.typeMemberReference.typeEntryIndex = j;
-								identifierSearchResult->reference.typeMemberReference.memberEntryIndex = k;
-								identifierSearchResult->reference.typeMemberReference.isGlobal = false;
+								isr->didExist = true;
+								isr->typeOfResult = IdentifierSearchResultIsTypeMember;
+								isr->reference.typeMemberReference.blockFrameEntryIndex = i;
+								isr->reference.typeMemberReference.typeEntryIndex = j;
+								isr->reference.typeMemberReference.memberEntryIndex = k;
+								isr->reference.typeMemberReference.isGlobal = false;
 								return;
 							}
 						}
@@ -291,10 +287,10 @@ void searchForIdentifier(struct IdentifierSearchResult *identifierSearchResult,c
 			for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots;i++){
 				struct GlobalVariableEntry* tempGlobalVariableEntryPtr = &(blockFrameArray.globalBlockFrame.globalVariableEntries[i]);
 				if (tempGlobalVariableEntryPtr->staticLinkbackID==0 && areIdentifierStringsEquivalent(tempGlobalVariableEntryPtr->typeString,identifier)){
-					identifierSearchResult->didExist = true;
-					identifierSearchResult->typeOfResult = IdentifierSearchResultIsVariable;
-					identifierSearchResult->reference.variableReference.variableEntryIndex = i;
-					identifierSearchResult->reference.variableReference.isGlobal = true;
+					isr->didExist = true;
+					isr->typeOfResult = IdentifierSearchResultIsVariable;
+					isr->reference.variableReference.variableEntryIndex = i;
+					isr->reference.variableReference.isGlobal = true;
 					return;
 				}
 			}
@@ -307,11 +303,11 @@ void searchForIdentifier(struct IdentifierSearchResult *identifierSearchResult,c
 					for (uint16_t k=0;k<tempGlobalTypeEntryPtr->numberOfMemberEntries;k++){
 						struct TypeMemberEntry* tempTypeMemberEntryPtr = &(tempGlobalTypeEntryPtr->arrayOfMemberEntries[k]);
 						if (areIdentifierStringsEquivalent(tempTypeMemberEntryPtr->typeString,identifier)){
-							identifierSearchResult->didExist = true;
-							identifierSearchResult->typeOfResult = IdentifierSearchResultIsTypeMember;
-							identifierSearchResult->reference.typeMemberReference.typeEntryIndex = i;
-							identifierSearchResult->reference.typeMemberReference.memberEntryIndex = k;
-							identifierSearchResult->reference.typeMemberReference.isGlobal = true;
+							isr->didExist = true;
+							isr->typeOfResult = IdentifierSearchResultIsTypeMember;
+							isr->reference.typeMemberReference.typeEntryIndex = i;
+							isr->reference.typeMemberReference.memberEntryIndex = k;
+							isr->reference.typeMemberReference.isGlobal = true;
 							return;
 						}
 					}
@@ -322,15 +318,15 @@ void searchForIdentifier(struct IdentifierSearchResult *identifierSearchResult,c
 			for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalFunctionEntrySlots;i++){
 				struct GlobalFunctionEntry* tempGlobalFunctionEntryPtr = &(blockFrameArray.globalBlockFrame.globalFunctionEntries[i]);
 				if (areIdentifierStringsEquivalent(tempGlobalFunctionEntryPtr->typeString,identifier)){
-					identifierSearchResult->didExist = true;
-					identifierSearchResult->typeOfResult = IdentifierSearchResultIsFunction;
-					identifierSearchResult->reference.functionReference.functionEntryIndex = i;
+					isr->didExist = true;
+					isr->typeOfResult = IdentifierSearchResultIsFunction;
+					isr->reference.functionReference.functionEntryIndex = i;
 					return;
 				}
 			}
 		}
 	}
-	identifierSearchResult->didExist = false;
+	isr->didExist = false;
 	return;
 }
 
@@ -375,15 +371,15 @@ uint8_t addGlobalVariable(
 	uint32_t indexOfEntryIfIdentifierExists;
 	{
 		// identifier collisions are weird at the global level...
-		struct IdentifierSearchResult identifierSearchResult;
-		searchForIdentifier(&identifierSearchResult,typeString,true,false,false,true,true);
-		if (identifierSearchResult.didExist){
+		struct IdentifierSearchResult isr;
+		searchForIdentifier(&isr,typeString,true,false,false,true,true);
+		if (isr.didExist){
 			return 1; // identifier collision exists with non-variable
 		}
-		searchForIdentifier(&identifierSearchResult,typeString,true,false,true,false,false);
-		doesIdentifierAlreadyExist = identifierSearchResult.didExist;
-		if (identifierSearchResult.didExist){
-			indexOfEntryIfIdentifierExists = identifierSearchResult.reference.variableReference.variableEntryIndex;
+		searchForIdentifier(&isr,typeString,true,false,true,false,false);
+		doesIdentifierAlreadyExist = isr.didExist;
+		if (isr.didExist){
+			indexOfEntryIfIdentifierExists = isr.reference.variableReference.variableEntryIndex;
 			// TODO: support tentative declarations. This should not always fail
 			printf("Warning: global variable was attempted to be redefined, and I do not currently support tentative declarations.\n");
 			return 2; // identifier collision exists with variable
@@ -437,8 +433,21 @@ return value description:
  2 - function was already defined (cannot be defined again)
  3 - identifier conflict with non-function
  4 - is being defined but had a missing identifier on a parameter
+ 5 - extern functions cannot be given a definition
 */
-uint8_t addGlobalFunction(const char* typeString, bool isDefinitionBeingGiven){
+uint8_t addGlobalFunction(
+		const char* typeString,
+		uint32_t indexOfDeclaration,
+		bool isDefinitionBeingGiven,
+		bool usedStatic,
+		bool usedExtern,
+		bool usedInline){
+	
+	if (usedExtern&isDefinitionBeingGiven) return 5;
+	if (usedExtern&usedInline){
+		usedInline=false;
+		err_010_0("functions declared 'extern' cannot be inlined. The 'inline' keyword is being ignored for this declaration",indexOfDeclaration);
+	}
 	bool hasPreviousPrototype;
 	bool wasPreviouslyDefinedSoDontChange = false;
 	uint32_t indexOfPreviousPrototype;
@@ -455,17 +464,23 @@ uint8_t addGlobalFunction(const char* typeString, bool isDefinitionBeingGiven){
 		}
 	}
 	// this checks for function prototype conflicts
-	struct IdentifierSearchResult identifierSearchResult;
-	searchForIdentifier(&identifierSearchResult,typeString,true,false,true,true,false);
-	if (identifierSearchResult.didExist){
+	struct IdentifierSearchResult isr;
+	searchForIdentifier(&isr,typeString,true,false,true,true,false);
+	if (isr.didExist){
 		destroyFunctionTypeAnalysis(&functionTypeAnalysis_this);
 		return 3; // identifier conflict with non-function
 	}
-	searchForIdentifier(&identifierSearchResult,typeString,true,false,false,false,true);
-	hasPreviousPrototype = identifierSearchResult.didExist;
-	if (identifierSearchResult.didExist){
-		indexOfPreviousPrototype = identifierSearchResult.reference.functionReference.functionEntryIndex;
+	searchForIdentifier(&isr,typeString,true,false,false,false,true);
+	hasPreviousPrototype = isr.didExist;
+	if (isr.didExist){
+		indexOfPreviousPrototype = isr.reference.functionReference.functionEntryIndex;
 		struct GlobalFunctionEntry* globalFunctionEntryPtr = &(blockFrameArray.globalBlockFrame.globalFunctionEntries[indexOfPreviousPrototype]);
+		if (globalFunctionEntryPtr->usedStatic!=usedStatic |
+			globalFunctionEntryPtr->usedExtern!=usedExtern |
+			globalFunctionEntryPtr->usedInline!=usedInline){
+			
+			return 1; // storage class specifier conflict
+		}
 		if (globalFunctionEntryPtr->hasBeenDefined){
 			if (isDefinitionBeingGiven){
 				destroyFunctionTypeAnalysis(&functionTypeAnalysis_this);
@@ -547,6 +562,10 @@ uint8_t addGlobalFunction(const char* typeString, bool isDefinitionBeingGiven){
 			globalFunctionEntryPtr->labelID = ++globalLabelID;
 			globalFunctionEntryPtr->usesVaArgs = usesVaArgs;
 		}
+		globalFunctionEntryPtr->usedStatic=usedStatic;
+		globalFunctionEntryPtr->usedExtern=usedExtern;
+		globalFunctionEntryPtr->usedInline=usedInline;
+		globalFunctionEntryPtr->indexOfDeclaration=indexOfDeclaration;
 		analyseFunctionTypeString(&(globalFunctionEntryPtr->functionTypeAnalysis),typeString,true);
 	}
 	return 0; // function entry is valid
@@ -558,14 +577,12 @@ uint8_t addGlobalFunction(const char* typeString, bool isDefinitionBeingGiven){
 /*
 typeString should have types broken down and typedefs resolved prior to calling this function
 
-this function returns true if the identifier already exists and cannot be overrided from global scope. Otherwise, it returns false.
 typeString should have an identifier
 typeString is copied in this function
 this should not be used for global variables
-if there is no initializer, then startIndexOfInitializer and endIndexOfInitializer should be 0 (those values are used if isStatic==true)
-isRegister is if the keyword was specified.
+isRegister and isStatic refer to if the respective keywords were specified
 */
-bool addVariableToBlockFrame(
+void addVariableToBlockFrame(
 		const char* typeString,
 		uint32_t indexOfDeclaration,
 		bool isRegister,
@@ -577,28 +594,30 @@ bool addVariableToBlockFrame(
 		exit(1);
 	}
 	if (typeString[1+indexOfFirstSpace]=='('){
-		printf("function is not allowed here\n");
+		printInformativeMessageAtSourceContainerIndex(true,"Function declaration is not allowed here",indexOfDeclaration,0);
 		exit(1);
 	}
-	if (isRegister & isStatic){
-		printf("Internal Error: Keywords \"register\" and \"static\" cannot be used together, however this error should have been caught elsewhere");
-		exit(1);
-	}
+	assert(!(isRegister & isStatic));
 	{
-		// this does a check to ensure that a variable is not already defined that has the same identifier.
-		// however, global identifiers are not checked (when the search for an identifier happens, local variables are searched first, and local may override global)
-		struct IdentifierSearchResult identifierSearchResult;
-		searchForIdentifier(&identifierSearchResult,typeString,false,true,true,true,true);
-		if (identifierSearchResult.didExist){
-			/*
-			that identifier already exists and therefore the variable cannot be added.
-			although it would be relatively easy to do what the standard actually says 
-			and only check the current scope for identifier collisions, 
-			I think that is a stupid idea because I want to know if I already 
-			declared an identifier with the same identifier in that function
-			so I can be confident that I am reading/writing the correct variable.
-			*/
-			return true;
+		// global identifiers are not checked (when the search for an identifier happens, local variables are searched first, and local may override global)
+		struct IdentifierSearchResult isr;
+		searchForIdentifier(&isr,typeString,false,true,true,true,false);
+		if (isr.didExist){
+			bool isAcceptable=false;
+			// isr could be global because of static
+			if (isr.typeOfResult==IdentifierSearchResultIsVariable){
+				isAcceptable=isr.reference.variableReference.isGlobal || isr.reference.variableReference.blockFrameEntryIndex!=blockFrameArray.numberOfValidSlots-1;
+			} else {
+				isAcceptable=isr.reference.typeMemberReference.isGlobal || isr.reference.typeMemberReference. blockFrameEntryIndex!=blockFrameArray.numberOfValidSlots-1;
+			}
+			if (isAcceptable){
+printInformativeMessageAtSourceContainerIndex(false,
+	"Identical identifier was already declared in a previous scope.\n  The previous declaration will be overriden while this variable is in scope",indexOfDeclaration,0);
+			} else {
+printInformativeMessageAtSourceContainerIndex(true,
+	"Identical identifier was already declared in the same scope",indexOfDeclaration,0);
+exit(1);
+			}
 		}
 		// getting here means that the variable has no identifier collisions
 	}
@@ -642,7 +661,6 @@ bool addVariableToBlockFrame(
 		blockFrameVariableEntryPtr->staticLinkbackID = 0;
 	}
 	blockFrameVariableEntryPtr->thisSizeof = (uint16_t)thisSizeof;
-	return false; // variable added successfully
 }
 
 

@@ -206,7 +206,6 @@ char* advancedCrackedTypeToTypeString(char* crackedType){
 			this=temp;
 			}
 			{
-			char c;
 			while ((c=*crackedType)!=','){
 				assert(c!=0);
 				if (c=='('){

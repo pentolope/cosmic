@@ -11,9 +11,8 @@ void printSingleInstructionOptCode(const InstructionSingle);
 
 
 /*
-all functions here modify their input
+this function modifies it's input
 may read settings from the CompileSettings struct in "Common.c"
-
 */
 
 

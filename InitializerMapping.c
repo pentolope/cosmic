@@ -13,191 +13,6 @@ There is constant and static expression walking and evaluation in this file too
 */
 
 
-void applyFinalizeToGlobalStaticData(){
-	if (globalStringLiteralEntries.numberOfValidEntries!=0){
-		for (uint32_t i0=1;i0<globalStringLiteralEntries.numberOfValidEntries;i0++){
-			uint32_t i1=i0;
-			while (i1!=0){
-				struct StringLiteralEntry* sle_ptr_1=globalStringLiteralEntries.entries+(i1-0);
-				struct StringLiteralEntry* sle_ptr_2=globalStringLiteralEntries.entries+(i1-1);
-				if (sle_ptr_2->lengthOfData<=sle_ptr_1->lengthOfData) break;
-				struct StringLiteralEntry sle;
-				sle=*sle_ptr_2;
-				*sle_ptr_2=*sle_ptr_1;
-				*sle_ptr_1=sle;
-				i1--;
-			}
-		}
-		for (uint32_t i0=1;i0<globalStringLiteralEntries.numberOfValidEntries;i0++){
-			uint32_t i1=i0;
-			while (i1!=0){
-				struct StringLiteralEntry* sle_ptr_1=globalStringLiteralEntries.entries+(i1-0);
-				struct StringLiteralEntry* sle_ptr_2=globalStringLiteralEntries.entries+(i1-1);
-				if (sle_ptr_2->lengthOfData!=sle_ptr_1->lengthOfData) break;
-				uint8_t stringCompareResult = stringDataCompare(sle_ptr_1->data,sle_ptr_2->data,sle_ptr_2->lengthOfData);
-				if (stringCompareResult!=1) break;
-				struct StringLiteralEntry sle;
-				sle=*sle_ptr_2;
-				*sle_ptr_2=*sle_ptr_1;
-				*sle_ptr_1=sle;
-				i1--;
-			}
-		}
-		{
-		uint32_t* labelRenamesFrom;
-		uint32_t* labelRenamesTo;
-		{
-		uint32_t sizeForAllocation=(globalStringLiteralEntries.numberOfValidEntries-1)*sizeof(uint32_t);
-		labelRenamesFrom=cosmic_malloc(sizeForAllocation);
-		labelRenamesTo=cosmic_malloc(sizeForAllocation);
-		}
-		uint32_t labelRenamesCount=0;
-		for (uint32_t i0=1;i0<globalStringLiteralEntries.numberOfValidEntries;i0++){
-			struct StringLiteralEntry* sle_ptr_1=globalStringLiteralEntries.entries+(i0-0);
-			struct StringLiteralEntry* sle_ptr_2=globalStringLiteralEntries.entries+(i0-1);
-			while (i0<globalStringLiteralEntries.numberOfValidEntries){
-				if (sle_ptr_2->lengthOfData!=sle_ptr_1->lengthOfData) break;
-				uint8_t stringCompareResult = stringDataCompare(sle_ptr_1->data,sle_ptr_2->data,sle_ptr_2->lengthOfData);
-				if (stringCompareResult!=0) break;
-				labelRenamesFrom[labelRenamesCount]=sle_ptr_1->label;
-				labelRenamesTo[labelRenamesCount]=sle_ptr_2->label;
-				labelRenamesCount++;
-				cosmic_free(sle_ptr_1->data);
-				for (uint32_t i1=i0+1;i1<globalStringLiteralEntries.numberOfValidEntries;i1++){
-					globalStringLiteralEntries.entries[i1-1]=globalStringLiteralEntries.entries[i1-0];
-				}
-				globalStringLiteralEntries.numberOfValidEntries--;
-			}
-		}
-		applyLabelRenamesInAllCompressedInstructionBuffers(labelRenamesFrom,labelRenamesTo,labelRenamesCount);
-		applyLabelRenamesInInstructionBuffer(&global_static_data,labelRenamesFrom,labelRenamesTo,labelRenamesCount);
-		cosmic_free(labelRenamesFrom);
-		cosmic_free(labelRenamesTo);
-		}
-	}
-	RemoveUnusedStart:;
-	{
-	InstructionSingle* buffer=global_static_data.buffer;
-	uint32_t labelCount=0;
-	uint32_t i0;
-	for (i0=0;i0<global_static_data.numberOfSlotsTaken;i0++){
-		if (buffer[i0].id==I_LABL) labelCount++;
-	}
-	uint32_t labelTotal=labelCount;
-	if (labelTotal==0) goto RemoveUnusedEnd;
-	uint32_t* labelMarkoff=cosmic_malloc(labelTotal*sizeof(uint32_t));
-	labelCount=0;
-	for (i0=0;i0<global_static_data.numberOfSlotsTaken;i0++){
-		if (buffer[i0].id==I_LABL) labelMarkoff[labelCount++]=buffer[i0].arg.D.a_0;
-	}
-	doLabelMarkoffInAllCompressedInstructionBuffers(labelMarkoff,labelCount);
-	doLabelMarkoffInInstructionBuffer(&global_static_data,labelMarkoff,labelCount);
-	uint32_t i1;
-	labelCount=0;
-	for (i1=0;i1<labelTotal;i1++){
-		if (labelMarkoff[i1]!=0){
-			// then unused
-			for (i0=0;i0<global_static_data.numberOfSlotsTaken;i0++){
-				if (buffer[i0].id==I_LABL){
-					if (labelCount==i1){
-						uint32_t unusedLabelNumber=buffer[i0].arg.D.a_0;
-						bool foundVariable=false;
-						for (uint32_t i2=0;i2<blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots;i2++){
-							if (blockFrameArray.globalBlockFrame.globalVariableEntries[i2].labelID==unusedLabelNumber){
-								if (!blockFrameArray.globalBlockFrame.globalVariableEntries[i2].usedStatic){
-									// if the declaration used static, then it cannot be verified that this can be removed, it may be used elsewhere at link time
-									goto ContinueUnusedSearch;
-								}
-								err_010_0("This static variable is effectively unused. It\'s data is being removed. Remove the keyword 'static' to avoid removal.",blockFrameArray.globalBlockFrame.globalVariableEntries[i2].indexOfDeclaration);
-								foundVariable=true;
-								break;
-							}
-						}
-						assert(foundVariable);
-						assert(i0!=0 && (buffer[i0-1].id==I_NSNB | buffer[i0-1].id==I_NSCB));
-						uint32_t bytesLeft=buffer[i0-1].arg.D.a_0;
-						buffer[i0-1].id=I_NOP_;
-						while (bytesLeft!=0){
-							enum InstructionTypeID id=buffer[i0].id;
-							if (id==I_SYDB | id==I_BYTE){bytesLeft-=1;}
-							else if (id==I_SYDW | id==I_WORD){assert(bytesLeft>=2);bytesLeft-=2;}
-							else if (id==I_SYDD | id==I_DWRD){assert(bytesLeft>=4);bytesLeft-=4;}
-							else if (id==I_ZNXB){assert(bytesLeft>=buffer[i0].arg.D.a_0);bytesLeft-=buffer[i0].arg.D.a_0;}
-							buffer[i0++].id=I_NOP_;
-							if (i0>=global_static_data.numberOfSlotsTaken){
-								assert(bytesLeft==0);
-								break;
-							}
-						}
-						removeNop(&global_static_data);
-						cosmic_free(labelMarkoff);
-						goto RemoveUnusedStart;
-					} else {
-						labelCount++;
-					}
-				}
-			}
-		}
-		ContinueUnusedSearch:;
-	}
-	}
-	RemoveUnusedEnd:;
-	if (globalStringLiteralEntries.numberOfValidEntries!=0){
-		{
-		bool didStringRemoveAtLeastOne=false;
-		uint32_t* stringLabelMarkoff=cosmic_malloc(globalStringLiteralEntries.numberOfValidEntries*sizeof(uint32_t));
-		uint32_t i0;
-		for (i0=0;i0<globalStringLiteralEntries.numberOfValidEntries;i0++){
-			stringLabelMarkoff[i0]=globalStringLiteralEntries.entries[i0].label;
-		}
-		doLabelMarkoffInAllCompressedInstructionBuffers(stringLabelMarkoff,globalStringLiteralEntries.numberOfValidEntries);
-		doLabelMarkoffInInstructionBuffer(&global_static_data,stringLabelMarkoff,globalStringLiteralEntries.numberOfValidEntries);
-		for (i0=globalStringLiteralEntries.numberOfValidEntries;i0--!=0;){
-			if (stringLabelMarkoff[i0]!=0){
-				didStringRemoveAtLeastOne=true;
-				cosmic_free(globalStringLiteralEntries.entries[i0].data);
-				for (uint32_t i1=i0+1;i1<globalStringLiteralEntries.numberOfValidEntries;i1++){
-					globalStringLiteralEntries.entries[i1-1]=globalStringLiteralEntries.entries[i1-0];
-				}
-				globalStringLiteralEntries.numberOfValidEntries--;
-			}
-		}
-		cosmic_free(stringLabelMarkoff);
-		if (didStringRemoveAtLeastOne) goto RemoveUnusedStart;
-		}
-		// todo: allow string literals to be stored inside of other string literals (put that here)
-		{
-		InstructionBuffer ib_temp;
-		initInstructionBuffer(&ib_temp);
-		uint32_t totalByteCount=0;
-		for (uint32_t i0=0;i0<globalStringLiteralEntries.numberOfValidEntries;i0++){
-			totalByteCount+=globalStringLiteralEntries.entries[i0].lengthOfData;
-		}
-		InstructionSingle IS_temp;
-		IS_temp.id=I_NSCB;
-		IS_temp.arg.D.a_0=totalByteCount;
-		addInstruction(&ib_temp,IS_temp);
-		for (uint32_t i0=0;i0<globalStringLiteralEntries.numberOfValidEntries;i0++){
-			struct StringLiteralEntry sle=globalStringLiteralEntries.entries[i0];
-			IS_temp.id=I_LABL;
-			IS_temp.arg.D.a_0=sle.label;
-			addInstruction(&ib_temp,IS_temp);
-			IS_temp.id=I_BYTE;
-			for (uint32_t i1=0;i1<sle.lengthOfData;i1++){
-				IS_temp.arg.B.a_0=sle.data[i1];
-				addInstruction(&ib_temp,IS_temp);
-			}
-		}
-		dataBytecodeReduction(&ib_temp);
-		singleMergeIB(&global_static_data,&ib_temp);
-		destroyInstructionBuffer(&ib_temp);
-		}
-	}
-	dataBytecodeReduction(&global_static_data); // probably won't find anything, but it doesn't really hurt to try
-}
-
-
-
 struct MemoryOrganizerForInitializer{
 	uint32_t size;
 	bool* isSet; // isSet[location] is if the byte is set at location
@@ -884,7 +699,7 @@ struct ConstValueTypePair{
 
 // this function has specific expectations for being called
 bool shouldAvoidWarningsForInitializerExpressionElement(ExpressionTreeNode* rootNode){
-	return rootNode->operatorID==62 && (!compileSettings.warnForZeroCastInStructOrUnionInInitializer & rootNode->post.extraVal==0);
+	return rootNode->operatorID==62 && rootNode->post.extraVal==0;
 }
 
 
@@ -912,12 +727,25 @@ void expressionToSymbolicRoot(struct MemoryOrganizerForInitializer* mofi,const c
 	doSymbolicConstantGenForExp=true;
 	ExpressionTreeNode* thisNode=expressionTreeGlobalBuffer.expressionTreeNodes+nodeIndex;
 	uint32_t sizeOfCastType=getSizeofForTypeString(typeStringCast,true);
-	if (sizeOfCastType==0 | sizeOfCastType==3 | sizeOfCastType>4){
-		printInformativeMessageForExpression(true,"type size for the destination type of this static expression is invalid",thisNode);
+	expressionToSymbolic(nodeIndex);
+	bool shouldNoWarn=potentialNoWarn && shouldAvoidWarningsForInitializerExpressionElement(thisNode);
+	bool isToArrayType=*typeStringCast=='[';
+	if (sizeOfCastType==0 | sizeOfCastType==3 | sizeOfCastType>4 | isToArrayType){
+		if (sizeOfCastType!=0 & isToArrayType){
+			if (shouldNoWarn){
+				// then the destination type is an array when doing no warn, in which case it is valid, any there is nothing more to do (except free a few things)
+				cosmic_free(thisNode->post.typeString);
+				destroyInstructionBuffer(&thisNode->ib);
+				doSymbolicConstantGenForExp=false;
+				return;
+			}
+			printInformativeMessageForExpression(true,"cannot initialize an array type with expression",thisNode);
+		} else {
+			printInformativeMessageForExpression(true,"type size for the destination type of this static expression is invalid",thisNode);
+		}
 		exit(1);
 	}
-	expressionToSymbolic(nodeIndex);
-	applyTypeCast(thisNode,typeStringCast,15*!(potentialNoWarn && shouldAvoidWarningsForInitializerExpressionElement(thisNode)));
+	applyTypeCast(thisNode,typeStringCast,15*!shouldNoWarn);
 	cosmic_free(thisNode->post.typeString);
 	InstructionBuffer* ib=&thisNode->ib;
 	InstructionBuffer ibTemp;

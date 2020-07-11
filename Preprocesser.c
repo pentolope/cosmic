@@ -4,78 +4,7 @@
 #include "Common.c"
 
 
-// doesFileExist isn't used now, but I might want it later
-#if 0
-bool doesFileExist(char* filePath){
-    FILE *file;
-    if((file = fopen(filePath,"r"))!=NULL){
-        fclose(file);
-        return true;
-    }
-    return false;
-}
-#endif
-
-
-//TODO: this function doesn't really need to be in this file
-void writeFileContentsToDisk(char* filePath, char* string){
-    FILE *inputFile = fopen(filePath,"w");
-    if (inputFile==NULL){
-        printf("Null pointer given for file in writeFileContentsToDisk()\n");
-		exit(1);
-    }
-    for (int32_t i=0;string[i];i++){
-        char returnedValue = fputc(string[i],inputFile);
-        if (returnedValue!=string[i]){
-            fclose(inputFile);
-            printf("error in writing file in function writeFileContentsToDisk()\n");
-			exit(1);
-        }
-    }
-    int returnedValue = fclose(inputFile);
-    if (returnedValue!=0){
-        printf("error in closing file that was being written to\n");
-		exit(1);
-    }
-}
-
-
-
-// also prepends and appends a newline
-char* loadFileContentsToStringOnHeap(char* filePath){
-    FILE *inputFile = fopen(filePath,"r");
-    if (inputFile==NULL){
-        printf("Error: could not load file: \"%s\"\n",filePath);
-		exit(1);
-    }
-    fpos_t startingPositionOfFile;
-    fgetpos(inputFile,&startingPositionOfFile);
-    int32_t lengthOfFile = 0;
-    while (fgetc(inputFile)!=EOF){
-        lengthOfFile++;
-        if (lengthOfFile>268435456L){ // 2**28
-            fclose(inputFile);
-            printf("Error: Input file \"%s\" is too long\n",filePath);
-			exit(1);
-        }
-    }
-    fsetpos(inputFile,&startingPositionOfFile);
-    char *characterArrayOfFile = cosmic_malloc((lengthOfFile+3)*sizeof(char));
-    characterArrayOfFile[0] = '\n';
-    characterArrayOfFile[lengthOfFile+1] = '\n';
-    characterArrayOfFile[lengthOfFile+2] = 0;
-    for (int32_t i=1;i<lengthOfFile+1;i++){
-        char currentCharacter = fgetc(inputFile);
-        characterArrayOfFile[i]=currentCharacter;
-        if (!(currentCharacter!=0 | currentCharacter!=16 | currentCharacter!=26)){
-            fclose(inputFile);
-            printf("Error: asserting ((char!=0) | (char!=16) | (char!=26)) failed for input file. I can't process \"%s\" as source code.\n",filePath);
-			exit(1);
-        }
-    }
-    fclose(inputFile);
-    return characterArrayOfFile;
-}
+char* loadFileContentsAsSourceCode(char* filePath);
 
 
 // used after the preprocesser is done so that the compiler can just manage a string
@@ -236,56 +165,57 @@ void replaceAreaOfSourceContainer(char* string, int32_t indexToStart, int32_t in
 
 
 
+
 /*
 fills gaps of character 26 in by pulling all other characters down and setting the resulting empty space at end with 0
 */
 void pullDownSourceChar(SourceChar* sourceChar){
 	int32_t destinationIndex=0;
-    int32_t sourceIndex=0;
-    for (sourceIndex=0;sourceChar[sourceIndex].c;sourceIndex++){
-        if (sourceChar[sourceIndex].c==26){
-            sourceChar[destinationIndex].c = 0;
-        } else {
-            sourceChar[destinationIndex++]=sourceChar[sourceIndex];
-        }
-    }
-    for (;destinationIndex<sourceIndex;destinationIndex++){
-        sourceChar[destinationIndex].c = 0;
-    }
+	int32_t sourceIndex=0;
+	for (sourceIndex=0;sourceChar[sourceIndex].c;sourceIndex++){
+		if (sourceChar[sourceIndex].c==26){
+			sourceChar[destinationIndex].c = 0;
+		} else {
+			sourceChar[destinationIndex++]=sourceChar[sourceIndex];
+		}
+	}
+	for (;destinationIndex<sourceIndex;destinationIndex++){
+		sourceChar[destinationIndex].c = 0;
+	}
 }
 
 // given index of `'` or `"` it will give the index of the ending `'` or `"` respectively
 int32_t literalSkipSourceChar(SourceChar *sourceChar, int32_t start){
-    if (sourceChar[start].c=='\''){
-        start++;
-        while (sourceChar[start].c!='\''){
-            if (sourceChar[start].c==0){
-				printf("literalSkip() detected unbounded char literal\n");
+	if (sourceChar[start].c=='\''){
+		start++;
+		while (sourceChar[start].c!='\''){
+			if (sourceChar[start].c==0){
+				printf("literalSkip() detected unbounded character literal\n");
 				exit(1);
-            }
-            if (sourceChar[start].c=='\\'){
-                start++;
-            }
-            start++;
-        }
-        return start; // this parameter has been modified
-    } else if (sourceChar[start].c=='\"'){
-        start++;
-        while (sourceChar[start].c!='\"'){
-            if (sourceChar[start].c==0){
+			}
+			if (sourceChar[start].c=='\\'){
+				start++;
+			}
+			start++;
+		}
+		return start; // this parameter has been modified
+	} else if (sourceChar[start].c=='\"'){
+		start++;
+		while (sourceChar[start].c!='\"'){
+			if (sourceChar[start].c==0){
 				printf("literalSkip() detected unbounded string literal\n");
 				exit(1);
-            }
-            if (sourceChar[start].c=='\\'){
-                start++;
-            }
-            start++;
-        }
-        return start; // this parameter has been modified
-    } else {
+			}
+			if (sourceChar[start].c=='\\'){
+				start++;
+			}
+			start++;
+		}
+		return start; // this parameter has been modified
+	} else {
 		printf("literalSkip() got invalid character for beginning\n");
 		exit(1);
-    }
+	}
 }
 
 
@@ -295,20 +225,20 @@ given index of the asterisk in the start of a block comment, get index of the ba
 assumes start index is valid
 */
 int32_t commentBlockSetAndSkip(SourceChar *sourceChar, int32_t index){
-    sourceChar[index-1].c=' ';
-    sourceChar[index].c = ' ';
-    index+=2;
-    while (!((sourceChar[index-1].c=='*') & (sourceChar[index].c=='/'))){
-        if (sourceChar[index].c==0){
+	sourceChar[index-1].c=' ';
+	sourceChar[index].c = ' ';
+	index+=2;
+	while (!((sourceChar[index-1].c=='*') & (sourceChar[index].c=='/'))){
+		if (sourceChar[index].c==0){
 			printf("commentBlockSetAndSkip() didn't find end\n");
 			exit(1);
-        }
-        sourceChar[index-1].c=' ';
-        index++;
-    }
-    sourceChar[index-1].c=' ';
-    sourceChar[index].c = ' ';
-    return index;
+		}
+		sourceChar[index-1].c=' ';
+		index++;
+	}
+	sourceChar[index-1].c=' ';
+	sourceChar[index].c = ' ';
+	return index;
 }
 
 
@@ -317,34 +247,34 @@ given index of second slash in line comment start, get index of next newline. se
 assumes start index is valid
 */
 int32_t commentLineSetAndSkip(SourceChar *sourceChar, int32_t index){
-    sourceChar[index-1].c=' ';
-    sourceChar[index].c = ' ';
-    while (sourceChar[index].c!='\n'){
-        if (sourceChar[index].c==0){
-			printf("commentLineSetAndSkip() didn't find end\n");
-			exit(1);
-        }
-        sourceChar[index].c=' ';
-        index++;
-    }
-    return index;
+	sourceChar[index-1].c=' ';
+	sourceChar[index].c = ' ';
+	while (sourceChar[index].c!='\n'){
+	if (sourceChar[index].c==0){
+		printf("commentLineSetAndSkip() didn't find end\n");
+		exit(1);
+	}
+	sourceChar[index].c=' ';
+	index++;
+	}
+	return index;
 }
 
 /*
 replaces comments with spaces
 */
 void commentStripSourceChar(SourceChar *sourceChar){
-    if (sourceChar[0].c!=0){
-        for (int32_t i=1;sourceChar[i].c;i++){
-            if (sourceChar[i].c=='\'' | sourceChar[i].c=='\"'){
+	if (sourceChar[0].c!=0){
+		for (int32_t i=1;sourceChar[i].c;i++){
+			if (sourceChar[i].c=='\'' | sourceChar[i].c=='\"'){
 				i = literalSkipSourceChar(sourceChar,i);
-            } else if (sourceChar[i-1].c=='/' & sourceChar[i].c=='*'){
-                i = commentBlockSetAndSkip(sourceChar,i);
-            } else if (sourceChar[i-1].c=='/' & sourceChar[i].c=='/'){
-                i = commentLineSetAndSkip(sourceChar,i);
-            }
-        }
-    }
+			} else if (sourceChar[i-1].c=='/' & sourceChar[i].c=='*'){
+				i = commentBlockSetAndSkip(sourceChar,i);
+			} else if (sourceChar[i-1].c=='/' & sourceChar[i].c=='/'){
+				i = commentLineSetAndSkip(sourceChar,i);
+			}
+		}
+	}
 }
 
 void initialStripSourceChar(SourceChar *sourceChar){
@@ -369,7 +299,7 @@ void initialStripSourceChar(SourceChar *sourceChar){
 		for (i=1;sourceChar[i].c;i++){
 			if ((sourceChar[i-1].c=='\\') & (sourceChar[i].c=='\n')){
 				sourceChar[i-1].c=26;
-				sourceChar[i  ].c=26;
+				sourceChar[i ].c=26;
 				didSetOne=true;
 			}
 		}
@@ -381,11 +311,12 @@ void initialStripSourceChar(SourceChar *sourceChar){
 
 /*
 removes repeated spaces and newlines in raw code.
-also changes the sequence "\n# " -> "\n#"  (for proper preprocesser directive support)
-expects that character and string literals have not been converted to their true form (such as turning \n into a newline).
+also changes the sequence "\n# " -> "\n#" (for proper preprocesser directive support)
+expects that character and string literals have not been converted to their true form (such as turning 
+into a newline).
 */
 void superStripSourceChar(SourceChar *sourceChar, int32_t startLocation){
-    int32_t i;
+	int32_t i;
 	bool didSetOne;
 	if (startLocation<=0){
 		startLocation=1;
@@ -395,61 +326,61 @@ void superStripSourceChar(SourceChar *sourceChar, int32_t startLocation){
 		printf("A string literal is not allowed here\n");
 		exit(1);
 	}
-    if (sourceChar[0].c!=0){
+	if (sourceChar[0].c!=0){
 		didSetOne=false;
-        for (i=startLocation;sourceChar[i].c;i++){
-            char previousChar = sourceChar[i-1].c;
-            char currentChar  = sourceChar[i].c;
-            if (currentChar=='\'' | currentChar=='\"'){
-                i = literalSkipSourceChar(sourceChar,i);
-            } else if (previousChar==' ' & (currentChar==' ' | currentChar=='\n')){
-                sourceChar[i-1].c=26;
+		for (i=startLocation;sourceChar[i].c;i++){
+			char previousChar = sourceChar[i-1].c;
+			char currentChar = sourceChar[i].c;
+			if (currentChar=='\'' | currentChar=='\"'){
+				i = literalSkipSourceChar(sourceChar,i);
+			} else if (previousChar==' ' & (currentChar==' ' | currentChar=='\n')){
+				sourceChar[i-1].c=26;
 				didSetOne=true;
-            }
-        }
-        if (didSetOne){
+			}
+		}
+		if (didSetOne){
 			pullDownSourceChar(sourceChar);
 		}
-    }
-    if (sourceChar[0].c!=0){
+	}
+	if (sourceChar[0].c!=0){
 		didSetOne=false;
-        for (i=startLocation;sourceChar[i].c;i++){
-            // newline characters are not allowed in strings anyway, so we don't need a literal skip
-            if (sourceChar[i-1].c=='\n' & sourceChar[i].c==' '){
-                sourceChar[i].c = 26;
+		for (i=startLocation;sourceChar[i].c;i++){
+			// newline characters are not allowed in strings anyway, so we don't need a literal skip
+			if (sourceChar[i-1].c=='\n' & sourceChar[i].c==' '){
+				sourceChar[i].c = 26;
 				didSetOne=true;
-            }
-        }
-        if (didSetOne){
+			}
+		}
+		if (didSetOne){
 			pullDownSourceChar(sourceChar);
 		}
-    }
-    if (sourceChar[0].c!=0){
+	}
+	if (sourceChar[0].c!=0){
 		didSetOne=false;
-        for (i=startLocation;sourceChar[i].c;i++){
-            // newline characters are not allowed in strings anyway, so we don't need a literal skip
-            if (sourceChar[i-1].c=='\n' & sourceChar[i].c=='\n'){
-                sourceChar[i-1].c = 26;
+		for (i=startLocation;sourceChar[i].c;i++){
+		// newline characters are not allowed in strings anyway, so we don't need a literal skip
+			if (sourceChar[i-1].c=='\n' & sourceChar[i].c=='\n'){
+				sourceChar[i-1].c = 26;
 				didSetOne=true;
-            }
-        }
-        if (didSetOne){
+			}
+		}
+		if (didSetOne){
 			pullDownSourceChar(sourceChar);
 		}
-    }
+	}
 	if (sourceChar[0].c!=0 & sourceChar[1].c!=0 & sourceChar[startLocation].c!=0){
 		didSetOne=false;
-        for (i=startLocation+1;sourceChar[i].c;i++){
-            // newline characters are not allowed in strings anyway, so we don't need a literal skip
-            if (sourceChar[i-2].c=='\n' & sourceChar[i-1].c=='#' & sourceChar[i].c==' '){
-                sourceChar[i].c = 26;
+		for (i=startLocation+1;sourceChar[i].c;i++){
+			// newline characters are not allowed in strings anyway, so we don't need a literal skip
+			if (sourceChar[i-2].c=='\n' & sourceChar[i-1].c=='#' & sourceChar[i].c==' '){
+				sourceChar[i].c = 26;
 				didSetOne=true;
-            }
-        }
-        if (didSetOne){
+			}
+		}
+		if (didSetOne){
 			pullDownSourceChar(sourceChar);
 		}
-    }
+	}
 }
 
 // expects that the sourceChar has repeated spaces eliminated
@@ -471,7 +402,7 @@ void adjacentStringConcatInSourceChar(SourceChar *sourceChar){
 				int32_t endOfNextStringLiteral = literalSkipSourceChar(sourceChar,i+2);
 				sourceChar[i+2].c = 26;
 				sourceChar[i+1].c = 26;
-				sourceChar[i  ].c = 26;
+				sourceChar[i ].c = 26;
 				i=beginning;
 				continue;
 			} else if (sourceChar[i+3].c=='\"' & sourceChar[i+2].c=='L' & sourceChar[i+1].c==' ' & isThisWideLiteral){
@@ -479,7 +410,7 @@ void adjacentStringConcatInSourceChar(SourceChar *sourceChar){
 				sourceChar[i+3].c = 26;
 				sourceChar[i+2].c = 26;
 				sourceChar[i+1].c = 26;
-				sourceChar[i  ].c = 26;
+				sourceChar[i ].c = 26;
 				i=beginning;
 				continue;
 			}
@@ -488,10 +419,6 @@ void adjacentStringConcatInSourceChar(SourceChar *sourceChar){
 	}
 	pullDownSourceChar(sourceChar);
 }
-
-
-
-
 
 
 bool isNextNonSpaceOpenParen(int32_t startIndexInSourceString){
@@ -1023,11 +950,10 @@ typedef struct SourceFileOriginal{
 } SourceFileOriginal;
 
 // this holds an array of the file names
-typedef struct SourceFileListing{
+struct SourceFileListing{
 	uint8_t allocationCount;
 	SourceFileOriginal sourceFileOriginals[255];
-} SourceFileListing;
-SourceFileListing sourceFileListing;
+} sourceFileListing;
 
 
 uint8_t getPotentiallyNewIDforFile(char* fileName, bool hadBrackets){
@@ -1045,7 +971,7 @@ uint8_t getPotentiallyNewIDforFile(char* fileName, bool hadBrackets){
 		// then it doesn't match anything we currently have, so lets mark it down
 		SourceFileOriginal sfo;
 		sfo.fileName=copyStringToHeapString(fileName);
-		sfo.originalContentOfFile=loadFileContentsToStringOnHeap(fileName);
+		sfo.originalContentOfFile=loadFileContentsAsSourceCode(fileName);
 		sfo.hadBrackets=hadBrackets;
 		sourceFileListing.sourceFileOriginals[sourceFileListing.allocationCount]=sfo;
 		return sourceFileListing.allocationCount++;
@@ -1314,11 +1240,11 @@ void printInformativeMessageAtSourceContainerIndex(bool isError,const char* mess
 	for (uint8_t i=0;i<ERR_MSG_LEN*2;i++){
 		if (tempString1[i]!=' ' | tempString2[i]!=' '){
 			if (i!=0){
-				for (uint8_t c=i;c<ERR_MSG_LEN*2+1;c++){
-					tempString1[c-i]=tempString1[c];
-					tempString2[c-i]=tempString2[c];
-					arrowString1[c-i]=arrowString1[c];
-					arrowString2[c-i]=arrowString2[c];
+				for (uint8_t u=i;u<ERR_MSG_LEN*2+1;u++){
+					tempString1[u-i]=tempString1[u];
+					tempString2[u-i]=tempString2[u];
+					arrowString1[u-i]=arrowString1[u];
+					arrowString2[u-i]=arrowString2[u];
 				}
 			}
 			break;
@@ -2533,6 +2459,8 @@ void insertBeginningFileAndRunPreprocesser(const char *beginningFileName){
 		if (t1!=NULL) cosmic_free(t1);
 	}
 	cosmic_free(macroListing.macros);
+	cosmic_free((char*)preDefinedMacros.dateResult);
+	cosmic_free((char*)preDefinedMacros.timeResult);
 	
 	createSourceContainerString(); // so the compiler can just manage a string
 }

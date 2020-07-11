@@ -581,35 +581,6 @@ void addEntryToInstructionBuffersOfFunctions(InstructionBuffer* ib){
 	}
 	CompressedInstructionBuffer cib=compressInstructionBuffer(ib);
 	globalInstructionBuffersOfFunctions.slots[globalInstructionBuffersOfFunctions.numberOfSlotsTaken++]=cib;
-	{
-		InstructionBuffer test0=*ib;
-		InstructionBuffer test1=decompressInstructionBuffer(cib);
-		assert(test0.numberOfSlotsTaken==test1.numberOfSlotsTaken);
-		CompressedInstructionBuffer cib1=compressInstructionBuffer(&test1);
-		assert(cib1.allocLen==cib.allocLen);
-		uint16_t countUntilStart=0;
-		for (uint32_t i=0;i<cib.allocLen;i++){
-			//printf("%08X;%08X:%02X,%02X\n",cib.allocLen,i,cib.byteCode[i],cib1.byteCode[i]);
-			if (countUntilStart==0){
-				if (cib.byteCode[i]==0){
-					//printf("Safety skip!\n");
-					countUntilStart=1;
-				} else {
-					countUntilStart=getStorageDeltaForInstruction(cib.byteCode[i]);
-					InstructionSingle iiis0;
-					InstructionSingle iiis1;
-					decompressInstruction(cib.byteCode+i,&iiis0);
-					decompressInstruction(cib1.byteCode+i,&iiis1);
-					//printSingleInstructionOptCode(iiis0);printf("\n");
-					//printSingleInstructionOptCode(iiis1);printf("\n");
-				}
-			}
-			assert(cib.byteCode[i]==cib1.byteCode[i]);
-			countUntilStart--;
-		}
-		destroyInstructionBuffer(&test1);
-		cosmic_free(cib1.byteCode);
-	}
 	destroyInstructionBuffer(ib);
 }
 

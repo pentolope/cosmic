@@ -117,7 +117,7 @@ void addFunctionParemetersAndInternalValuesToBlockFrame(char* typeStringOfFuncti
 		for (int32_t i=indexOfEndOfThisArgument;i>=0;i--){
 			char c = internalTypeString[i];
 			bool isThisAnArgument = false;
-			if ((i==0) | (c==',')){
+			if (i==0 | c==','){
 				isThisAnArgument = true;
 			} else if (c==')'){
 				i = getIndexOfMatchingEnclosement(internalTypeString,i);
@@ -143,10 +143,7 @@ void addFunctionParemetersAndInternalValuesToBlockFrame(char* typeStringOfFuncti
 						exit(1);
 					}
 					// TODO: support register keyword in function parameters. There are several places that would need to be handled at
-					if (addVariableToBlockFrame(tempTypeString,0,false,false)){
-						printf("parameter name conflict for function\n");
-						exit(1);
-					}
+					addVariableToBlockFrame(tempTypeString,0,false,false);
 				} else {
 					// is there something to add if it is the variadic argument?
 				}
@@ -156,24 +153,29 @@ void addFunctionParemetersAndInternalValuesToBlockFrame(char* typeStringOfFuncti
 		cosmic_free(tempTypeString);
 	}
 	cosmic_free(internalTypeString);
-	bool didAddingAllInternalParametersNotSucceed = false;
 	if (isReturnValueNonVoid){
-		didAddingAllInternalParametersNotSucceed = addVariableToBlockFrame("__FUNCTION_RET_VALUE_PTR unsigned int",0,false,false);
+		addVariableToBlockFrame("__FUNCTION_RET_VALUE_PTR unsigned int",0,false,false);
 	}
-	didAddingAllInternalParametersNotSucceed |= addVariableToBlockFrame("__FUNCTION_ARG_SIZE unsigned int",0,false,false);
-	didAddingAllInternalParametersNotSucceed |= addVariableToBlockFrame("__FUNCTION_CALLER_RET_STACK_ADDRESS unsigned int",0,false,false);
-	didAddingAllInternalParametersNotSucceed |= addVariableToBlockFrame("__FUNCTION_CALLER_FRAME_STACK_ADDRESS unsigned int",0,false,false);
-	didAddingAllInternalParametersNotSucceed |= addVariableToBlockFrame("__FUNCTION_RET_INSTRUCTION_ADDRESS unsigned long",0,false,false);
+	addVariableToBlockFrame("__FUNCTION_ARG_SIZE unsigned int",0,false,false);
+	addVariableToBlockFrame("__FUNCTION_CALLER_RET_STACK_ADDRESS unsigned int",0,false,false);
+	addVariableToBlockFrame("__FUNCTION_CALLER_FRAME_STACK_ADDRESS unsigned int",0,false,false);
+	addVariableToBlockFrame("__FUNCTION_RET_INSTRUCTION_ADDRESS unsigned long",0,false,false);
 	
-	if (didAddingAllInternalParametersNotSucceed){
-		printf("There was a parameter to that function with a reserved identifier\n");
-		exit(1);
-	}
 }
 
+void addBlankStaticVariable(const char* typeString){
+	struct IdentifierSearchResult isr;
+	searchForIdentifier(&isr,typeString,false,true,true,false,false);
+	assert(isr.didExist);
+	struct GlobalVariableEntry* globalVariableEntry=
+		blockFrameArray.globalBlockFrame.globalVariableEntries+
+		isr.reference.variableReference.variableEntryIndex;
+	struct MemoryOrganizerForInitializer mofi;
+	initMemoryOrganizerForInitializer(&mofi,globalVariableEntry->thisSizeof);
+	finalizeMemoryOrganizerForInitializer(&mofi,globalVariableEntry->labelID,false);
+}
 
 #include "SwitchGotoHelper.c"
-
 
 
 /*
@@ -195,7 +197,6 @@ int32_t functionStatementsWalk(
 		uint32_t labelNumberForInlinedReturn,
 		bool stopAfterSingleExpression)
 {
-	
 	int32_t walkingIndex = indexOfStart;
 	InstructionBuffer instructionBufferLocalTemp_0;
 	InstructionBuffer instructionBufferLocalTemp_1;
@@ -212,31 +213,23 @@ int32_t functionStatementsWalk(
 			continue;
 		}
 		
-		
-		
-		
-		// this is debug for valgrind
-		if (++statementCount>=statementCountCutoff & isStatementCutoffActive){
-			printf("Debug: terminating due to statement count cutoff\n");
-			exit(0);
-		}
 		#ifdef STATEMENT_DEBUG
 		printInformativeMessageAtSourceContainerIndex(
 						false,"function scope walk starting here:",walkingIndex,0);
 		#endif
 		
-		
 		int32_t endOfToken = getEndOfToken(sourceContainer.string,walkingIndex);
-		if (endOfToken==-1){
-			err_1101_("Couldn\'t find end of this token",walkingIndex);
-		}
+		if (endOfToken==-1) err_1101_("Couldn\'t find end of this token",walkingIndex);
 		if (firstCharacter=='}'){
+			
 			if (stopAfterSingleExpression){
 				err_1101_("Expected expression",walkingIndex);
 			}
 			removeBlockFrame();
 			return walkingIndex;
+			
 		} else if (firstCharacter=='{'){
+			
 			walkingIndex = functionStatementsWalk(
 				returnTypeString,
 				walkingIndex+1,
@@ -245,7 +238,9 @@ int32_t functionStatementsWalk(
 				labelNumberForContinue,
 				labelNumberForInlinedReturn,
 				false);
+			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"if")){
+			
 			walkingIndex = advanceToNonNewlineSpace(walkingIndex+2);
 			if (sourceContainer.string[walkingIndex]!='('){
 				err_1101_("expected \'(\'",walkingIndex);
@@ -287,9 +282,13 @@ int32_t functionStatementsWalk(
 			}
 			destroyInstructionBuffer(&instructionBufferLocalTemp_1);
 			destroyInstructionBuffer(&instructionBufferLocalTemp_0);
+			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"else")){
+			
 			err_1101_("keyword \'else\' encountered without a matching \'if\'",walkingIndex);
+			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"for")){
+			
 			walkingIndex = advanceToNonNewlineSpace(walkingIndex+3);
 			if (sourceContainer.string[walkingIndex]!='('){
 				err_1101_("expected \'(\'",walkingIndex);
@@ -302,7 +301,6 @@ int32_t functionStatementsWalk(
 			initInstructionBuffer(&instructionBufferLocalTemp_2);
 			initInstructionBuffer(&instructionBufferLocalTemp_3);
 			addBlockFrame();
-			
 			if (sourceContainer.string[walkingIndex]!=';'){
 				endOfToken = getEndOfToken(sourceContainer.string,walkingIndex);
 				if (isSegmentOfStringTypeLike(sourceContainer.string,walkingIndex,endOfToken)){
@@ -324,8 +322,8 @@ int32_t functionStatementsWalk(
 						usedStatic = true;
 						walkingIndex += 7;
 					}
-					if (usedStatic){
-						err_1101_("static not quite ready in functions",walkingIndex);
+					if (usedStatic&usedRegister){
+						err_1101_("Cannot use 'register' and 'static' at the same time",walkingIndex);
 					}
 					if (sourceContainer.string[indexOfEndOfDeclaration]=='='){
 						int32_t indexOfStartOfInitializer = advanceToNonNewlineSpace(indexOfEndOfDeclaration+1);
@@ -335,15 +333,14 @@ int32_t functionStatementsWalk(
 					} else {
 						char* typeString = fullTypeParseAndAdd(walkingIndex,indexOfEndOfDeclaration,false);
 						addVariableToBlockFrame(typeString,walkingIndex,usedRegister,usedStatic);
+						if (usedStatic) addBlankStaticVariable(typeString);
 						cosmic_free(typeString);
 						walkingIndex=indexOfEndOfDeclaration;
 					}
 				} else {
 					// then assume the first statement is an expression
 					int32_t endingSemicolon = findIndexOfTypicalStatementEnd(walkingIndex);
-					if (walkingIndex!=endingSemicolon){
-						expressionToAssemblyWithCast(&instructionBufferLocalTemp_0,"void",walkingIndex,endingSemicolon);
-					}
+					expressionToAssemblyWithCast(&instructionBufferLocalTemp_0,"void",walkingIndex,endingSemicolon);
 					walkingIndex=endingSemicolon;
 				}
 				walkingIndex++;
@@ -371,11 +368,9 @@ int32_t functionStatementsWalk(
 			} else {
 				walkingIndex++;
 			}
-			
 			uint32_t newBreakLabel=++globalLabelID;
 			uint32_t newContinueLabel=++globalLabelID;
 			uint32_t internalLabel=++globalLabelID;
-			
 			walkingIndex = functionStatementsWalk(
 				returnTypeString,
 				walkingIndex,
@@ -384,7 +379,6 @@ int32_t functionStatementsWalk(
 				newContinueLabel,
 				labelNumberForInlinedReturn,
 				true);
-			
 			insert_IB_statement_for(
 				parentInstructionBufferToInsertTo,
 				&instructionBufferLocalTemp_0,
@@ -394,13 +388,14 @@ int32_t functionStatementsWalk(
 				newContinueLabel,
 				newBreakLabel,
 				internalLabel);
-			
 			removeBlockFrame();
 			destroyInstructionBuffer(&instructionBufferLocalTemp_3);
 			destroyInstructionBuffer(&instructionBufferLocalTemp_2);
 			destroyInstructionBuffer(&instructionBufferLocalTemp_1);
 			destroyInstructionBuffer(&instructionBufferLocalTemp_0);
+			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"break")){
+			
 			if (labelNumberForBreak==0){
 				err_1101_("\'break\' keyword has nothing to break to",walkingIndex);
 			}
@@ -410,7 +405,9 @@ int32_t functionStatementsWalk(
 			}
 			insert_IB_address_label(parentInstructionBufferToInsertTo,labelNumberForBreak);
 			singleMergeIB(parentInstructionBufferToInsertTo,&ib_direct_jump);
+			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"continue")){
+			
 			if (labelNumberForContinue==0){
 				err_1101_("\'continue\' keyword has nothing to continue to",walkingIndex);
 			}
@@ -420,7 +417,9 @@ int32_t functionStatementsWalk(
 			}
 			insert_IB_address_label(parentInstructionBufferToInsertTo,labelNumberForContinue);
 			singleMergeIB(parentInstructionBufferToInsertTo,&ib_direct_jump);
+			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"while")){
+			
 			walkingIndex = advanceToNonNewlineSpace(walkingIndex+5);
 			if (sourceContainer.string[walkingIndex]!='('){
 				err_1101_("expected \'(\'",walkingIndex);
@@ -445,9 +444,10 @@ int32_t functionStatementsWalk(
 			insert_IB_statement_while(parentInstructionBufferToInsertTo,&instructionBufferLocalTemp_0,&instructionBufferLocalTemp_1,newContinueLabel,newBreakLabel);
 			destroyInstructionBuffer(&instructionBufferLocalTemp_1);
 			destroyInstructionBuffer(&instructionBufferLocalTemp_0);
+			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"do")){
+			
 			walkingIndex = advanceToNonNewlineSpace(walkingIndex+2);
-			initInstructionBuffer(&instructionBufferLocalTemp_0);
 			initInstructionBuffer(&instructionBufferLocalTemp_1);
 			uint32_t internalLabel=++globalLabelID;
 			uint32_t newBreakLabel=++globalLabelID;
@@ -471,6 +471,7 @@ int32_t functionStatementsWalk(
 			}
 			walkingIndex++;
 			int32_t otherParenIndex = parenEndWithLiteralSkip(walkingIndex,0);
+			initInstructionBuffer(&instructionBufferLocalTemp_0);
 			expressionToAssemblyWithCast(&instructionBufferLocalTemp_0,"_Bool",walkingIndex,otherParenIndex);
 			walkingIndex = advanceToNonNewlineSpace(otherParenIndex+1);
 			if (sourceContainer.string[walkingIndex]!=';'){
@@ -479,7 +480,9 @@ int32_t functionStatementsWalk(
 			insert_IB_statement_do_while(parentInstructionBufferToInsertTo,&instructionBufferLocalTemp_0,&instructionBufferLocalTemp_1,internalLabel,newBreakLabel,newContinueLabel);
 			destroyInstructionBuffer(&instructionBufferLocalTemp_1);
 			destroyInstructionBuffer(&instructionBufferLocalTemp_0);
+			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"return")){
+			
 			walkingIndex = advanceToNonNewlineSpace(walkingIndex+6);
 			if (doStringsMatch(returnTypeString,"void")){
 				if (sourceContainer.string[walkingIndex]!=';'){
@@ -491,19 +494,19 @@ int32_t functionStatementsWalk(
 				}
 				if (labelNumberForInlinedReturn!=0){
 					// TODO
-					/*
-					Note for when I do implement this:
-					the global buffer for expressions will be overritten when the function walk occurs 
-					so it will need to be copied, both for a backup so the current expression can continue and to replace it back
-					*/
 					printf("inlined functions are not ready yet\n");
 					exit(1);
+					/*
+					Note for when I do implement this:
+					the global buffer for expressions will be overritten when the function walk occurs, so
+					use packExpressionTreeGlobalBuffer() and unpackExpressionTreeGlobalBuffer() here
+					for the expression 
+					*/
 				} else {
 					int32_t endingSemicolon = findIndexOfTypicalStatementEnd(walkingIndex);
 					expressionToAssemblyWithReturn(parentInstructionBufferToInsertTo,walkingIndex,endingSemicolon,returnTypeString);
 					walkingIndex=endingSemicolon;
 				}
-				
 			}
 			if (labelNumberForInlinedReturn!=0){
 				printf("inlined functions are not ready yet\n");
@@ -512,10 +515,13 @@ int32_t functionStatementsWalk(
 				insert_IB_address_label(parentInstructionBufferToInsertTo,labelNumberForInlinedReturn);
 				singleMergeIB(parentInstructionBufferToInsertTo,&ib_direct_jump);
 			} else {
-				instructionSingleTemp.id=I_RET_;
-				addInstruction(parentInstructionBufferToInsertTo,instructionSingleTemp);
+				InstructionSingle IS_temp;
+				IS_temp.id=I_RET_;
+				addInstruction(parentInstructionBufferToInsertTo,IS_temp);
 			}
+			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"switch")){
+			
 			struct SwitchManagment packedSwitchManagment = packCurrentSwitchManagment();
 			currentSwitchManagment.inSwitch=true;
 			walkingIndex = advanceToNonNewlineSpace(walkingIndex+6);
@@ -533,7 +539,6 @@ int32_t functionStatementsWalk(
 			addBlockFrame();
 			expressionToAssemblyWithCast(&currentSwitchManagment.ibSwitchItem,"unsigned int",walkingIndex,otherParenIndex);
 			uint32_t newBreakLabel=++globalLabelID;
-			
 			walkingIndex = functionStatementsWalk(
 				returnTypeString,
 				startBracketIndex+1,
@@ -543,7 +548,6 @@ int32_t functionStatementsWalk(
 				labelNumberForInlinedReturn,
 				false
 			);
-			
 			if (resolveSwitch()){
 				err_1101_("At least one case is required per switch statement",walkingIndex);
 			}
@@ -555,7 +559,9 @@ int32_t functionStatementsWalk(
 			destroyInstructionBuffer(&currentSwitchManagment.ibSwitchItem);
 			destroyInstructionBuffer(&instructionBufferLocalTemp_0);
 			unpackCurrentSwitchManagment(packedSwitchManagment);
+			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"case")){
+			
 			if (!currentSwitchManagment.inSwitch){
 				err_1101_("keyword \'case\' must be inside a switch",walkingIndex);
 			}
@@ -564,12 +570,8 @@ int32_t functionStatementsWalk(
 			{
 				char c;
 				while ((c=sourceContainer.string[tempWalkingIndex1]),(c!=':' & c!=0)){
-					if (c=='?'){
-						err_1101_("ternaries are not allowed in case constant-expression",tempWalkingIndex1);
-					}
-					if (c=='\"'){
-						err_1101_("string literals are not allowed in case constant-expression",tempWalkingIndex1);
-					}
+					if (c=='?')  err_1101_("ternaries are not allowed in case constant-expression",tempWalkingIndex1);
+					if (c=='\"') err_1101_("string literals are not allowed in case constant-expression",tempWalkingIndex1);
 					tempWalkingIndex1++;
 				}
 			}
@@ -591,7 +593,9 @@ int32_t functionStatementsWalk(
 					)
 				);
 			walkingIndex=tempWalkingIndex1;
+			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"default")){
+			
 			if (!currentSwitchManagment.inSwitch){
 				err_1101_("keyword \'default\' must be inside a switch",walkingIndex);
 			}
@@ -608,6 +612,7 @@ int32_t functionStatementsWalk(
 				currentSwitchManagment.defaultLabel=++globalLabelID
 				);
 			walkingIndex=tempWalkingIndex;
+			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"typedef")){
 			
 			err_1101_("typedef inside functions is not ready yet",walkingIndex);
@@ -633,6 +638,7 @@ int32_t functionStatementsWalk(
 			insert_IB_raw_label(parentInstructionBufferToInsertTo,addGotoOrLabel(copyStringSegmentToHeap(sourceContainer.string,labelStart,labelEnd),false));
 			
 		} else {
+			
 			if (isSegmentOfStringTypeLike(sourceContainer.string,walkingIndex,endOfToken)){
 				// then it is a declaration
 				int32_t indexOfEndOfDeclaration = findEndIndexForConvertType(sourceContainer.string,walkingIndex);
@@ -652,6 +658,9 @@ int32_t functionStatementsWalk(
 					usedStatic = true;
 					walkingIndex += 7;
 				}
+				if (usedStatic&usedRegister){
+					err_1101_("Cannot use 'register' and 'static' at the same time",walkingIndex);
+				}
 				if (sourceContainer.string[indexOfEndOfDeclaration]=='='){
 					int32_t indexOfStartOfInitializer = advanceToNonNewlineSpace(indexOfEndOfDeclaration+1);
 					int32_t indexOfEndOfInitializer = findIndexOfTypicalStatementEnd(indexOfStartOfInitializer);
@@ -660,19 +669,18 @@ int32_t functionStatementsWalk(
 				} else {
 					char* typeString = fullTypeParseAndAdd(walkingIndex,indexOfEndOfDeclaration,false);
 					addVariableToBlockFrame(typeString,walkingIndex,usedRegister,usedStatic);
+					if (usedStatic) addBlankStaticVariable(typeString);
 					cosmic_free(typeString);
 					walkingIndex=indexOfEndOfDeclaration;
 				}
 			} else {
 				// then assume it is an expression
 				int32_t endingSemicolon = findIndexOfTypicalStatementEnd(walkingIndex);
-				if (walkingIndex!=endingSemicolon){
-					expressionToAssemblyWithCast(parentInstructionBufferToInsertTo,"void",walkingIndex,endingSemicolon);
-				}
+				expressionToAssemblyWithCast(parentInstructionBufferToInsertTo,"void",walkingIndex,endingSemicolon);
 				walkingIndex=endingSemicolon;
 			}
+			
 		}
-		
 		if (stopAfterSingleExpression){
 			removeBlockFrame();
 			return walkingIndex;
@@ -786,7 +794,7 @@ void fileScopeStatementsWalk(){
 						exit(1);
 					}
 					applyToTypeStringArrayDecayToSelf(typeString);
-					uint8_t retValForAddingFunction = addGlobalFunction(typeString,isDefinitionBeingGiven);
+					uint8_t retValForAddingFunction = addGlobalFunction(typeString,gotoFailIndex,isDefinitionBeingGiven,hasStatic,hasExtern,hasInline);
 					if (retValForAddingFunction!=0){
 						if (retValForAddingFunction==1){
 							err_1101_("function declaration has type conflicts with previous declaration",gotoFailIndex);
@@ -796,6 +804,8 @@ void fileScopeStatementsWalk(){
 							err_1101_("that identifier is already used for a global variable, it cannot be used for a function",gotoFailIndex);
 						} else if (retValForAddingFunction==4){
 							err_1101_("function definitions must have identifiers for all parameters",gotoFailIndex);
+						} else if (retValForAddingFunction==4){
+							err_1101_("functions declared 'extern' cannot be given a definition",gotoFailIndex);
 						}
 						assert(false);
 					}

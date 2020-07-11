@@ -2483,10 +2483,12 @@ void attemptAllActiveOptPhase2(InstructionBuffer* ib){
 			exit(0);
 		}
 	}
-	DEBUG_STATUS("pep->","",1);
-	v6 = attemptPeepHoleOpt(ib);
-	DEBUG_STATUS("[YES]\n","[NO]\n",v6);
-	if (v6) {v0=1;v1=1;v2=1;v3=1;v4=1;v5=1;goto Middle;}
+	if (compileSettings.optLevel>2){
+		DEBUG_STATUS("pep->","",1);
+		v6 = attemptPeepHoleOpt(ib);
+		DEBUG_STATUS("[YES]\n","[NO]\n",v6);
+		if (v6) {v0=1;v1=1;v2=1;v3=1;v4=1;v5=1;goto Middle;}
+	} else v6=false;
 	DEBUG_STATUS("jmp->","",1);
 	v6=attemptJmpOpt(ib);
 	DEBUG_STATUS("[YES]\n","[NO]\n",v6);

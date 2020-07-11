@@ -3,21 +3,21 @@
 
 #ifdef USE_ALT_ALLOC
 
-#define ALT_ALLOC_BLK_SIZE 88
+#define ALT_ALLOC_BLK_SIZE 64 // 88 is just about the limit, but a little less generally uses less memory
 /*
 Because of the way that malloc,calloc,realloc,free are often used 
 (especially in the compiler), it can result in heap fragmentation.
 This implementation is used to help prevent that 
 (at the cost of a small amount of computational overhead)
 */
-#define ALT_ALLOC_INSTRUCTION_BUFFER_COUNT 128
+#define ALT_ALLOC_INSTRUCTION_BUFFER_COUNT 64
 
 struct {
 	struct {
 		InstructionSingle buffer[INIT_INSTRUCTION_BUFFER_SIZE];
 	} buffers[ALT_ALLOC_INSTRUCTION_BUFFER_COUNT];
 	bool isTaken[ALT_ALLOC_INSTRUCTION_BUFFER_COUNT];
-} cosmic_instruction_single_buffers;
+} cosmic_instruction_single_buffers = {0};
 
 
 
