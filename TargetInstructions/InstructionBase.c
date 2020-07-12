@@ -558,15 +558,18 @@ uint8_t decompressInstruction(const uint8_t* byteCode,InstructionSingle* IS_pare
 	return delta;
 }
 
-InstructionBuffer decompressInstructionBuffer(const CompressedInstructionBuffer cib){
+// byteCodeEnd may be NULL. byteCodeEnd represents the position of the terminating zero
+InstructionBuffer decompressInstructionBuffer(const uint8_t* byteCodeStart,const uint8_t** byteCodeEnd){
 	InstructionBuffer ib;
 	initInstructionBuffer(&ib);
-	uint8_t* byteCode=cib.byteCode;
-	for (uint32_t i=0;byteCode[i];){
+	const uint8_t* byteCode=byteCodeStart;
+	uint32_t i=0;
+	while (byteCode[i]){
 		InstructionSingle IS;
 		i+=decompressInstruction(byteCode+i,&IS);
 		addInstruction(&ib,IS);
 	}
+	if (byteCodeEnd!=NULL) *byteCodeEnd=byteCode+i;
 	return ib;
 }
 

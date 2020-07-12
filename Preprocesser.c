@@ -4,7 +4,7 @@
 #include "Common.c"
 
 
-char* loadFileContentsAsSourceCode(char* filePath);
+char* loadFileContentsAsSourceCode(const char* filePath);
 
 
 // used after the preprocesser is done so that the compiler can just manage a string

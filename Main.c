@@ -15,9 +15,20 @@ void runPreprocessCompile(const char* startFilePath, const char* outFilePath,boo
 	fileScopeStatementsWalk();
 	doFunctionDefinitionCheck();
 	applyFinalizeToGlobalStaticData();
-	finalOutput(outFilePath);
+	finalOutputFromCompile(outFilePath);
 	destroyAllCompilerInfo();
 }
+
+
+void runLink(const char* outPath,const char* in1Path,const char* in2Path){
+	if (doStringsMatch(in1Path,in2Path)) err_10_1_("Linking identical files is silly");
+	struct BinContainer bc0=loadFileContentsAsBinContainer(in1Path);
+	struct BinContainer bc1=loadFileContentsAsBinContainer(in2Path);
+	genAllBinContainerMatch(bc0,bc1);
+	printf("\nLink task done, but not finished. I have yet to write the rest.\n");
+	exit(0);
+}
+
 
 struct {
 	bool doTypicalCompile;
@@ -88,6 +99,9 @@ int main(int argc, char** argv){
 	if (mainArg.doTypicalCompile & mainArg.in2Path!=NULL){
 		err_10_1_("Command argument: Maxiumum of one input files may be specified for compile task");
 	}
+	if (mainArg.doLink & mainArg.in2Path==NULL){
+		err_10_1_("Command argument: Two input files required for link task");
+	}
 	if (mainArg.in1Path==NULL){
 		err_10_1_("Command argument: No input files specified");
 	}
@@ -106,13 +120,13 @@ int main(int argc, char** argv){
 	if (mainArg.opt3){
 		compileSettings.optLevel=4;
 	}
+	if (mainArg.outPath==NULL) mainArg.outPath="a.out";
 	
 	if (mainArg.doTypicalCompile){
-		if (mainArg.outPath==NULL) mainArg.outPath="a.out";
 		runPreprocessCompile(mainArg.in1Path,mainArg.outPath,false);
 	}
 	if (mainArg.doLink){
-		err_10_1_("Command argument: link not ready yet");
+		runLink(mainArg.outPath,mainArg.in1Path,mainArg.in2Path);
 	}
 	printf("\nTask completed successfully\n");
 	return 0;

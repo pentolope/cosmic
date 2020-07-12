@@ -33,6 +33,8 @@ callgrind.out.*
 out.txt
 out*.txt
 a.out
+a1.out
+a2.out
 trimOut.py
 optTesting.py
 

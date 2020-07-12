@@ -43,11 +43,10 @@ void writeFileContentsToDisk(char* filePath, char* string){
 
 
 // also prepends and appends a newline
-char* loadFileContentsAsSourceCode(char* filePath){
+char* loadFileContentsAsSourceCode(const char* filePath){
 	FILE *inputFile = fopen(filePath,"r");
 	if (inputFile==NULL){
-		printf("Error: could not load file: \"%s\"\n",filePath);
-		exit(1);
+		err_10_1_(strMerge3("Error: could not load file \"",filePath,"\""));
 	}
 	fpos_t startingPositionOfFile;
 	fgetpos(inputFile,&startingPositionOfFile);
@@ -56,8 +55,7 @@ char* loadFileContentsAsSourceCode(char* filePath){
 		lengthOfFile++;
 		if (lengthOfFile>268435456L){ // 2**28
 			fclose(inputFile);
-			printf("Error: Input file \"%s\" is too long\n",filePath);
-			exit(1);
+			err_10_1_(strMerge3("Error: Input file \"",filePath,"\" is too long"));
 		}
 	}
 	fsetpos(inputFile,&startingPositionOfFile);
@@ -77,6 +75,81 @@ char* loadFileContentsAsSourceCode(char* filePath){
 	fclose(inputFile);
 	return characterArrayOfFile;
 }
+
+
+
+
+struct BinContainer loadFileContentsAsBinContainer(const char* filePath){
+	struct BinContainer binContainerOut;
+	FILE *inputFile = fopen(filePath,"rb");
+	if (inputFile==NULL){
+		err_10_1_(strMerge3("Error: could not load file \"",filePath,"\""));
+	}
+	fpos_t startingPositionOfFile;
+	fgetpos(inputFile,&startingPositionOfFile);
+	binContainerOut.len_data=0;
+	while (fgetc(inputFile)!=EOF){
+		binContainerOut.len_data++;
+		if (binContainerOut.len_data>268435456L){ // 2**28
+			fclose(inputFile);
+			err_10_1_(strMerge3("Error: Input file \"",filePath,"\" is too long"));
+		}
+	}
+	char* errorMessage=strMerge3("Error: Input file \"",filePath,"\" is corrupted");
+	fsetpos(inputFile,&startingPositionOfFile);
+	binContainerOut.data = cosmic_malloc(binContainerOut.len_data*sizeof(char));
+	for (uint32_t i=0;i<binContainerOut.len_data;i++){
+		int currentCharacter = fgetc(inputFile);
+		binContainerOut.data[i]=currentCharacter;
+		assert(currentCharacter!=EOF); // length should have already been determined
+	}
+	fclose(inputFile);
+	uint32_t walkingIndexCore=4;
+	uint32_t walkingIndexAhead=4;
+	binContainerOut.len_symbols =(uint32_t)binContainerOut.data[0];
+	binContainerOut.len_symbols|=(uint32_t)binContainerOut.data[1]<<8;
+	binContainerOut.len_symbols|=(uint32_t)binContainerOut.data[2]<<16;
+	binContainerOut.len_symbols|=(uint32_t)binContainerOut.data[3]<<24;
+	binContainerOut.symbols=cosmic_malloc(binContainerOut.len_symbols*sizeof(struct SymbolEntry));
+	for (uint32_t i0=0;i0<binContainerOut.len_symbols;i0++){
+		if (walkingIndexCore+6>=binContainerOut.len_data) err_10_1_(errorMessage);
+		struct SymbolEntry se;
+		se.label =(uint32_t)binContainerOut.data[walkingIndexCore++];
+		se.label|=(uint32_t)binContainerOut.data[walkingIndexCore++]<<8;
+		se.label|=(uint32_t)binContainerOut.data[walkingIndexCore++]<<16;
+		se.label|=(uint32_t)binContainerOut.data[walkingIndexCore++]<<24;
+		for (walkingIndexAhead=walkingIndexCore;binContainerOut.data[walkingIndexAhead]>=6;walkingIndexAhead++){
+			if (walkingIndexAhead+1>=binContainerOut.len_data) err_10_1_(errorMessage);
+		}
+		se.name=cosmic_malloc(((walkingIndexAhead-walkingIndexCore)+1)*sizeof(char));
+		walkingIndexAhead=walkingIndexCore;
+		uint32_t i1;
+		for (i1=0;(se.name[i1]=binContainerOut.data[walkingIndexAhead])>=6;walkingIndexAhead++,i1++){
+			if (walkingIndexAhead+1>=binContainerOut.len_data) err_10_1_(errorMessage);
+		}
+		se.name[i1]=0;
+		se.type=binContainerOut.data[walkingIndexAhead];
+		binContainerOut.symbols[i0]=se;
+		walkingIndexCore=walkingIndexAhead+1;
+	}
+	const uint8_t* walkingByteCode=binContainerOut.data+walkingIndexCore;
+	binContainerOut.staticData=decompressInstructionBuffer(walkingByteCode,&walkingByteCode);
+	assert(*walkingByteCode==0);
+	++walkingByteCode;
+	binContainerOut.functions=decompressInstructionBuffer(walkingByteCode,&walkingByteCode);
+	if ((walkingByteCode-binContainerOut.data)+1!=binContainerOut.len_data) err_10_1_(errorMessage);
+	cosmic_free(errorMessage);
+	return binContainerOut;
+}
+
+
+
+
+
+
+
+
+
 
 
 // should be done before applyFinalizeToGlobalStaticData()
@@ -317,7 +390,7 @@ void safe_fputc(int value){
 
 
 // destroys global_static_data
-void finalOutput(const char* filePath){
+void finalOutputFromCompile(const char* filePath){
 	CompressedInstructionBuffer cis_global_static_data=compressInstructionBuffer(&global_static_data);
 	destroyInstructionBuffer(&global_static_data);
 	uint32_t symbolEntryLength=0;

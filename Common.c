@@ -206,7 +206,20 @@ typedef struct SourceContainer{
 SourceContainer sourceContainer;
 
 
-
+struct BinContainer{
+	uint8_t* data;
+	struct SymbolEntry{
+		char* name;
+		uint32_t label;
+		uint8_t type;
+		bool hasMatch; // this is if the identifier is in the other BinContainer
+		uint32_t match; // this is the index in the other BinContainer
+	}* symbols;
+	uint32_t len_data;
+	uint32_t len_symbols;
+	InstructionBuffer staticData;
+	InstructionBuffer functions;
+};
 
 
 bool doStringsMatch(const char* string1,const char* string2){
@@ -218,6 +231,27 @@ bool doStringsMatch(const char* string1,const char* string2){
 		if (c1!=c2) return false;
 	}
 	return c1==c2;
+}
+
+void genAllBinContainerMatch(struct BinContainer bc0,struct BinContainer bc1){
+	for (uint32_t i0=0;i0<bc0.len_symbols;i0++){
+		bool* hasMatch=&bc0.symbols[i0].hasMatch;
+		*hasMatch=false;
+		uint32_t* match=&bc0.symbols[i0].match;
+		char* name=bc0.symbols[i0].name;
+		for (uint32_t i1=0;i1<bc1.len_symbols;i1++){
+			if (doStringsMatch(name,bc1.symbols[i1].name)){*hasMatch=true;*match=i1;break;}
+		}
+	}
+	for (uint32_t i1=0;i1<bc1.len_symbols;i1++){
+		bool* hasMatch=&bc1.symbols[i1].hasMatch;
+		*hasMatch=false;
+		uint32_t* match=&bc1.symbols[i1].match;
+		char* name=bc1.symbols[i1].name;
+		for (uint32_t i0=0;i0<bc0.len_symbols;i0++){
+			if (doStringsMatch(name,bc0.symbols[i0].name)){*hasMatch=true;*match=i0;break;}
+		}
+	}
 }
 
 char* copyStringToHeapString(const char* string){
