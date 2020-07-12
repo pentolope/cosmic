@@ -1,15 +1,6 @@
 
 
-//#include "UtilitiesLevel2.c"
-
-#include "TestAssemblyBuilder.c"
-
-
-
-
-
-
-
+#include "UtilitiesLevel2.c"
 
 
 // more specifically, findIndexOfTypicalStatementEnd() looks for an unenclosed semicolon and returns the index if it
@@ -925,7 +916,6 @@ printInstructionBufferWithMessageAndNumber(&instructionBufferForFunction,typeStr
 			err_1111_("Unknown starting token at file scope",walkingIndex,endOfToken);
 		}
 	}
-	//printInstructionBufferWithMessageAndNumber(&global_static_data,"global static data printout",0);
 }
 
 

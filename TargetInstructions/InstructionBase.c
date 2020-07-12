@@ -208,12 +208,6 @@ void printInstructionBufferWithMessageAndNumber(const InstructionBuffer*,const c
 void printSingleInstructionOptCode(const InstructionSingle);
 
 
-struct InstructionBuffersOfFunctions{
-	CompressedInstructionBuffer* slots;
-	uint32_t numberOfSlotsAllocated;
-	uint32_t numberOfSlotsTaken;
-} globalInstructionBuffersOfFunctions;
-
 const InstructionBuffer resetInstructionBuffer={0};
 #define INIT_INSTRUCTION_BUFFER_SIZE 1024
 
@@ -574,6 +568,13 @@ InstructionBuffer decompressInstructionBuffer(const uint8_t* byteCodeStart,const
 }
 
 
+#ifndef IS_BUILDING_RUN
+struct InstructionBuffersOfFunctions{
+	CompressedInstructionBuffer* slots;
+	uint32_t numberOfSlotsAllocated;
+	uint32_t numberOfSlotsTaken;
+} globalInstructionBuffersOfFunctions;
+
 // input is destroyed
 void addEntryToInstructionBuffersOfFunctions(InstructionBuffer* ib){
 	if (globalInstructionBuffersOfFunctions.numberOfSlotsTaken>=globalInstructionBuffersOfFunctions.numberOfSlotsAllocated){
@@ -823,7 +824,7 @@ void convertSTPI_STPA(InstructionBuffer* ib, uint16_t offsetToAdd){
 		}
 	}
 }
-
+#endif //ifndef IS_BUILDING_RUN
 
 
 

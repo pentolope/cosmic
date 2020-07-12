@@ -1,9 +1,13 @@
-Suggested initial compile command:\
-`clang Main.c -O1 -Wno-parentheses -o cosmic.exe`\
+Suggested initial compile command for cosmic:\
+`clang Cosmic.c -O1 -Wno-parentheses -o cosmic.exe`\
 Obviously, if on Linux, the '.exe' is likely not desired.\
 clang is not required. Other compilers such as gcc should work flawlessly.\
 Other optimization levels should all work flawlessly, and should produce identical output.\
 If compiled at `-O3`, cosmic is very fast ;)\
+\
+There are two other tools that can be made in addition to `cosmic`, `run` and `sim`.\
+`run` is intended to be used on the target machine, and will not work on modern machines.\
+`sim` is intended to be used on modern machines, and will not work on the target machine.\
 \
 I am currently taking no care for the possibility of a C++ compiler attempting to compile this.\
 The goal of this project is to make (at least) a C99 compiler/linker that can compile/link it's own source code.\

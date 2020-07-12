@@ -19,6 +19,7 @@
 #include <string.h>
 
 
+#define USE_ALT_ALLOC
 
 void* cosmic_malloc(size_t size);
 void* cosmic_calloc(size_t nmemb,size_t size);
@@ -91,8 +92,6 @@ void err_1111_(const char* message,int32_t s,int32_t e){printInformativeMessageA
 
 #define ERR_MSG_LEN 60 // controls the length of error messages
 
-#define USE_ALT_ALLOC
-
 
 //#define STATEMENT_DEBUG
 //#define EXP_TO_ASSEMBLY_DEBUG
@@ -114,7 +113,6 @@ STATEMENT_DEBUG tells the statement walker to print every statement it reaches p
 EXP_TO_ASSEMBLY_DEBUG tells ExpressionToInstructions to print some information about what it is currently processing
 COMPILE_EXP_DEBUG_PRINTOUT tells ExpressionParser to explain how the expression tree got built
 */
-
 
 
 
@@ -165,8 +163,13 @@ void resetColor(){
 	printf("\033[0m");
 }
 
+void memZero(void* ptr, uint32_t numberOfBytes){
+	for (uint32_t i=0;i<numberOfBytes;i++){
+		((uint8_t*)ptr)[i]=0;
+	}
+}
 
-void checkArchitecture(){
+static void checkArchitecture(){
 	uint32_t v0 = 0xFFEE5522;
 	uint8_t* a0 = (uint8_t*)(&v0);
 	uint8_t r0 = *(a0+0);
@@ -179,12 +182,6 @@ void checkArchitecture(){
 	if ((r0!=0x22) | (r1!=0x55) | (r2!=0xEE) | (r3!=0xFF) | (r4!=0x5522u) | (r5!=0xFFEE)){
 		printf("Fatal Error: Computer Architecture not compatible. This compiler requires running on a computer with a byte-accessed little-endian architecture.\n");
 		exit(2);
-	}
-}
-
-void memZero(void* ptr, uint32_t numberOfBytes){
-	for (uint32_t i=0;i<numberOfBytes;i++){
-		((uint8_t*)ptr)[i]=0;
 	}
 }
 
@@ -617,9 +614,7 @@ int32_t emptyIndexAdvance(int32_t strStart){
 }
 
 
-
-
 #include "NumberParser.c"
 
-#endif
+#endif //#ifndef HAS_COMMON_BEEN_INCLUDED
 

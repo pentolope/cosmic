@@ -1,6 +1,8 @@
 
 #include "StatementWalk.c"
 #include "FinalizersAndFileIO.c"
+#include "PrintInstructionBuffer.c"
+
 
 // if addAngleBrackets==false, then double quotes will be added
 void runPreprocessCompile(const char* startFilePath, const char* outFilePath,bool addAngleBrackets){
