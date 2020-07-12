@@ -184,7 +184,8 @@ void parseNumber(struct NumberParseResult* numberParseResult,const char* string,
 				} else if ((digit>='A') & (digit<='F')){
 					digit=(digit-'A')+10;
 				} else {
-					digit=17; // this will cause a failure
+					numberParseResult->errorCode=3;
+					return;
 				}
 			} else {
 				digit-='0';

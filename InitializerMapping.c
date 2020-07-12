@@ -34,81 +34,126 @@ InstructionBuffer finalizeMemoryOrganizerForInitializer(
 		struct MemoryOrganizerForInitializer* mofi_ptr,
 		uint32_t labelNumber,bool isConst){
 	
-	assert(labelNumber!=0);
 	struct MemoryOrganizerForInitializer mofi=*mofi_ptr;
+	assert(labelNumber!=0);
 	cosmic_free(mofi.isSet);
-	InstructionBuffer ib_destination;
 	InstructionSingle IS_temp;
-	initInstructionBuffer(&ib_destination);
+	InstructionBuffer ib_destination;
+	uint32_t i0;
 	IS_temp.id=isConst?I_NSCB:I_NSNB;
 	IS_temp.arg.D.a_0=mofi.size;
+	if (mofi.ib.numberOfSlotsTaken==0){
+		// then just reuse this InstructionBuffer, there is nothing in it
+		addInstruction(&mofi.ib,IS_temp);
+		IS_temp.id=I_LABL;
+		IS_temp.arg.D.a_0=labelNumber;
+		addInstruction(&mofi.ib,IS_temp);
+		IS_temp.id=I_ZNXB;
+		IS_temp.arg.D.a_0=mofi.size;
+		addInstruction(&mofi.ib,IS_temp);
+		return mofi.ib;
+	}
+	initInstructionBuffer(&ib_destination);
 	addInstruction(&ib_destination,IS_temp);
 	IS_temp.id=I_LABL;
 	IS_temp.arg.D.a_0=labelNumber;
 	addInstruction(&ib_destination,IS_temp);
-	bool didFind;
-	uint32_t lowestOffset;
-	uint32_t locationOfLowestOffset;
 	uint32_t currentOffset=0;
-	InstructionSingle* IS_ptr_end=mofi.ib.buffer+mofi.ib.numberOfSlotsTaken;
-	goto TransitionLoopStart;
-	do {
-		if (currentOffset!=lowestOffset){
-			IS_temp.id=I_ZNXB;
-			IS_temp.arg.D.a_0=lowestOffset-currentOffset;
-			currentOffset=lowestOffset;
-			addInstruction(&ib_destination,IS_temp);
-		}
-		mofi.ib.buffer[locationOfLowestOffset++].id=I_NOP_;
-		assert(locationOfLowestOffset<mofi.ib.numberOfSlotsTaken);
-		{
-			enum InstructionTypeID data_type=mofi.ib.buffer[locationOfLowestOffset].id;
-			if (data_type==I_BYTE | data_type==I_SYDB){
-				currentOffset+=1;
-			} else if (data_type==I_WORD | data_type==I_SYDW){
-				currentOffset+=2;
-			} else {
-				assert(data_type==I_DWRD | data_type==I_SYDD);
-				currentOffset+=4;
+	uint32_t loffCount=0;
+	for (i0=0;i0<mofi.ib.numberOfSlotsTaken;i0++){
+		bool b=mofi.ib.buffer[i0].id==I_LOFF;
+		loffCount+=b;
+	}
+	if (loffCount>1){
+		struct LOFF_sort{
+			uint32_t loff_arg;
+			uint32_t indexInIB;
+		};
+		struct LOFF_sort* LOFF_sort_arr=cosmic_malloc(loffCount*sizeof(struct LOFF_sort));
+		uint32_t* loff_locationEnd=cosmic_malloc(loffCount*sizeof(uint32_t));
+		loffCount=0;
+		for (i0=0;i0<mofi.ib.numberOfSlotsTaken;i0++){
+			if (mofi.ib.buffer[i0].id==I_LOFF){
+				LOFF_sort_arr[loffCount].loff_arg=mofi.ib.buffer[i0].arg.D.a_0;
+				LOFF_sort_arr[loffCount].indexInIB=i0;
+				loff_locationEnd[loffCount]=i0;
+				loffCount++;
 			}
 		}
-		do {
-			InstructionSingle* IS_ptr=mofi.ib.buffer+locationOfLowestOffset;
-			if (IS_ptr->id==I_NOP_){
-				do {
-					if (++locationOfLowestOffset<mofi.ib.numberOfSlotsTaken) goto TransitionLoopStart;
-					IS_ptr=mofi.ib.buffer+locationOfLowestOffset;
-				} while (IS_ptr->id!=I_NOP_);
+		for (i0=1;i0<loffCount;i0++){
+			loff_locationEnd[i0-1]=loff_locationEnd[i0];
+			uint32_t i1=i0;
+			struct LOFF_sort* p;
+			struct LOFF_sort* n;
+			while (
+				((p=LOFF_sort_arr+(i1-1)),(n=LOFF_sort_arr+i1)),
+				(p->loff_arg > n->loff_arg)) // this line is the conditional
+			{
+				struct LOFF_sort t=*p;*p=*n;*n=t;
+				if (--i1==0) break;
 			}
-			if (IS_ptr->id==I_LOFF) goto TransitionLoopStart;
-			addInstruction(&ib_destination,*IS_ptr);
-			IS_ptr->id=I_NOP_;
-		} while (++locationOfLowestOffset<mofi.ib.numberOfSlotsTaken);
-		TransitionLoopStart:
-		didFind=false;
-		lowestOffset=0;
-		locationOfLowestOffset=0;
-		for (uint32_t i=0;i<mofi.ib.numberOfSlotsTaken;i++){
-			InstructionSingle* IS_ptr=mofi.ib.buffer+i;
-			if (IS_ptr->id==I_LOFF){
-				if (!didFind | IS_ptr->arg.D.a_0<lowestOffset){
-					didFind=true;
-					lowestOffset=IS_ptr->arg.D.a_0;
-					locationOfLowestOffset=i;
+		}
+		loff_locationEnd[loffCount-1]=mofi.ib.numberOfSlotsTaken;
+		for (i0=0;i0<loffCount;i0++){
+			struct LOFF_sort t=LOFF_sort_arr[i0];
+			uint32_t thisLoffEnd=loff_locationEnd[i0];
+			if (t.loff_arg>currentOffset){
+				IS_temp.id=I_ZNXB;
+				IS_temp.arg.D.a_0=t.loff_arg-currentOffset;
+				currentOffset=t.loff_arg;
+				addInstruction(&ib_destination,IS_temp);
+			}
+			for (uint32_t i1=t.indexInIB+1;i1<thisLoffEnd;i1++){
+				IS_temp=mofi.ib.buffer[i1];
+				addInstruction(&ib_destination,IS_temp);
+				switch (IS_temp.id){
+					case I_BYTE:case I_SYDB:currentOffset+=1;break;
+					case I_WORD:case I_SYDW:currentOffset+=2;break;
+					case I_DWRD:case I_SYDD:currentOffset+=4;
+					default:;
 				}
 			}
 		}
-	} while (didFind);
-	if (mofi.size!=currentOffset){
-		IS_temp.id=I_ZNXB;
-		IS_temp.arg.D.a_0=mofi.size-currentOffset;
-		currentOffset=mofi.size;
-		addInstruction(&ib_destination,IS_temp);
+		if (mofi.size>currentOffset){
+			IS_temp.id=I_ZNXB;
+			IS_temp.arg.D.a_0=mofi.size-currentOffset;
+			addInstruction(&ib_destination,IS_temp);
+		}
+		cosmic_free(LOFF_sort_arr);
+		cosmic_free(loff_locationEnd);
+		destroyInstructionBuffer(&mofi.ib);
+		dataBytecodeReduction(&ib_destination);
+		return ib_destination;
+	} else {
+		assert(mofi.ib.buffer[0].id==I_LOFF);
+		uint32_t singleLoffArg=mofi.ib.buffer[0].arg.D.a_0;
+		if (singleLoffArg>0){
+			IS_temp.id=I_ZNXB;
+			IS_temp.arg.D.a_0=singleLoffArg;
+			currentOffset=singleLoffArg;
+			addInstruction(&ib_destination,IS_temp);
+		}
+		for (uint32_t i1=1;i1<mofi.ib.numberOfSlotsTaken;i1++){
+			IS_temp=mofi.ib.buffer[i1];
+			addInstruction(&ib_destination,IS_temp);
+			switch (IS_temp.id){
+				case I_BYTE:case I_SYDB:currentOffset+=1;break;
+				case I_WORD:case I_SYDW:currentOffset+=2;break;
+				case I_DWRD:case I_SYDD:currentOffset+=4;
+				default:;
+			}
+		}
+		if (mofi.size>currentOffset){
+			IS_temp.id=I_ZNXB;
+			IS_temp.arg.D.a_0=mofi.size-currentOffset;
+			addInstruction(&ib_destination,IS_temp);
+		}
+		destroyInstructionBuffer(&mofi.ib);
+		dataBytecodeReduction(&ib_destination);
+		return ib_destination;
 	}
-	destroyInstructionBuffer(&mofi.ib);
-	dataBytecodeReduction(&ib_destination);
-	return ib_destination;
 }
+
 
 
 /*
@@ -463,10 +508,18 @@ void applyConstantOperator(ExpressionTreeNode* thisNode){
 			}
 		}
 		break;
+		case 23:*thisConstVal=leftConstVal<<rightConstVal;
+		break;
+		case 24:*thisConstVal=leftConstVal>>rightConstVal;
+		break;
+		case 31:*thisConstVal=leftConstVal&rightConstVal;
+		break;
+		case 32:*thisConstVal=leftConstVal^rightConstVal;
+		break;
+		case 33:*thisConstVal=leftConstVal|rightConstVal;
+		break;
 		case 14:
-		case 62:{
-			*thisConstVal=extraVal;
-		}
+		case 62:*thisConstVal=extraVal;
 		break;
 		case 59:{
 			if (operatorTypeID==1){
@@ -784,6 +837,7 @@ void expressionToSymbolicRoot(struct MemoryOrganizerForInitializer* mofi,const c
 
 
 struct InitializerMap{
+	// InitializerMapEntry has initializers, don't change it around
 	struct InitializerMapEntry{
 		// for the next 3, the value is -1 if it doesn't exist
 		int32_t chainEntry;
@@ -794,13 +848,12 @@ struct InitializerMap{
 		int32_t strEnd;
 		uint8_t typeOfEntry;
 		int16_t expNode;
+		uint32_t arrayConstVal; // only used if typeOfEntry==5
 	} *entries;
 	int32_t numberOfEntriesAllocated;
 	int32_t numberOfEntriesTaken;
 	int32_t rootEntry;
 	uint8_t typeOfInit;
-	
-	
 } initializerMap;
 /*
 
@@ -839,28 +892,6 @@ int32_t partitionEntryInInitializerMap(){
 		initializerMap.entries=cosmic_realloc(initializerMap.entries,initializerMap.numberOfEntriesAllocated*sizeof(struct InitializerMapEntry));
 	}
 	return initializerMap.numberOfEntriesTaken++;
-}
-
-int32_t emptyIndexRecedeForInitializerMap(int32_t strStart){
-	int32_t strWalk=strStart+1;
-	while (true){
-		char c=sourceContainer.string[--strWalk];
-		assert(strWalk!=0); // hit string start
-		if (!(c==' ' | c=='\n')){
-			return strWalk;
-		}
-	}
-}
-
-int32_t emptyIndexAdvanceForInitializerMap(int32_t strStart){
-	int32_t strWalk=strStart-1;
-	while (true){
-		char c=sourceContainer.string[++strWalk];
-		assert(c!=0);
-		if (!(c==' ' | c=='\n')){
-			return strWalk;
-		}
-	}
 }
 
 int32_t findLocatorEndForInitializerMap(int32_t strStart){
@@ -930,7 +961,7 @@ int32_t findTypicalEndForInitializerMap(int32_t strStart){
 				return strWalk;
 			}
 		} else if (c=='=' && sourceContainer.string[strStart]!='{'){
-			int32_t t = findTypicalEndForInitializerMap(emptyIndexAdvanceForInitializerMap(strWalk+1));
+			int32_t t = findTypicalEndForInitializerMap(emptyIndexAdvance(strWalk+1));
 			return t;
 		}
 	}
@@ -957,7 +988,7 @@ int32_t initializerMapLocator(int32_t strStart){
 		return -1;
 	}
 	int32_t thisEntry=partitionEntryInInitializerMap();
-	ime.chainEntry=initializerMapLocator(emptyIndexAdvanceForInitializerMap(ime.strEnd));
+	ime.chainEntry=initializerMapLocator(emptyIndexAdvance(ime.strEnd));
 	initializerMap.entries[thisEntry]=ime;
 	return thisEntry;
 }
@@ -969,7 +1000,7 @@ uint8_t catagorizeInitializerMapTypical(char* string,int32_t index){
 		return 1;
 	} else if (c0=='\"' | (c0=='L' & c1=='\"')){
 		if (initializerMap.typeOfInit==0){
-			if (string[emptyIndexAdvanceForInitializerMap(getEndOfToken(string,index))]==';') return 2;
+			if (string[emptyIndexAdvance(getEndOfToken(string,index))]==';') return 2;
 			return 4;
 		} else if (initializerMap.typeOfInit==4) return 4;
 		return 2;
@@ -988,7 +1019,7 @@ int32_t initializerMapTypical(int32_t strStart){
 		while (true){
 			char c=sourceContainer.string[++ime.strMid];
 			if (c=='='){
-				ime.strMid=emptyIndexAdvanceForInitializerMap(ime.strMid+1);
+				ime.strMid=emptyIndexAdvance(ime.strMid+1);
 				assert(ime.strMid<ime.strEnd); // overran strEnd while looking for locator end
 				ime.descriptionBranchEntry=initializerMapLocator(strStart);
 				break;
@@ -1000,13 +1031,13 @@ int32_t initializerMapTypical(int32_t strStart){
 	ime.typeOfEntry=catagorizeInitializerMapTypical(sourceContainer.string,ime.strMid);
 	}
 	int32_t thisEntry=partitionEntryInInitializerMap();
-	int32_t strEndNextIndex=emptyIndexAdvanceForInitializerMap(ime.strEnd+1);
+	int32_t strEndNextIndex=emptyIndexAdvance(ime.strEnd+1);
 	char strEndChar=sourceContainer.string[ime.strEnd];
 	if (ime.typeOfEntry==1){
 		assert(strEndChar=='}'); // bad end
-		ime.subEntry=initializerMapTypical(emptyIndexAdvanceForInitializerMap(ime.strMid+1));
+		ime.subEntry=initializerMapTypical(emptyIndexAdvance(ime.strMid+1));
 		if (sourceContainer.string[strEndNextIndex]==','){
-			ime.chainEntry=initializerMapTypical(emptyIndexAdvanceForInitializerMap(strEndNextIndex+1));
+			ime.chainEntry=initializerMapTypical(emptyIndexAdvance(strEndNextIndex+1));
 		}
 	} else {
 		assert(strEndChar=='}' | strEndChar==';' | strEndChar==','); // bad end
@@ -1060,22 +1091,20 @@ void expressionPrecheckForInitializer(int16_t nodeIndex){
 	
 }
 
+// also calculates constant expression value for array indexes
 void genExpressionsForInitializerMap(int32_t entryIndex){
 	if (entryIndex==-1) return;
 	struct InitializerMapEntry* ime=initializerMap.entries+entryIndex;
 	uint8_t typeOfEntry=ime->typeOfEntry;
 	if (typeOfEntry>=2 & typeOfEntry<=5){
-		int32_t start=ime->strMid;
-		int32_t end=ime->strEnd-1;
-		if (typeOfEntry==5){
-			++start;
-			--end;
-		}
-		start=emptyIndexAdvanceForInitializerMap(start);
-		end=emptyIndexRecedeForInitializerMap(end)+1;
-		ime->expNode=buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(sourceContainer.string,start,end,false);
-		if (ime->expNode!=-1){
-			expressionPrecheckForInitializer(ime->expNode);
+		const bool isTypeOfEntry5=typeOfEntry==5;
+		const int32_t start=emptyIndexAdvance(ime->strMid+isTypeOfEntry5);
+		const int32_t end=emptyIndexRecede((ime->strEnd-1)-isTypeOfEntry5)+1;
+		const int16_t expNode=buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(sourceContainer.string,start,end,false);
+		ime->expNode=expNode;
+		if (expNode!=-1){
+			if (isTypeOfEntry5) ime->arrayConstVal=expressionToConstantValue("unsigned long",expNode);
+			else expressionPrecheckForInitializer(expNode);
 		} else {
 			printInformativeMessageAtSourceContainerIndex(true,"Expression expected here",start,end);
 			exit(1);
@@ -1095,7 +1124,7 @@ int32_t initializerMapRoot(int32_t strStart,int32_t strEnd){
 	initializerMap.typeOfInit=catagorizeInitializerMapTypical(sourceContainer.string,strStart);
 	int32_t root = initializerMapTypical(strStart);
 	if (initializerMap.typeOfInit==1){
-		strEnd=emptyIndexRecedeForInitializerMap(strEnd-1);
+		strEnd=emptyIndexRecede(strEnd-1);
 		assert(strStart<strEnd); // bracket location calc failure
 	}
 	assert(initializerMap.entries[root].typeOfEntry==initializerMap.typeOfInit); // failed to agree on catagory
@@ -1171,7 +1200,6 @@ void initializerImplementNonstaticExpression(
 			applyTypeCast(thisNode,firstMemberTypeString,warnValue);
 			typeSize=getSizeofForTypeString(firstMemberTypeString,true);
 			cosmic_free(firstMemberTypeString);
-			goto InsertJmp;
 		} else {
 			const char* message;
 			if (isSU) message="Cannot initialize non-struct and non-union with struct or union expression";
@@ -1179,9 +1207,7 @@ void initializerImplementNonstaticExpression(
 			printInformativeMessageAtSourceContainerIndex(true,message,ime->strStart,0);
 			exit(1);
 		}
-	}
-	if (!isSU) applyTypeCast(thisNode,typeStringCast,warnValue);
-	InsertJmp:;
+	} else if (!isSU) applyTypeCast(thisNode,typeStringCast,warnValue);
 	singleMergeIB(ib,&thisNode->ib);
 	destroyInstructionBuffer(&thisNode->ib);
 	if (isSU){
@@ -1226,7 +1252,6 @@ void initializerImplementNonstaticExpression(
 char* advanceToMembersInCrackedType(char* crackedType){
 	char c;
 	while ((c=*(crackedType++))!='{'){
-		assert(c!=0);
 		if (c=='|') return NULL;
 	}
 	return crackedType;
@@ -1235,8 +1260,7 @@ char* advanceToMembersInCrackedType(char* crackedType){
 char* advanceToNextMemberInCrackedType(char* crackedType){
 	char c;
 	while ((c=*crackedType)!=';'){
-		assert(c!=0);
-		if (c=='<') crackedType=getIndexOfMatchingEnclosement(crackedType,0)+crackedType;
+		if (c=='<') crackedType+=getIndexOfMatchingEnclosement(crackedType,0);
 		crackedType++;
 	}
 	return crackedType+1;
@@ -1253,51 +1277,44 @@ char* gotoMemberAtIndex(char* crackedType,uint16_t memberIndex){
 }
 
 char* advanceToNameInCrackedType(char* crackedType){
-	char c;
+	char c=*crackedType;
 	while (true){
-		c=*crackedType;
-		if (c=='<'){
+		if (c=='<' | c=='('){
 			crackedType+=getIndexOfMatchingEnclosement(crackedType,0)+1;
-			break;
-		} else if (c=='('){
-			crackedType+=getIndexOfMatchingEnclosement(crackedType,0)+1;
-			crackedType=advanceToNameInCrackedType(crackedType);
-			break;
-		} else if (c=='?'|c=='!'|c=='#'){
+			if (c=='(') crackedType=advanceToNameInCrackedType(crackedType);
+			return crackedType;
+		} else if (c=='?' | c=='!' | c=='#'){
 			crackedType+=8;
 		} else if (c=='j' | c=='h'){
-			while (*crackedType!='|'){
-				assert(*crackedType!=0);
-				crackedType++;
+			while (*(crackedType++)!='|'){
 			}
-			crackedType++;
-			break;
+			return crackedType;
 		} else if (c!='*'){
-			crackedType++;
-			break;
+			return crackedType+1;
 		}
-		crackedType++;
+		c=*(++crackedType);
 	}
-	return crackedType;
 }
 
+
 uint16_t findMemberIndexForName(char* crackedType,int32_t strStart,int32_t strEnd){
-	char* subCrackedType;
+	char* crackedTypeMember=advanceToMembersInCrackedType(crackedType);
 	uint16_t i=0;
-	while ((subCrackedType=gotoMemberAtIndex(crackedType,i))!=NULL){
-		subCrackedType=advanceToNameInCrackedType(subCrackedType);
+	while (true){
+		char* crackedTypeMemberName=advanceToNameInCrackedType(crackedTypeMember);
 		int32_t strWalk=strStart;
 		while (true){
-			if (*subCrackedType==';'){
+			char c=*(crackedTypeMemberName++);
+			if (c==';' | strWalk>strEnd){
 				if (strWalk==strEnd) return i;
 				else break;
 			}
-			if (strWalk>strEnd) break;
-			if (*(subCrackedType++)!=sourceContainer.string[strWalk++]) break;
+			if (c!=sourceContainer.string[strWalk++]) break;
 		}
 		i++;
+		crackedTypeMember=advanceToNextMemberInCrackedType(crackedTypeMember);
+		if (*crackedTypeMember=='}') return 0xFFFFu;
 	}
-	return 0xFFFFu;
 }
 
 
@@ -1351,17 +1368,17 @@ void calcPotentialDesignatorAndSize(int32_t entryIndex,char* crackedType, uint32
 		assert(ime->typeOfEntry==5 | ime->typeOfEntry==6);
 		cts= crackedType[0];
 		if ((hasQualifier=(cts=='g' | cts=='f'))) cts= crackedType[1];
+		crackedTypeNQ=crackedType+hasQualifier;
+		isArray=cts!='<';
 		if ((ime->typeOfEntry==5 & cts!='?' & cts!='!' & cts!='#') |
-			(ime->typeOfEntry==6 & cts!='<')){
+			(ime->typeOfEntry==6 & isArray)){
 			
 			printInformativeMessageAtSourceContainerIndex(true,"This designator and the type do not match",ime->strStart,ime->strEnd);
 			exit(1);
 		}
-		crackedTypeNQ=crackedType+hasQualifier;
-		isArray=cts!='<';
 		if (isArray){
-			thisBaseDesignation=expressionToConstantValue("unsigned long",ime->expNode);
 			uint32_t suggestedLength=readHexInString(crackedTypeNQ+1);
+			thisBaseDesignation=ime->arrayConstVal;
 			if (thisBaseDesignation>=suggestedLength){
 				if (cts=='#'){
 					printInformativeMessageAtSourceContainerIndex(true,"This designator\'s index is out of bounds",ime->strStart,ime->strEnd);
@@ -1393,7 +1410,7 @@ void calcPotentialDesignatorAndSize(int32_t entryIndex,char* crackedType, uint32
 					cosmic_free(unitType);
 				}
 				designationOffsetTotal+=unitSize*thisBaseDesignation;
-			} else {
+			} else if (*(crackedTypeNQ+1)=='j'){ // otherwise it is a union, which would mean it's offset is 0
 				struct TypeMemberEntry* tmeArray;
 				{
 					char* unitType=advancedCrackedTypeToTypeString(crackedTypeNQ);

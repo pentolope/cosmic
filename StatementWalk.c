@@ -55,7 +55,7 @@ int32_t advanceToNonNewlineSpace(int32_t index){
 	char c;
 	int32_t i=index;
 	while ((c=sourceContainer.string[i])){
-		if ((c==' ') | (c=='\n')){
+		if (c==' ' | c=='\n'){
 			i++;
 		} else {
 			return i;
@@ -572,16 +572,25 @@ int32_t functionStatementsWalk(
 				while ((c=sourceContainer.string[tempWalkingIndex1]),(c!=':' & c!=0)){
 					if (c=='?')  err_1101_("ternaries are not allowed in case constant-expression",tempWalkingIndex1);
 					if (c=='\"') err_1101_("string literals are not allowed in case constant-expression",tempWalkingIndex1);
+					if (c=='\''){
+while (true){
+	c=sourceContainer.string[++tempWalkingIndex1];
+	if (c=='\'') break;
+	// this next if statement depends on short circuiting || and &&
+	if (c==0 || (c=='\\' && sourceContainer.string[++tempWalkingIndex1]==0)) err_1101_("Unexpected source termination",tempWalkingIndex1-1);
+}
+					}
 					tempWalkingIndex1++;
 				}
 			}
 			if (sourceContainer.string[tempWalkingIndex1]!=':'){
-				err_1101_("expected \':\' after keyword \'case\'",tempWalkingIndex1);
+				err_1101_("expected \':\' after keyword \'case\'",tempWalkingIndex0);
 			}
 			int16_t expRoot=buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(sourceContainer.string,tempWalkingIndex0,tempWalkingIndex1,true);
 			if (expRoot==-1){
 				err_1101_("expected const-expression after keyword \'case\'",tempWalkingIndex0);
 			}
+			walkingIndex=tempWalkingIndex1;
 			insert_IB_raw_label(
 				parentInstructionBufferToInsertTo,
 				insertSwitchCase(
@@ -592,7 +601,6 @@ int32_t functionStatementsWalk(
 						)
 					)
 				);
-			walkingIndex=tempWalkingIndex1;
 			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"default")){
 			
@@ -607,11 +615,11 @@ int32_t functionStatementsWalk(
 				err_1101_("There cannot be two \'default\' for a switch",walkingIndex);
 			}
 			currentSwitchManagment.hasDefault=true;
+			walkingIndex=tempWalkingIndex;
 			insert_IB_raw_label(
 				parentInstructionBufferToInsertTo,
 				currentSwitchManagment.defaultLabel=++globalLabelID
 				);
-			walkingIndex=tempWalkingIndex;
 			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"typedef")){
 			

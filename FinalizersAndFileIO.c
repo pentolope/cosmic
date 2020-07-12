@@ -339,11 +339,10 @@ void finalOutput(const char* filePath){
 	for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots;i++){
 		struct GlobalVariableEntry gve=blockFrameArray.globalBlockFrame.globalVariableEntries[i];
 		if (!gve.usedStatic){
-			uint32_t labelID=gve.labelID;
-			safe_fputc((uint8_t)(labelID));
-			safe_fputc((uint8_t)(labelID>>8));
-			safe_fputc((uint8_t)(labelID>>16));
-			safe_fputc((uint8_t)(labelID>>24));
+			safe_fputc((uint8_t)(gve.labelID));
+			safe_fputc((uint8_t)(gve.labelID>>8));
+			safe_fputc((uint8_t)(gve.labelID>>16));
+			safe_fputc((uint8_t)(gve.labelID>>24));
 			char* t=applyToTypeStringGetIdentifierToNew(gve.typeString);
 			for (uint32_t i2=0;t[i2];i2++) safe_fputc(t[i2]);
 			cosmic_free(t);
@@ -359,11 +358,10 @@ void finalOutput(const char* filePath){
 	for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalFunctionEntrySlots;i++){
 		struct GlobalFunctionEntry gfe=blockFrameArray.globalBlockFrame.globalFunctionEntries[i];
 		if (!gfe.usedStatic^gfe.usedInline){
-			uint32_t labelID=gfe.labelID;
-			safe_fputc((uint8_t)(labelID));
-			safe_fputc((uint8_t)(labelID>>8));
-			safe_fputc((uint8_t)(labelID>>16));
-			safe_fputc((uint8_t)(labelID>>24));
+			safe_fputc((uint8_t)(gfe.labelID));
+			safe_fputc((uint8_t)(gfe.labelID>>8));
+			safe_fputc((uint8_t)(gfe.labelID>>16));
+			safe_fputc((uint8_t)(gfe.labelID>>24));
 			char* t=applyToTypeStringGetIdentifierToNew(gfe.typeString);
 			for (uint32_t i2=0;t[i2];i2++) safe_fputc(t[i2]);
 			cosmic_free(t);

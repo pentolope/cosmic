@@ -248,10 +248,7 @@ bool isStringLengthLargerThan(const char* string,const int32_t startIndex,const 
 		}
 		amountLeft--;
 	}
-	if (amountLeft==0){
-		return true;
-	}
-	return false;
+	return amountLeft==0;
 }
 
 bool specificStringEqualCheck(const char* stringLarge,const int32_t startInStringLarge,const int32_t endInStringLarge,const char* subStringToCheck){
@@ -540,30 +537,50 @@ uint32_t readHexInString(const char* string){
 
 
 
-// does not check for string literals, assumes enclosements match
+// does not check for string literals, assumes input is valid
 int32_t getIndexOfMatchingEnclosement(const char* string,const int32_t index){
+	const char list[]={'(',')','<','>','[',']','{','}'};
 	int32_t i=index;
-	const char sc=string[index];
-	const uint8_t type=((sc=='<')*1+(sc=='>')*2+(sc=='(')*3+(sc==')')*4+(sc=='[')*5+(sc==']')*6+(sc=='{')*7+(sc=='}')*8)-1;
-	if (type>7) return -1;
-	const char next="<>()[]{}"[type];
-	const char end="><)(][}{"[type];
-	const bool isBackward=type&1;
+	const char next=string[index];
+	const char type=(next==list[1])*1|(next==list[2])*2|(next==list[3])*3|(next==list[4])*4|(next==list[5])*5|(next==list[6])*6|(next==list[7])*7;
+	const char end=list[type^1];
 	char c;
-	while (true){
-		if (isBackward){
-			while ((c=string[--i]),!(c==next | c==end | i==0)){
-			}
-		} else {
-			while ((c=string[++i]),!(c==next | c==end | c==0)){
-			}
+	if (type&1){
+		while ((c=string[--i])){
+			if (c==end) return i;
+			if (c==next) i=getIndexOfMatchingEnclosement(string,i);
 		}
-		if (c==end) return i;
-		if (c==next) i=getIndexOfMatchingEnclosement(string,i);
-		else return -1;
+	} else {
+		while ((c=string[++i])){
+			if (c==end) return i;
+			if (c==next) i=getIndexOfMatchingEnclosement(string,i);
+		}
+	}
+	printf("Internal Error: internal enclosement match failed\n");
+	exit(1);
+}
+
+int32_t emptyIndexRecede(int32_t strStart){
+	int32_t strWalk=strStart+1;
+	while (true){
+		char c=sourceContainer.string[--strWalk];
+		assert(strWalk!=0); // hit string start
+		if (!(c==' ' | c=='\n')){
+			return strWalk;
+		}
 	}
 }
 
+int32_t emptyIndexAdvance(int32_t strStart){
+	int32_t strWalk=strStart-1;
+	while (true){
+		char c=sourceContainer.string[++strWalk];
+		assert(c!=0);
+		if (!(c==' ' | c=='\n')){
+			return strWalk;
+		}
+	}
+}
 
 
 

@@ -18,8 +18,8 @@ typedef struct fpos_t{
 	unsigned long placeholder_definition;
 } fpos_t;
 
-FILE stderr={0};
-FILE stdout={0};
+FILE* stderr=NULL;
+FILE* stdout=NULL;
 
 FILE* fopen(const char* file,const char* mode){
 	// placeholder definition
@@ -50,6 +50,10 @@ int fgetc(FILE* stream){
 	return EOF;
 }
 
+int fflush(FILE* stream){
+	// placeholder definition
+	return EOF;
+}
 
 int fgetpos(FILE* inputFile,fpos_t* pos){
 	return 0;

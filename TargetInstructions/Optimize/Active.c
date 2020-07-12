@@ -2406,7 +2406,7 @@ sanityCheck(ib);
 
 
 #ifdef OPT_DEBUG_GENERAL_ACTIVE
-#define DEBUG_STATUS(s0,s1,b) printf("%s",b?s0:s1)
+#define DEBUG_STATUS(s0,s1,b) printf("%s",b?s0:s1),fflush(stdout);
 #else
 #define DEBUG_STATUS(s0,s1,b) ((void)0)
 #endif

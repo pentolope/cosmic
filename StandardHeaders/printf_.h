@@ -26,7 +26,7 @@ int printf(const char* format, ...){
 	long i=0;
 	while (format[i++]){
 	}
-	return fprintf(&stdout,format);
+	return fprintf(stdout,format);
 }
 
 int snprintf(char* str, unsigned long size, const char* format, ...){

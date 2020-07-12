@@ -876,7 +876,6 @@ char* breakDownTypeAndAdd(char* typeString, bool addToGlobal){
 	for (int32_t i=0;i<length;i++){
 		if (internalString[i]=='{'){
 			int32_t pair = getIndexOfMatchingEnclosement(internalString,i);
-			assert(pair>=0);
 			int32_t target2=i;
 			for (int32_t j=i-2;j>=0;j--){
 				if (internalString[j]==' '){
@@ -912,7 +911,6 @@ char* breakDownTypeAndAdd(char* typeString, bool addToGlobal){
 					numberOfSplitSegments++;
 				} else if (c=='(' | c=='[' | c=='{'){
 					j = getIndexOfMatchingEnclosement(internalString,j);
-					assert(j>=0);
 				}
 			}
 			int32_t* indexesOfSplitStart = cosmic_malloc(numberOfSplitSegments*sizeof(int32_t));

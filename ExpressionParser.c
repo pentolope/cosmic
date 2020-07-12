@@ -174,7 +174,7 @@ bool isSubstringANameForAValidType(char *string, int32_t startIndex, int32_t end
 
 
 
-struct ExpressionToken{
+typedef struct ExpressionToken{
 	int32_t tokenStart;
 	int32_t tokenEnd;
 	int32_t operatorTargetRoot; // initialized and used when building expression tree. See those functions for explanation
@@ -190,15 +190,13 @@ struct ExpressionToken{
 	int16_t precedenceToRemoveImmediatelyAfterToken;
 	int16_t precedenceTotal; // calculated after operator order is mapped using the other 2 precedence numbers in this struct. Does not include ternaryPrecedenceTotal
 	int32_t nextTokenIndexWithMatchingPrecedence; // initialized right before building expression tree. If it equals -1, there is no next token
-};
-typedef struct ExpressionToken ExpressionToken;
+} ExpressionToken;
 
-struct ExpressionTokenArray{
+typedef struct ExpressionTokenArray{
 	char* string;
-	struct ExpressionToken* expressionTokens;
+	ExpressionToken* expressionTokens;
 	int32_t length;
-};
-typedef struct ExpressionTokenArray ExpressionTokenArray;
+} ExpressionTokenArray;
 
 /*
 operatorID list
@@ -328,9 +326,7 @@ int32_t findIndexForAppropriatePrecedenceToLeft(ExpressionToken *expressionToken
 		relativePrecedence += expressionTokens[i].precedenceToRemoveImmediatelyAfterToken;
 		// `relativePrecedence>0` is always true at this point
 		relativePrecedence -= expressionTokens[i].precedenceToAddImmediatelyBeforeToken;
-		if (relativePrecedence<=0 & i!=operatorIndex-1){
-			return i;
-		}
+		if (relativePrecedence<=0 & i!=operatorIndex-1) return i;
 	}
 	return 0;
 }
@@ -352,9 +348,7 @@ int32_t findIndexForAppropriatePrecedenceToRight(ExpressionToken *expressionToke
 		relativePrecedence += expressionTokens[i].precedenceToAddImmediatelyBeforeToken;
 		// `relativePrecedence>0` is always true at this point
 		relativePrecedence -= expressionTokens[i].precedenceToRemoveImmediatelyAfterToken;
-		if (relativePrecedence<=0 & i!=operatorIndex-1){
-			return i;
-		}
+		if (relativePrecedence<=0 & i!=operatorIndex-1) return i;
 	}
 	return lengthOfExpressionTokens-1;
 }
@@ -383,7 +377,7 @@ does not handle declarations.
 void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 	int32_t i;
 	int32_t length = expressionTokenArray.length;
-	int32_t indexOfFirstCharacterInCurrentToken;
+	int32_t ifcct; // indexOfFirstCharacterInCurrentToken
 	int32_t lengthOfStringInCurrentToken;
 	int32_t leftIndexForPairing;
 	int32_t rightIndexForPairing;
@@ -408,56 +402,62 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 	}
 	for (i=0;i<length;i++){ // initialize part 2: catagorize
 		currentTokenPtr = &(expressionTokens[i]);
-		indexOfFirstCharacterInCurrentToken = currentTokenPtr->tokenStart;
-		lengthOfStringInCurrentToken = currentTokenPtr->tokenEnd - indexOfFirstCharacterInCurrentToken;
-		firstCharacterOfCurrentToken = string[indexOfFirstCharacterInCurrentToken];
+		ifcct = currentTokenPtr->tokenStart;
+		lengthOfStringInCurrentToken = currentTokenPtr->tokenEnd - ifcct;
+		firstCharacterOfCurrentToken = string[ifcct];
 		
 		uint8_t n_oID = 0;
 		if (lengthOfStringInCurrentToken==6){
-			if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"sizeof"))   n_oID = 17;
+			if (isSectionOfStringEquivalent(string,ifcct,"sizeof"))   n_oID = 17;
 		} else if (lengthOfStringInCurrentToken==3){
-			if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"<<="))      n_oID = 44;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,">>=")) n_oID = 45;
+			if (firstCharacterOfCurrentToken=='<' | firstCharacterOfCurrentToken=='>'){
+				if (isSectionOfStringEquivalent(string,ifcct,"<<="))      n_oID = 44;
+				else if (isSectionOfStringEquivalent(string,ifcct,">>=")) n_oID = 45;
+			}
 		} else if (lengthOfStringInCurrentToken==2){
-			if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"++"))      n_oID = 52;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"--")) n_oID = 53;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"->")) n_oID =  6;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"<<")) n_oID = 23;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,">>")) n_oID = 24;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"<=")) n_oID = 25;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,">=")) n_oID = 26;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"==")) n_oID = 29;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"!=")) n_oID = 30;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"&&")) n_oID = 34;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"||")) n_oID = 35;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"+=")) n_oID = 39;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"-=")) n_oID = 40;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"*=")) n_oID = 41;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"/=")) n_oID = 42;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"%=")) n_oID = 43;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"&=")) n_oID = 46;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"^=")) n_oID = 47;
-			else if (isSectionOfStringEquivalent(string,indexOfFirstCharacterInCurrentToken,"|=")) n_oID = 48;
+			switch ((firstCharacterOfCurrentToken<<8)|string[ifcct+1]){
+				case ('+'<<8)|'+':n_oID = 52;break;
+				case ('-'<<8)|'-':n_oID = 53;break;
+				case ('-'<<8)|'>':n_oID =  6;break;
+				case ('<'<<8)|'<':n_oID = 23;break;
+				case ('>'<<8)|'>':n_oID = 24;break;
+				case ('&'<<8)|'&':n_oID = 34;break;
+				case ('|'<<8)|'|':n_oID = 35;break;
+				case ('<'<<8)|'=':n_oID = 25;break;
+				case ('>'<<8)|'=':n_oID = 26;break;
+				case ('='<<8)|'=':n_oID = 29;break;
+				case ('!'<<8)|'=':n_oID = 30;break;
+				case ('+'<<8)|'=':n_oID = 39;break;
+				case ('-'<<8)|'=':n_oID = 40;break;
+				case ('*'<<8)|'=':n_oID = 41;break;
+				case ('/'<<8)|'=':n_oID = 42;break;
+				case ('%'<<8)|'=':n_oID = 43;break;
+				case ('&'<<8)|'=':n_oID = 46;break;
+				case ('^'<<8)|'=':n_oID = 47;break;
+				case ('|'<<8)|'=':n_oID = 48;break;
+			}
 		} else if (lengthOfStringInCurrentToken==1){
-			if (firstCharacterOfCurrentToken=='(')      n_oID = 63;
-			else if (firstCharacterOfCurrentToken=='[') n_oID =  4;
-			else if (firstCharacterOfCurrentToken=='.') n_oID =  5;
-			else if (firstCharacterOfCurrentToken=='+') n_oID = 54;
-			else if (firstCharacterOfCurrentToken=='-') n_oID = 55;
-			else if (firstCharacterOfCurrentToken=='!') n_oID = 12;
-			else if (firstCharacterOfCurrentToken=='~') n_oID = 13;
-			else if (firstCharacterOfCurrentToken=='&') n_oID = 57;
-			else if (firstCharacterOfCurrentToken=='*') n_oID = 56;
-			else if (firstCharacterOfCurrentToken=='/') n_oID = 19;
-			else if (firstCharacterOfCurrentToken=='%') n_oID = 20;
-			else if (firstCharacterOfCurrentToken=='<') n_oID = 27;
-			else if (firstCharacterOfCurrentToken=='>') n_oID = 28;
-			else if (firstCharacterOfCurrentToken=='^') n_oID = 32;
-			else if (firstCharacterOfCurrentToken=='|') n_oID = 33;
-			else if (firstCharacterOfCurrentToken=='?') n_oID = 36;
-			else if (firstCharacterOfCurrentToken==':') n_oID = 37;
-			else if (firstCharacterOfCurrentToken=='=') n_oID = 38;
-			else if (firstCharacterOfCurrentToken==',') n_oID = 51;
+			switch (firstCharacterOfCurrentToken){
+				case '(':n_oID = 63;break;
+				case '[':n_oID =  4;break;
+				case '.':n_oID =  5;break;
+				case '+':n_oID = 54;break;
+				case '-':n_oID = 55;break;
+				case '!':n_oID = 12;break;
+				case '~':n_oID = 13;break;
+				case '&':n_oID = 57;break;
+				case '*':n_oID = 56;break;
+				case '/':n_oID = 19;break;
+				case '%':n_oID = 20;break;
+				case '<':n_oID = 27;break;
+				case '>':n_oID = 28;break;
+				case '^':n_oID = 32;break;
+				case '|':n_oID = 33;break;
+				case '?':n_oID = 36;break;
+				case ':':n_oID = 37;break;
+				case '=':n_oID = 38;break;
+				case ',':n_oID = 51;break;
+			}
 		}
 		if (n_oID==0){
 			if (isLetter(firstCharacterOfCurrentToken) |
@@ -467,15 +467,15 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 				firstCharacterOfCurrentToken=='.'){
 				
 				if (isExpressionTokenName(expressionTokenArray,i)){
-					n_oID = 59+(bool)isSubstringANameForAValidType(string,indexOfFirstCharacterInCurrentToken,currentTokenPtr->tokenEnd);
+					n_oID = 59+(bool)isSubstringANameForAValidType(string,ifcct,currentTokenPtr->tokenEnd);
 				} else {
 					if (firstCharacterOfCurrentToken=='\"' |
 					    firstCharacterOfCurrentToken=='\'' |
 						(firstCharacterOfCurrentToken=='L' & 
-						 string[indexOfFirstCharacterInCurrentToken+1]=='\"')){
+						 string[ifcct+1]=='\"')){
 						
 						n_oID = 61;
-					} else if (isDigit(firstCharacterOfCurrentToken) || (isDigit(string[indexOfFirstCharacterInCurrentToken+1]) & firstCharacterOfCurrentToken=='.')){
+					} else if (isDigit(firstCharacterOfCurrentToken) || (isDigit(string[ifcct+1]) & firstCharacterOfCurrentToken=='.')){
 						n_oID = 62;
 					} else {
 						printf("ill-formed token detected: cannot discern between number, name, or literal\n");
@@ -956,7 +956,7 @@ the indexes : argumentIndexStart,argumentIndexEnd
 typedef struct ExpTreePostWalkData{
 	char* typeStringNQ; // no identifer, volatile, or const. comes from the same allocation as typeString, and should NOT be cosmic_freed
 	char* typeString; // no identifier, may have volatile and const. is heap allocated
-	// next two refer to the typeString. it makes type detection easier, as well as allows rvalue pointer -> lvalue transformation
+	// next two refer to the typeString. it makes type detection easier
 	bool isRValueConst;
 	bool isRValueVolatile;
 	// next five refer to the object of the value
@@ -1087,34 +1087,30 @@ void genAllPreWalkData(int16_t nodeIndex){
 int16_t partitionNewExpressionTreeNodeInGlobalBufferAndReturnIndex(){
 	if (expressionTreeGlobalBuffer.numberOfNodesAllocatedToArray<=(expressionTreeGlobalBuffer.walkingIndexForNextOpenSlot+1)){
 		if (expressionTreeGlobalBuffer.numberOfNodesAllocatedToArray==0){
-			expressionTreeGlobalBuffer.expressionTreeNodes = cosmic_malloc(50*sizeof(ExpressionTreeNode));
-			expressionTreeGlobalBuffer.numberOfNodesAllocatedToArray = 50;
-		} else {
-			if (expressionTreeGlobalBuffer.numberOfNodesAllocatedToArray>=10000){
-				printf("That is a ton of expression nodes, I am not allocating more. How big of an expression were you trying to make me do?\n");
-				exit(1);
-			}
-			expressionTreeGlobalBuffer.numberOfNodesAllocatedToArray+=50;
-			expressionTreeGlobalBuffer.expressionTreeNodes = cosmic_realloc(expressionTreeGlobalBuffer.expressionTreeNodes,
-											((size_t)(expressionTreeGlobalBuffer.numberOfNodesAllocatedToArray))*sizeof(ExpressionTreeNode));
+			expressionTreeGlobalBuffer.numberOfNodesAllocatedToArray=2;
 		}
+		expressionTreeGlobalBuffer.numberOfNodesAllocatedToArray*=2;
+		if (expressionTreeGlobalBuffer.numberOfNodesAllocatedToArray>=20000){
+			printf("That is a ton of expression nodes, I am not allocating more. How big of an expression were you trying to make me do?\n");
+			exit(1);
+		}
+		expressionTreeGlobalBuffer.expressionTreeNodes = cosmic_realloc(
+			expressionTreeGlobalBuffer.expressionTreeNodes,
+			expressionTreeGlobalBuffer.numberOfNodesAllocatedToArray*sizeof(ExpressionTreeNode));
 	}
 	return expressionTreeGlobalBuffer.walkingIndexForNextOpenSlot++;
 }
 
-
-
-bool isOperatorForExpressionTree(const uint8_t oID){
+static inline bool isOperatorForExpressionTree(const uint8_t oID){
 	return (oID<=49 & oID!=3) | oID==65 | oID==66;
 }
 
-bool isOneOperandOperatorForExpressionTree(const uint8_t oID){
+static inline bool isOneOperandOperatorForExpressionTree(const uint8_t oID){
 	return (oID>=8 & oID<=16) | oID==1 | oID==2;
 }
 
-bool isTwoOperandOperatorForExpressionTree(const uint8_t oID){
-	return (oID>=4 & oID<=6) |
-			(oID>=18 & oID<=49);
+static inline bool isTwoOperandOperatorForExpressionTree(const uint8_t oID){
+	return (oID>=4 & oID<=6) | (oID>=18 & oID<=49);
 }
 
 
