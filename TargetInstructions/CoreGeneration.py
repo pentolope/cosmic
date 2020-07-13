@@ -5996,7 +5996,15 @@ for k in dictionaryOfInitializationContents.keys():
 
 namesToUse = filter(lambda e:e not in namesToSkipBecauseZero,dictionaryOfInitializationContents.keys())
 namesToUse = sorted(namesToUse)
-
+namesInRunSection=[
+'IB_internal_div32_s_s',
+'IB_internal_div32_u_u',
+'IB_internal_mod32_s_s',
+'IB_internal_mod32_u_u',
+]
+namesUnused=[
+'IB_stack_swp_12',
+]
 
 f=open('GeneratedInstructionInitialization.c','w')
 f.write('\n')
@@ -6019,6 +6027,7 @@ def genInitializerForArguments(index,instrList):
        }
     s=''.join([d[i[0]] for i in instrList])
     r=','.join([genInitializerForSingleArgument(index,s,arg,i) for i,arg in enumerate(instrList)])
+    if s=='BWD':print r
     return r
 
 def genInitializerForSplitInstructions(tpl):
@@ -6031,16 +6040,32 @@ def genInitializerForSplitInstructions(tpl):
     if instrList[0]=='INSR':return ''
     return ','.join(filter(lambda x:len(x)!=0,['['+str(index)+'].id=I_'+instrList[0],genInitializerForArguments(index,instrList[1:])]))
 
-for k in namesToUse:
+def genFullInitization(k):
     altName1 = 'ib_'+k[3:]
     altName2 = altName1+'_contents'
     splitInstructions = splitInstructionString(dictionaryOfInitializationContents[k])
     numberOfInstructionsAsString = str(len(splitInstructions))
-    f.write('const InstructionSingle '+altName2+'['+numberOfInstructionsAsString+']={')
-    f.write(','.join(filter(lambda x:len(x)!=0,map(genInitializerForSplitInstructions,list(enumerate(splitInstructions))))))
-    f.write('};\nconst InstructionBuffer '+altName1+'={(InstructionSingle*)'+altName2+','+numberOfInstructionsAsString+','+numberOfInstructionsAsString+'};\n\n')
+    s='static const InstructionSingle '+altName2+'['+numberOfInstructionsAsString+']={'+','.join(filter(lambda x:len(x)!=0,map(genInitializerForSplitInstructions,list(enumerate(splitInstructions)))))+'};\nstatic const InstructionBuffer '+altName1+'={(InstructionSingle*)'+altName2+','+numberOfInstructionsAsString+','+numberOfInstructionsAsString+'};\n\n'
+    while s!=s.replace('=0x00','=0x0'):s=s.replace('=0x00','=0x0')
+    for letter in map(str,range(10))+['A','B','C','D','E','F']:s=s.replace('=0x0'+letter,'=0x'+letter)
+    return s
 
 
+f.write('#ifdef IS_BUILDING_RUN\n')
+
+for k in namesToUse:
+    if k in namesInRunSection:
+        if not (k in namesUnused):
+            f.write(genFullInitization(k))
+
+f.write('#else\n')
+
+for k in namesToUse:
+    if not (k in namesInRunSection):
+        if not (k in namesUnused):
+            f.write(genFullInitization(k))
+
+f.write('#endif\n')
 f.close()
 
 f=open('GeneratedInstructionInsertion.c','w')

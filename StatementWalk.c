@@ -156,14 +156,16 @@ void addFunctionParemetersAndInternalValuesToBlockFrame(char* typeStringOfFuncti
 
 void addBlankStaticVariable(const char* typeString){
 	struct IdentifierSearchResult isr;
-	searchForIdentifier(&isr,typeString,false,true,true,false,false);
+	searchForIdentifier(&isr,typeString,true,true,true,false,false);
 	assert(isr.didExist);
 	struct GlobalVariableEntry* globalVariableEntry=
 		blockFrameArray.globalBlockFrame.globalVariableEntries+
 		isr.reference.variableReference.variableEntryIndex;
 	struct MemoryOrganizerForInitializer mofi;
 	initMemoryOrganizerForInitializer(&mofi,globalVariableEntry->thisSizeof);
-	finalizeMemoryOrganizerForInitializer(&mofi,globalVariableEntry->labelID,false);
+	InstructionBuffer ib=finalizeMemoryOrganizerForInitializer(&mofi,globalVariableEntry->labelID,false);
+	singleMergeIB(&global_static_data,&ib);
+	destroyInstructionBuffer(&ib);
 }
 
 #include "SwitchGotoHelper.c"
@@ -902,6 +904,7 @@ printInstructionBufferWithMessageAndNumber(&instructionBufferForFunction,typeStr
 						retValForAddingVariable = addGlobalVariable(typeString,0,labelID,gotoFailIndex,hasStatic,hasExtern,true);
 					} else {
 						retValForAddingVariable = addGlobalVariable(typeString,0,labelID,gotoFailIndex,hasStatic,hasExtern,false);
+						addBlankStaticVariable(typeString);
 					}
 					if (retValForAddingVariable==1){
 						err_1101_("identifier collision at file scope for variable, a variable was already declared with the same identifier",gotoFailIndex);

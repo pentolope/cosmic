@@ -29,16 +29,15 @@ linux
 *.ilk
 *.pdb
 callgrind.out.*
-*.ink
 out.txt
 out*.txt
 a.out
-a1.out
-a2.out
+a*.out
 trimOut.py
 optTesting.py
-
-
+StandardHeaders/mpaland/
+SDL2.dll
+SDL/
 
 # =========================
 # Operating System Files

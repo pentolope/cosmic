@@ -32,7 +32,7 @@ instructions:
 1 - 0,1,0,0, - r1  and r2 -> r0
 1 - 0,1,0,1, - r1  or  r2 -> r0
 1 - 0,1,1,0, - r1  xor r2 -> r0
-1 - 0,1,1,1, - do r0+r1+~r2 -> r1, with carry stored to ones bit of r0 (carry cannot extend past ones bit, if the sum would have a carry of '10', the behaviour is undefined. r0 is intended to only hold a value of 0 or 1, but could hold other values).
+1 - 0,1,1,1, - do r0+r1+~r2 -> r1, with carry stored to ones bit of r0, if carry would be larger then 1, r0 would still hold 1.
 1 - 1,0,0,0, - memory write the word in r0 at r1,r2  (must be aligned to word boundry)
 1 - 1,0,0,1, - memory read a  word into r0 at r1,r2  (must be aligned to word boundry)
 1 - 1,0,1,0, - r1 + r2 -> r0

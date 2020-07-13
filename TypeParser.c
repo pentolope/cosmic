@@ -745,6 +745,7 @@ char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* st
 					for (int32_t stringI=length;stringI>=stopPoint;stringI--){
 						stringInternal[stringI+4] = stringInternal[stringI];
 					}
+					stringInternal[stopPoint+0]=' ';
 					stringInternal[stopPoint+1]='i';
 					stringInternal[stopPoint+2]='n';
 					stringInternal[stopPoint+3]='t';
@@ -1453,6 +1454,7 @@ char* convertType(int32_t startIndex, int32_t endIndex){
 	cosmic_free(typeTokenArray.typeTokens);
 	cosmic_free(typeTokenArray.indexesForRearrangement);
 	uint16_t errorValueForTypeNormalizer;
+	
 	char *normalizedResultString = checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(resultString,&errorValueForTypeNormalizer,startIndex,endIndex);
 	if (normalizedResultString==NULL){
 		if (errorValueForTypeNormalizer==1){
