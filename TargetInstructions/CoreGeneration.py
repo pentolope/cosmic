@@ -476,9 +476,9 @@ PU1_ %7
 """,
 
 
-"IB_comp_geq_int_s":"""
+"IB_comp_g_int_s":"""
 
-POP2 %2 %C
+POP2 %C %2
 
 RL1_ %3 #8000
 XOR_ %C %C %3
@@ -494,10 +494,10 @@ PU1_ %3
 """,
 
 
-"IB_comp_geq_long_s":"""
+"IB_comp_g_long_s":"""
 
-POP2 %C %2
 POP2 %3 %4
+POP2 %C %2
 
 RL1_ %5 #8000
 XOR_ %2 %2 %5
@@ -513,9 +513,9 @@ PU1_ %5
 """,
 
 
-"IB_comp_g_int_s":"""
+"IB_comp_geq_int_s":"""
 
-POP2 %2 %C
+POP2 %C %2
 
 RL1_ %3 #8000
 XOR_ %C %C %3
@@ -528,10 +528,10 @@ PU1_ %3
 """,
 
 
-"IB_comp_g_long_s":"""
+"IB_comp_geq_long_s":"""
 
-POP2 %C %2
 POP2 %3 %4
+POP2 %C %2
 
 RL1_ %5 #8000
 XOR_ %2 %2 %5
@@ -540,42 +540,6 @@ XOR_ %4 %4 %5
 BL1_ %5 $01
 SSUB %5 %2 %4
 SSUB %5 %C %2
-PU1_ %5
-
-""",
-
-
-"IB_comp_leq_int_s":"""
-
-POP2 %2 %C
-
-RL1_ %3 #8000
-XOR_ %C %C %3
-XOR_ %2 %2 %3
-
-BL1_ %3 $01
-SSUB %3 %2 %C
-BL1_ %4 $01
-XOR_ %3 %4 %3
-PU1_ %3
-
-""",
-
-
-"IB_comp_leq_long_s":"""
-
-POP2 %C %2
-POP2 %3 %4
-
-RL1_ %5 #8000
-XOR_ %2 %2 %5
-XOR_ %4 %4 %5
-
-BL1_ %5 $01
-SSUB %5 %2 %4
-SSUB %5 %C %3
-BL1_ %6 $01
-XOR_ %5 %6 %5
 PU1_ %5
 
 """,
@@ -583,7 +547,43 @@ PU1_ %5
 
 "IB_comp_l_int_s":"""
 
-POP2 %2 %C
+POP2 %C %2
+
+RL1_ %3 #8000
+XOR_ %C %C %3
+XOR_ %2 %2 %3
+
+BL1_ %3 $01
+SSUB %3 %2 %C
+BL1_ %4 $01
+XOR_ %3 %4 %3
+PU1_ %3
+
+""",
+
+
+"IB_comp_l_long_s":"""
+
+POP2 %3 %4
+POP2 %C %2
+
+RL1_ %5 #8000
+XOR_ %2 %2 %5
+XOR_ %4 %4 %5
+
+BL1_ %5 $01
+SSUB %5 %2 %4
+SSUB %5 %C %3
+BL1_ %6 $01
+XOR_ %5 %6 %5
+PU1_ %5
+
+""",
+
+
+"IB_comp_leq_int_s":"""
+
+POP2 %C %2
 
 RL1_ %3 #8000
 XOR_ %C %C %3
@@ -596,10 +596,10 @@ PU1_ %3
 """,
 
 
-"IB_comp_l_long_s":"""
+"IB_comp_leq_long_s":"""
 
-POP2 %C %2
 POP2 %3 %4
+POP2 %C %2
 
 RL1_ %5 #8000
 XOR_ %2 %2 %5
@@ -613,9 +613,9 @@ PU1_ %5
 """,
 
 
-"IB_comp_geq_int_u":"""
+"IB_comp_g_int_u":"""
 
-POP2 %2 %C
+POP2 %C %2
 BL1_ %3 $01
 SSUB %3 %C %2
 BL1_ %4 $01
@@ -625,10 +625,10 @@ PU1_ %3
 """,
 
 
-"IB_comp_geq_long_u":"""
+"IB_comp_g_long_u":"""
 
-POP2 %C %2
 POP2 %3 %4
+POP2 %C %2
 BL1_ %5 $01
 SSUB %5 %4 %2
 SSUB %5 %3 %C
@@ -639,9 +639,9 @@ PU1_ %5
 """,
 
 
-"IB_comp_g_int_u":"""
+"IB_comp_geq_int_u":"""
 
-POP2 %2 %C
+POP2 %C %2
 BL1_ %3 $01
 SSUB %3 %2 %C
 PU1_ %3
@@ -649,10 +649,10 @@ PU1_ %3
 """,
 
 
-"IB_comp_g_long_u":"""
+"IB_comp_geq_long_u":"""
 
-POP2 %C %2
 POP2 %3 %4
+POP2 %C %2
 BL1_ %5 $01
 SSUB %5 %2 %4
 SSUB %5 %C %2
@@ -661,9 +661,9 @@ PU1_ %5
 """,
 
 
-"IB_comp_leq_int_u":"""
+"IB_comp_l_int_u":"""
 
-POP2 %2 %C
+POP2 %C %2
 BL1_ %3 $01
 SSUB %3 %2 %C
 BL1_ %4 $01
@@ -673,10 +673,10 @@ PU1_ %3
 """,
 
 
-"IB_comp_leq_long_u":"""
+"IB_comp_l_long_u":"""
 
-POP2 %C %2
 POP2 %3 %4
+POP2 %C %2
 BL1_ %5 $01
 SSUB %5 %2 %4
 SSUB %5 %C %3
@@ -687,9 +687,9 @@ PU1_ %5
 """,
 
 
-"IB_comp_l_int_u":"""
+"IB_comp_leq_int_u":"""
 
-POP2 %2 %C
+POP2 %C %2
 BL1_ %3 $01
 SSUB %3 %C %2
 PU1_ %3
@@ -697,10 +697,10 @@ PU1_ %3
 """,
 
 
-"IB_comp_l_long_u":"""
+"IB_comp_leq_long_u":"""
 
-POP2 %C %2
 POP2 %3 %4
+POP2 %C %2
 BL1_ %5 $01
 SSUB %5 %4 %2
 SSUB %5 %3 %C

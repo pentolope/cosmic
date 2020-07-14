@@ -322,7 +322,7 @@ uint32_t backendInstructionSize(const InstructionSingle IS){
 
 // symVal includes JTEN
 // symVal includes location of related label for D32U,D32S,R32U,R32S
-void backendInstructionWrite(uint8_t** word,uint32_t symVal,uint16_t func_stack_size,uint8_t func_stack_initial,const InstructionSingle IS){
+void backendInstructionWrite(uint8_t** byte,uint32_t symVal,uint16_t func_stack_size,uint8_t func_stack_initial,const InstructionSingle IS){
 	uint8_t b0=((unsigned)IS.arg.BB.a_0&0xFu)|(((unsigned)IS.arg.BB.a_1&0xFu)<<4);
 	uint8_t b1=((unsigned)IS.arg.BBB.a_0&0xFu)|(((unsigned)IS.arg.BBB.a_1&0xFu)<<4);
 	uint8_t b2=(unsigned)IS.arg.BBB.a_2&0xFu;
@@ -369,127 +369,126 @@ void backendInstructionWrite(uint8_t** word,uint32_t symVal,uint16_t func_stack_
 		case I_SYCL:
 		return;
 		
-		case I_SYDB:*((*word)++)=symVal;return;
-		case I_BYTE:*((*word)++)=IS.arg.B.a_0;return;
+		case I_SYDB:*((*byte)++)=symVal;return;
+		case I_BYTE:*((*byte)++)=IS.arg.B.a_0;return;
 		
-		case I_PU1_:case I_PUA1:*((*word)++)=0xF0;*((*word)++)=(unsigned)IS.arg.B.a_0&0xFu;return;
-		case I_POP1:*((*word)++)=0xF2;*((*word)++)=IS.arg.B.a_0&0xFu;return;
-		case I_PU2_:case I_PUA2:*((*word)++)=0xF1;*((*word)++)=b0;return;
-		case I_POP2:*((*word)++)=0xF3;*((*word)++)=b0;return;
-		case I_MOV_:*((*word)++)=0xF4;*((*word)++)=b0;return;
-		case I_BSWP:*((*word)++)=0xF5;*((*word)++)=b0;return;
-		case I_SHFT:*((*word)++)=0xF6;*((*word)++)=b0;return;
-		case I_MULS:*((*word)++)=0xF7;*((*word)++)=b0;return;
-		case I_MULL:*((*word)++)=0xF8;*((*word)++)=b0;return;
-		case I_DIVM:*((*word)++)=0xF9;*((*word)++)=b0;return;
-		case I_CALL:*((*word)++)=0xFA;*((*word)++)=b0;return;
-		case I_MWBN:case I_MWBV:*((*word)++)=0xFC;*((*word)++)=b0;return;
-		case I_MRBN:case I_MRBV:*((*word)++)=0xFD;*((*word)++)=b0;return;
-		case I_JJMP:*((*word)++)=0xFE;*((*word)++)=b0;return;
-		case I_AJMP:*((*word)++)=0xFE;*((*word)++)=b0;return;
-		case I_RET_:*((*word)++)=0xFB;*((*word)++)=0;return;
-		case I_AND_:*((*word)++)=0x40|b2;*((*word)++)=b1;return;
-		case I_OR__:*((*word)++)=0x50|b2;*((*word)++)=b1;return;
-		case I_XOR_:*((*word)++)=0x60|b2;*((*word)++)=b1;return;
-		case I_SSUB:*((*word)++)=0x70|b2;*((*word)++)=b1;return;
-		case I_MWWN:case I_MWWV:*((*word)++)=0x80|b2;*((*word)++)=b1;return;
-		case I_MRWN:case I_MRWV:*((*word)++)=0x90|b2;*((*word)++)=b1;return;
-		case I_ADDN:*((*word)++)=0xA0|b2;*((*word)++)=b1;return;
-		case I_ADDC:*((*word)++)=0xB0|b2;*((*word)++)=b1;return;
-		case I_SUBN:*((*word)++)=0xC0|b2;*((*word)++)=b1;return;
-		case I_SUBC:*((*word)++)=0xD0|b2;*((*word)++)=b1;return;
-		case I_CJMP:*((*word)++)=0xE0|b2;*((*word)++)=b1;return;
+		case I_PU1_:case I_PUA1:*((*byte)++)=(unsigned)IS.arg.B.a_0&0xFu;*((*byte)++)=0xF0;return;
+		case I_POP1:*((*byte)++)=IS.arg.B.a_0&0xFu;*((*byte)++)=0xF2;return;
+		case I_PU2_:case I_PUA2:*((*byte)++)=b0;*((*byte)++)=0xF1;return;
+		case I_POP2:*((*byte)++)=b0;*((*byte)++)=0xF3;return;
+		case I_MOV_:*((*byte)++)=b0;*((*byte)++)=0xF4;return;
+		case I_BSWP:*((*byte)++)=b0;*((*byte)++)=0xF5;return;
+		case I_SHFT:*((*byte)++)=b0;*((*byte)++)=0xF6;return;
+		case I_MULS:*((*byte)++)=b0;*((*byte)++)=0xF7;return;
+		case I_MULL:*((*byte)++)=b0;*((*byte)++)=0xF8;return;
+		case I_DIVM:*((*byte)++)=b0;*((*byte)++)=0xF9;return;
+		case I_CALL:*((*byte)++)=b0;*((*byte)++)=0xFA;return;
+		case I_MRBN:case I_MRBV:*((*byte)++)=b0;*((*byte)++)=0xFC;return;
+		case I_MWBN:case I_MWBV:*((*byte)++)=b0;*((*byte)++)=0xFD;return;
+		case I_JJMP:case I_AJMP:*((*byte)++)=b0;*((*byte)++)=0xFE;return;
+		case I_RET_:*((*byte)++)=0;*((*byte)++)=0xFB;return;
+		case I_AND_:*((*byte)++)=b1;*((*byte)++)=0x40|b2;return;
+		case I_OR__:*((*byte)++)=b1;*((*byte)++)=0x50|b2;return;
+		case I_XOR_:*((*byte)++)=b1;*((*byte)++)=0x60|b2;return;
+		case I_SSUB:*((*byte)++)=b1;*((*byte)++)=0x70|b2;return;
+		case I_MRWN:case I_MRWV:*((*byte)++)=b1;*((*byte)++)=0x80|b2;return;
+		case I_MWWN:case I_MWWV:*((*byte)++)=b1;*((*byte)++)=0x90|b2;return;
+		case I_ADDN:*((*byte)++)=b1;*((*byte)++)=0xA0|b2;return;
+		case I_ADDC:*((*byte)++)=b1;*((*byte)++)=0xB0|b2;return;
+		case I_SUBN:*((*byte)++)=b1;*((*byte)++)=0xC0|b2;return;
+		case I_SUBC:*((*byte)++)=b1;*((*byte)++)=0xD0|b2;return;
+		case I_CJMP:*((*byte)++)=b1;*((*byte)++)=0xE0|b2;return;
 		
-		case I_SYRB:*((*word)++)=(((unsigned)symVal>>4)&0xFu);*((*word)++)=(((unsigned)symVal&0xFu)<<4)|((unsigned)IS.arg.B.a_0&0xFu);return;
-		case I_BL1_:*((*word)++)=(((unsigned)IS.arg.BB.a_1>>4)&0xFu);*((*word)++)=(((unsigned)IS.arg.BB.a_1&0xFu)<<4)|((unsigned)IS.arg.BB.a_0&0xFu);return;
-		case I_STRN:case I_STRV:*((*word)++)=0x20u|(((unsigned)IS.arg.BB.a_1>>4)&0xFu);*((*word)++)=(((unsigned)IS.arg.BB.a_1&0xFu)<<4)|((unsigned)IS.arg.BB.a_0&0xFu);return;
-		case I_STWN:case I_STWV:*((*word)++)=0x30u|(((unsigned)IS.arg.BB.a_1>>4)&0xFu);*((*word)++)=(((unsigned)IS.arg.BB.a_1&0xFu)<<4)|((unsigned)IS.arg.BB.a_0&0xFu);return;
+		case I_SYRB:*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|((unsigned)IS.arg.B.a_0&0xFu);*((*byte)++)=(((unsigned)symVal>>4)&0xFu);return;
+		case I_BL1_:*((*byte)++)=(((unsigned)IS.arg.BB.a_1&0xFu)<<4)|((unsigned)IS.arg.BB.a_0&0xFu);*((*byte)++)=(((unsigned)IS.arg.BB.a_1>>4)&0xFu);return;
+		case I_STRN:case I_STRV:*((*byte)++)=(((unsigned)IS.arg.BB.a_1&0xFu)<<4)|((unsigned)IS.arg.BB.a_0&0xFu);*((*byte)++)=0x20u|(((unsigned)IS.arg.BB.a_1>>4)&0xFu);return;
+		case I_STWN:case I_STWV:*((*byte)++)=(((unsigned)IS.arg.BB.a_1&0xFu)<<4)|((unsigned)IS.arg.BB.a_0&0xFu);*((*byte)++)=0x30u|(((unsigned)IS.arg.BB.a_1>>4)&0xFu);return;
 		
-		case I_SYDW:*((*word)++)=IS.arg.W.a_0;*((*word)++)=(unsigned)IS.arg.W.a_0>>8;return;
-		case I_WORD:*((*word)++)=IS.arg.W.a_0;*((*word)++)=(unsigned)IS.arg.W.a_0>>8;return;
+		case I_SYDW:*((*byte)++)=symVal;*((*byte)++)=(unsigned)symVal>>8;return;
+		case I_WORD:*((*byte)++)=IS.arg.W.a_0;*((*byte)++)=(unsigned)IS.arg.W.a_0>>8;return;
 		
 		case I_SYRW:
-		*((*word)++)=(((unsigned)symVal>>4)&0xFu);*((*word)++)=(((unsigned)symVal&0xFu)<<4)|((unsigned)IS.arg.B.a_0&0xFu);
-		*((*word)++)=0x10u|(((unsigned)symVal>>12)&0xFu);*((*word)++)=(((unsigned)symVal>>4)&0xF0u)|((unsigned)IS.arg.B.a_0&0xFu);
+		*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|((unsigned)IS.arg.B.a_0&0xFu);*((*byte)++)=(((unsigned)symVal>>4)&0xFu);
+		*((*byte)++)=(((unsigned)symVal>>4)&0xF0u)|((unsigned)IS.arg.B.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)symVal>>12)&0xFu);
 		return;
 		case I_RL1_:
-		*((*word)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xFu);*((*word)++)=(((unsigned)IS.arg.BW.a_1&0xFu)<<4)|((unsigned)IS.arg.BW.a_0&0xFu);
-		*((*word)++)=0x10u|(((unsigned)IS.arg.BW.a_1>>12)&0xFu);*((*word)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xF0u)|((unsigned)IS.arg.BW.a_0&0xFu);
+		*((*byte)++)=(((unsigned)IS.arg.BW.a_1&0xFu)<<4)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xFu);
+		*((*byte)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xF0u)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)IS.arg.BW.a_1>>12)&0xFu);
 		return;
 		case I_STPS:
 		w=func_stack_size-IS.arg.BW.a_1;
-		*((*word)++)=(((unsigned)w>>4)&0xFu);*((*word)++)=(((unsigned)w&0xFu)<<4)|((unsigned)IS.arg.BW.a_0&0xFu);
-		*((*word)++)=0xA1;*((*word)++)=(((unsigned)IS.arg.BW.a_0<<4)&0xF0u)|((unsigned)IS.arg.BW.a_0&0xFu);
+		*((*byte)++)=(((unsigned)w&0xFu)<<4)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=(((unsigned)w>>4)&0xFu);
+		*((*byte)++)=(((unsigned)IS.arg.BW.a_0<<4)&0xF0u)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=0xA1;
 		return;
 		
-		case I_JTEN:case I_SYDD:*((*word)++)=symVal;*((*word)++)=(unsigned)symVal>>8;*((*word)++)=symVal>>16;*((*word)++)=symVal>>24;return;
-		case I_DWRD:*((*word)++)=IS.arg.D.a_0;*((*word)++)=(unsigned)IS.arg.D.a_0>>8;*((*word)++)=IS.arg.D.a_0>>16;*((*word)++)=IS.arg.D.a_0>>24;return;
+		case I_JTEN:case I_SYDD:*((*byte)++)=symVal;*((*byte)++)=(unsigned)symVal>>8;*((*byte)++)=symVal>>16;*((*byte)++)=symVal>>24;return;
+		case I_DWRD:*((*byte)++)=IS.arg.D.a_0;*((*byte)++)=(unsigned)IS.arg.D.a_0>>8;*((*byte)++)=IS.arg.D.a_0>>16;*((*byte)++)=IS.arg.D.a_0>>24;return;
 		return;
 		case I_STPA:
 		w=func_stack_size-IS.arg.BW.a_1;
-		*((*word)++)=(((unsigned)w>>4)&0xFu);*((*word)++)=(((unsigned)w&0xFu)<<4)|((unsigned)IS.arg.BW.a_0&0xFu);
-		*((*word)++)=0x10u|(((unsigned)w>>12)&0xFu);*((*word)++)=(((unsigned)w>>4)&0xF0u)|((unsigned)IS.arg.BW.a_0&0xFu);
-		*((*word)++)=0xA1;*((*word)++)=(((unsigned)IS.arg.BW.a_0<<4)&0xF0u)|((unsigned)IS.arg.BW.a_0&0xFu);
+		*((*byte)++)=(((unsigned)w&0xFu)<<4)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=(((unsigned)w>>4)&0xFu);
+		*((*byte)++)=(((unsigned)w>>4)&0xF0u)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)w>>12)&0xFu);
+		*((*byte)++)=(((unsigned)IS.arg.BW.a_0<<4)&0xF0u)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=0xA1;
 		return;
 		case I_ALOC:
 		w=func_stack_size-func_stack_initial;
-		*((*word)++)=(((unsigned)w>>4)&0xFu);*((*word)++)=(((unsigned)w&0xFu)<<4)|1u;
-		*((*word)++)=0x10u|(((unsigned)w>>12)&0xFu);*((*word)++)=(((unsigned)w>>4)&0xF0u)|1u;
-		*((*word)++)=0xFF;*((*word)++)=1;
+		*((*byte)++)=(((unsigned)w&0xFu)<<4)|1u;*((*byte)++)=(((unsigned)w>>4)&0xFu);
+		*((*byte)++)=(((unsigned)w>>4)&0xF0u)|1u;*((*byte)++)=0x10u|(((unsigned)w>>12)&0xFu);
+		*((*byte)++)=1;*((*byte)++)=0xFF;
 		return;
 		case I_RL2_:
-		*((*word)++)=(((unsigned)IS.arg.BBD.a_2>>4)&0xFu);*((*word)++)=(((unsigned)IS.arg.BBD.a_2&0xFu)<<4)|((unsigned)IS.arg.BBD.a_0&0xFu);
-		*((*word)++)=0x10u|(((unsigned)IS.arg.BBD.a_2>>12)&0xFu);*((*word)++)=(((unsigned)IS.arg.BBD.a_2>>4)&0xF0u)|((unsigned)IS.arg.BBD.a_0&0xFu);
+		*((*byte)++)=(((unsigned)IS.arg.BBD.a_2&0xFu)<<4)|((unsigned)IS.arg.BBD.a_0&0xFu);*((*byte)++)=(((unsigned)IS.arg.BBD.a_2>>4)&0xFu);
+		*((*byte)++)=(((unsigned)IS.arg.BBD.a_2>>4)&0xF0u)|((unsigned)IS.arg.BBD.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)IS.arg.BBD.a_2>>12)&0xFu);
 		w=IS.arg.BBD.a_2>>16;
-		*((*word)++)=(((unsigned)w>>4)&0xFu);*((*word)++)=(((unsigned)w&0xFu)<<4)|((unsigned)IS.arg.BBD.a_0&0xFu);
-		*((*word)++)=0x10u|(((unsigned)w>>12)&0xFu);*((*word)++)=(((unsigned)w>>4)&0xF0u)|((unsigned)IS.arg.BBD.a_0&0xFu);
+		*((*byte)++)=(((unsigned)w&0xFu)<<4)|((unsigned)IS.arg.BBD.a_1&0xFu);*((*byte)++)=(((unsigned)w>>4)&0xFu);
+		*((*byte)++)=(((unsigned)w>>4)&0xF0u)|((unsigned)IS.arg.BBD.a_1&0xFu);*((*byte)++)=0x10u|(((unsigned)w>>12)&0xFu);
 		return;
 		case I_SYRD:
-		*((*word)++)=(((unsigned)symVal>>4)&0xFu);*((*word)++)=(((unsigned)symVal&0xFu)<<4)|((unsigned)IS.arg.BBD.a_0&0xFu);
-		*((*word)++)=0x10u|(((unsigned)symVal>>12)&0xFu);*((*word)++)=(((unsigned)symVal>>4)&0xF0u)|((unsigned)IS.arg.BBD.a_0&0xFu);
+		*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|((unsigned)IS.arg.BB.a_0&0xFu);*((*byte)++)=(((unsigned)symVal>>4)&0xFu);
+		*((*byte)++)=(((unsigned)symVal>>4)&0xF0u)|((unsigned)IS.arg.BB.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)symVal>>12)&0xFu);
 		w=symVal>>16;
-		*((*word)++)=(((unsigned)w>>4)&0xFu);*((*word)++)=(((unsigned)w&0xFu)<<4)|((unsigned)IS.arg.BBD.a_0&0xFu);
-		*((*word)++)=0x10u|(((unsigned)w>>12)&0xFu);*((*word)++)=(((unsigned)w>>4)&0xF0u)|((unsigned)IS.arg.BBD.a_0&0xFu);
+		*((*byte)++)=(((unsigned)w&0xFu)<<4)|((unsigned)IS.arg.BB.a_1&0xFu);*((*byte)++)=(((unsigned)w>>4)&0xFu);
+		*((*byte)++)=(((unsigned)w>>4)&0xF0u)|((unsigned)IS.arg.BB.a_1&0xFu);*((*byte)++)=0x10u|(((unsigned)w>>12)&0xFu);
 		return;
 		case I_D32U:
 		case I_R32U:
 		case I_D32S:
 		case I_R32S:
-		*((*word)++)=0;*((*word)++)=0xA;*((*word)++)=0xF0;*((*word)++)=0xA;
+		*((*byte)++)=0xA;*((*byte)++)=0;*((*byte)++)=0xA;*((*byte)++)=0xF0;
 		
-		*((*word)++)=(((unsigned)symVal>>4)&0xFu);*((*word)++)=(((unsigned)symVal&0xFu)<<4)|0xAu;
-		*((*word)++)=0x10u|(((unsigned)symVal>>12)&0xFu);*((*word)++)=(((unsigned)symVal>>4)&0xF0u)|0xAu;
+		*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|0xAu;*((*byte)++)=(((unsigned)symVal>>4)&0xFu);
+		*((*byte)++)=(((unsigned)symVal>>4)&0xF0u)|0xAu;*((*byte)++)=0x10u|(((unsigned)symVal>>12)&0xFu);
 		w=symVal>>16;
-		*((*word)++)=(((unsigned)w>>4)&0xFu);*((*word)++)=(((unsigned)w&0xFu)<<4)|0xBu;
-		*((*word)++)=0x10u|(((unsigned)w>>12)&0xFu);*((*word)++)=(((unsigned)w>>4)&0xF0u)|0xBu;
+		*((*byte)++)=(((unsigned)w&0xFu)<<4)|0xBu;*((*byte)++)=(((unsigned)w>>4)&0xFu);
+		*((*byte)++)=(((unsigned)w>>4)&0xF0u)|0xBu;*((*byte)++)=0x10u|(((unsigned)w>>12)&0xFu);
 		
-		*((*word)++)=0xFA;*((*word)++)=0xBA;
+		*((*byte)++)=0xBA;*((*byte)++)=0xFA;
 		return;
 		case I_ALCR:
-		*((*word)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xFu);*((*word)++)=(((unsigned)IS.arg.BW.a_1&0xFu)<<4)|((unsigned)IS.arg.BW.a_0&0xFu);
+		*((*byte)++)=(((unsigned)IS.arg.BW.a_1&0xFu)<<4)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xFu);
 		if ((((unsigned)IS.arg. BW.a_1&0xFF00u)!=0u)){
-			*((*word)++)=0x10u|(((unsigned)IS.arg.BW.a_1>>12)&0xFu);*((*word)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xF0u)|((unsigned)IS.arg.BW.a_0&0xFu);
+			*((*byte)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xF0u)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)IS.arg.BW.a_1>>12)&0xFu);
 		}
-		*((*word)++)=0xFF;*((*word)++)=(unsigned)IS.arg.BW.a_0&0xFu;
+		*((*byte)++)=(unsigned)IS.arg.BW.a_0&0xFu;*((*byte)++)=0xFF;
 		return;
 		case I_STOF:
-		*((*word)++)=0;*((*word)++)=(unsigned)IS.arg.BBW.a_1&0xFu;
-		*((*word)++)=0xFF;*((*word)++)=(unsigned)IS.arg.BBW.a_1&0xFu;
+		*((*byte)++)=(unsigned)IS.arg.BBW.a_1&0xFu;*((*byte)++)=0;
+		*((*byte)++)=(unsigned)IS.arg.BBW.a_1&0xFu;*((*byte)++)=0xFF;
 		w=(unsigned)IS.arg.BBW.a_0&0xFu;
-		*((*word)++)=(((unsigned)IS.arg.BBW.a_2>>4)&0xFu);*((*word)++)=(((unsigned)IS.arg.BBW.a_2&0xFu)<<4)|((unsigned)w);
+		*((*byte)++)=(((unsigned)IS.arg.BBW.a_2&0xFu)<<4)|((unsigned)w);*((*byte)++)=(((unsigned)IS.arg.BBW.a_2>>4)&0xFu);
 		if (((unsigned)IS.arg.BBW.a_2&0xFF00u)!=0u){
-			*((*word)++)=0x10u|(((unsigned)IS.arg.BBW.a_2>>12)&0xFu);*((*word)++)=(((unsigned)IS.arg.BBW.a_2>>4)&0xF0u)|((unsigned)w);
+			*((*byte)++)=(((unsigned)IS.arg.BBW.a_2>>4)&0xF0u)|((unsigned)w);*((*byte)++)=0x10u|(((unsigned)IS.arg.BBW.a_2>>12)&0xFu);
 		}
-		*((*word)++)=0xA0|((unsigned)IS.arg.BBW.a_1&0xFu);*((*word)++)=(unsigned)w|((unsigned)w<<4);
+		*((*byte)++)=(unsigned)w|((unsigned)w<<4);*((*byte)++)=0xA0|((unsigned)IS.arg.BBW.a_1&0xFu);
 		return;
 		case I_ZNXB:
 		for (uint32_t i=0;i<IS.arg.D.a_0;i++){
-			*((*word)++)=0;
+			*((*byte)++)=0;
 		}
 		return;
 		case I_ZNXW:
 		for (uint32_t i=0;i<IS.arg.D.a_0;i++){
-			*((*word)++)=0;*((*word)++)=0;
+			*((*byte)++)=0;*((*byte)++)=0;
 		}
 		return;
 		default:;
@@ -629,60 +628,60 @@ uint8_t decompressInstruction(const uint8_t* byteCode,InstructionSingle* IS_pare
 		break;
 		case 1:
 		case 2:
-		IS.arg.B.a_0=(uint16_t)byteCode[1]&15U;
+		IS.arg.B.a_0=byteCode[1];
 		delta=2;
 		break;
 		case 3:
-		IS.arg.BB.a_0=(uint16_t)byteCode[1]&15U;
-		IS.arg.BB.a_1=(uint16_t)byteCode[1]/16U;
+		IS.arg.BB.a_0=(unsigned)byteCode[1]&15u;
+		IS.arg.BB.a_1=(unsigned)byteCode[1]/16u;
 		delta=2;
 		break;
 		case 4:
-		IS.arg.BBB.a_0=(uint16_t)byteCode[1]&15U;
-		IS.arg.BBB.a_1=(uint16_t)byteCode[1]/16U;
-		IS.arg.BBB.a_2=(uint16_t)byteCode[2]&15U;
+		IS.arg.BBB.a_0=(unsigned)byteCode[1]&15u;
+		IS.arg.BBB.a_1=(unsigned)byteCode[1]/16u;
+		IS.arg.BBB.a_2=(unsigned)byteCode[2]&15u;
 		delta=3;
 		break;
 		case 5:
-		IS.arg.BB.a_0=(uint16_t)byteCode[1]&15U;
-		IS.arg.BB.a_1=(uint16_t)byteCode[2];
+		IS.arg.BB.a_0=(unsigned)byteCode[1]&15u;
+		IS.arg.BB.a_1=byteCode[2];
 		delta=3;
 		break;
 		case 6:
-		IS.arg.W.a_0=(uint16_t)byteCode[1]|(uint16_t)byteCode[2]*256U;
+		IS.arg.W.a_0=(unsigned)byteCode[1]|(unsigned)byteCode[2]*256u;
 		delta=3;
 		break;
 		case 7:
-		IS.arg.BW.a_0=(uint16_t)byteCode[1]&15U;
-		IS.arg.BW.a_1=(uint16_t)byteCode[2]|(uint16_t)byteCode[3]*256U;
+		IS.arg.BW.a_0=(unsigned)byteCode[1]&15u;
+		IS.arg.BW.a_1=(unsigned)byteCode[2]|(unsigned)byteCode[3]*256u;
 		delta=4;
 		break;
 		case 8:
-		IS.arg.BBW.a_0=(uint16_t)byteCode[1]&15U;
-		IS.arg.BBW.a_1=(uint16_t)byteCode[1]/16U;
-		IS.arg.BBW.a_2=(uint16_t)byteCode[2]|(uint16_t)byteCode[3]*256U;
+		IS.arg.BBW.a_0=(unsigned)byteCode[1]&15u;
+		IS.arg.BBW.a_1=(unsigned)byteCode[1]/16u;
+		IS.arg.BBW.a_2=(unsigned)byteCode[2]|(unsigned)byteCode[3]*256u;
 		delta=4;
 		break;
 		case 9:
 		IS.arg.D.a_0=
-		(uint32_t)((uint16_t)byteCode[1]|(uint16_t)byteCode[2]*256U)|
-		(uint32_t)((uint16_t)byteCode[3]|(uint16_t)byteCode[4]*256U)*65536LU;
+		(uint32_t)((unsigned)byteCode[1]|(unsigned)byteCode[2]*256u)|
+		(uint32_t)((unsigned)byteCode[3]|(unsigned)byteCode[4]*256u)*65536lu;
 		delta=5;
 		break;
 		case 10:
-		IS.arg.BBD.a_0=(uint16_t)byteCode[1]&15U;
-		IS.arg.BBD.a_1=(uint16_t)byteCode[1]/16U;
+		IS.arg.BBD.a_0=(uint16_t)byteCode[1]&15u;
+		IS.arg.BBD.a_1=(uint16_t)byteCode[1]/16u;
 		IS.arg.BBD.a_2=
-		(uint32_t)((uint16_t)byteCode[2]|(uint16_t)byteCode[3]*256U)|
-		(uint32_t)((uint16_t)byteCode[4]|(uint16_t)byteCode[5]*256U)*65536LU;
+		(uint32_t)((unsigned)byteCode[2]|(unsigned)byteCode[3]*256u)|
+		(uint32_t)((unsigned)byteCode[4]|(unsigned)byteCode[5]*256u)*65536lu;
 		delta=6;
 		break;
 		case 11:
-		IS.arg.BWD.a_0=(uint16_t)byteCode[1];
-		IS.arg.BWD.a_1=(uint16_t)byteCode[2]|(uint16_t)byteCode[3]*256U;
+		IS.arg.BWD.a_0=byteCode[1];
+		IS.arg.BWD.a_1=(unsigned)byteCode[2]|(unsigned)byteCode[3]*256u;
 		IS.arg.BWD.a_2=
-		(uint32_t)((uint16_t)byteCode[4]|(uint16_t)byteCode[5]*256U)|
-		(uint32_t)((uint16_t)byteCode[6]|(uint16_t)byteCode[7]*256U)*65536LU;
+		(uint32_t)((unsigned)byteCode[4]|(unsigned)byteCode[5]*256u)|
+		(uint32_t)((unsigned)byteCode[6]|(unsigned)byteCode[7]*256u)*65536lu;
 		delta=8;
 		break;
 	}

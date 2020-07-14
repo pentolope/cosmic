@@ -1539,6 +1539,8 @@ void applyOperator(ExpressionTreeNode* thisNode){
 		case 5:
 		case 6:{
 			singleMergeIB(ib,ibLeft);
+			insert_IB_load_dword(ib,extraVal);
+			singleMergeIB(ib,&ib_i_32add);
 		}
 		break;
 		case 8:{

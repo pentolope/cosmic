@@ -68,20 +68,24 @@ InstructionBuffer finalizeMemoryOrganizerForInitializer(
 		struct LOFF_sort{
 			uint32_t loff_arg;
 			uint32_t indexInIB;
+			uint32_t loff_locationEnd;
 		};
 		struct LOFF_sort* LOFF_sort_arr=cosmic_malloc(loffCount*sizeof(struct LOFF_sort));
-		uint32_t* loff_locationEnd=cosmic_malloc(loffCount*sizeof(uint32_t));
 		loffCount=0;
 		for (i0=0;i0<mofi.ib.numberOfSlotsTaken;i0++){
 			if (mofi.ib.buffer[i0].id==I_LOFF){
-				LOFF_sort_arr[loffCount].loff_arg=mofi.ib.buffer[i0].arg.D.a_0;
-				LOFF_sort_arr[loffCount].indexInIB=i0;
-				loff_locationEnd[loffCount]=i0;
-				loffCount++;
+				struct LOFF_sort LOFF_sort_item;
+				LOFF_sort_item.loff_arg=mofi.ib.buffer[i0].arg.D.a_0;
+				LOFF_sort_item.indexInIB=i0;
+				LOFF_sort_item.loff_locationEnd=i0;
+				LOFF_sort_arr[loffCount++]=LOFF_sort_item;
 			}
 		}
+		for (i0=1;i0<loffCount;i0++) {
+			LOFF_sort_arr[i0-1].loff_locationEnd=LOFF_sort_arr[i0].loff_locationEnd;
+		}
+		LOFF_sort_arr[loffCount-1].loff_locationEnd=mofi.ib.numberOfSlotsTaken;
 		for (i0=1;i0<loffCount;i0++){
-			loff_locationEnd[i0-1]=loff_locationEnd[i0];
 			uint32_t i1=i0;
 			struct LOFF_sort* p;
 			struct LOFF_sort* n;
@@ -93,17 +97,15 @@ InstructionBuffer finalizeMemoryOrganizerForInitializer(
 				if (--i1==0) break;
 			}
 		}
-		loff_locationEnd[loffCount-1]=mofi.ib.numberOfSlotsTaken;
 		for (i0=0;i0<loffCount;i0++){
 			struct LOFF_sort t=LOFF_sort_arr[i0];
-			uint32_t thisLoffEnd=loff_locationEnd[i0];
 			if (t.loff_arg>currentOffset){
 				IS_temp.id=I_ZNXB;
 				IS_temp.arg.D.a_0=t.loff_arg-currentOffset;
 				currentOffset=t.loff_arg;
 				addInstruction(&ib_destination,IS_temp);
 			}
-			for (uint32_t i1=t.indexInIB+1;i1<thisLoffEnd;i1++){
+			for (uint32_t i1=t.indexInIB+1;i1<t.loff_locationEnd;i1++){
 				IS_temp=mofi.ib.buffer[i1];
 				addInstruction(&ib_destination,IS_temp);
 				switch (IS_temp.id){
@@ -120,7 +122,6 @@ InstructionBuffer finalizeMemoryOrganizerForInitializer(
 			addInstruction(&ib_destination,IS_temp);
 		}
 		cosmic_free(LOFF_sort_arr);
-		cosmic_free(loff_locationEnd);
 		destroyInstructionBuffer(&mofi.ib);
 		dataBytecodeReduction(&ib_destination);
 		return ib_destination;

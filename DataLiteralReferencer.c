@@ -157,6 +157,7 @@ uint32_t addEntryForStringData(int32_t indexOfFirstQuote, int32_t indexOfLastQuo
 
 
 void dataBytecodeReduction(InstructionBuffer* ib){
+	return;
 	ReductionOptFullRestart:;
 	bool didApplySingle=false;
 	bool isThisWordMisaligned=false;
@@ -170,7 +171,7 @@ void dataBytecodeReduction(InstructionBuffer* ib){
 		InstructionSingle IS_next=*ptr_next;
 		if (IS_this.id==I_BYTE & IS_next.id==I_BYTE & isThisWordMisaligned==0){
 			ptr_next->id=I_WORD;
-			ptr_next->arg.W.a_0=((uint16_t)IS_next.arg.B.a_0<<8)|((uint16_t)IS_this.arg.B.a_0);
+			ptr_next->arg.W.a_0=((unsigned)IS_next.arg.B.a_0<<8)|((unsigned)IS_this.arg.B.a_0);
 			ptr_this->id=I_NOP_;
 			numberOfSlotsTaken=ib->numberOfSlotsTaken;
 			didApplySingle=true;goto ReductionOptSingleRestart;

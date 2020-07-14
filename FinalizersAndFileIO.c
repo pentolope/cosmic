@@ -133,10 +133,10 @@ struct BinContainer loadFileContentsAsBinContainer(const char* filePath){
 		walkingIndexCore=walkingIndexAhead+1;
 	}
 	const uint8_t* walkingByteCode=binContainerOut.data+walkingIndexCore;
-	binContainerOut.staticData=decompressInstructionBuffer(walkingByteCode,&walkingByteCode);
+	binContainerOut.functions=decompressInstructionBuffer(walkingByteCode,&walkingByteCode);
 	assert(*walkingByteCode==0);
 	++walkingByteCode;
-	binContainerOut.functions=decompressInstructionBuffer(walkingByteCode,&walkingByteCode);
+	binContainerOut.staticData=decompressInstructionBuffer(walkingByteCode,&walkingByteCode);
 	if ((walkingByteCode-binContainerOut.data)+1!=binContainerOut.len_data) err_10_1_(errorMessage);
 	cosmic_free(errorMessage);
 	return binContainerOut;
