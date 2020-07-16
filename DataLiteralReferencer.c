@@ -157,7 +157,6 @@ uint32_t addEntryForStringData(int32_t indexOfFirstQuote, int32_t indexOfLastQuo
 
 
 void dataBytecodeReduction(InstructionBuffer* ib){
-	return;
 	ReductionOptFullRestart:;
 	bool didApplySingle=false;
 	bool isThisWordMisaligned=false;

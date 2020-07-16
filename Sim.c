@@ -35,6 +35,7 @@ bool printEachInstruction=false;
 bool doCacheSim=false;
 bool isTerminationTriggered=false;
 uint16_t terminationValue=0;
+uint32_t endOfExecutable;
 
 struct MemSeg{
 	uint8_t seg[1LU<<11];
@@ -264,11 +265,6 @@ uint16_t pop(){
 
 
 void singleExecute(){
-	if (machineState.pc==0x04010000){
-		isTerminationTriggered=true;
-		terminationValue=readWord(0x0000FFFE);
-		return;
-	}
 	instructionExecutionCount++;
 	unsigned instr=readWord(machineState.pc);
 	uint8_t type=((instr&0xF000u)!=0xF000u)?((instr>>12)&0xFu):(((instr>>8)&0xFu)|0x10u);
@@ -290,7 +286,7 @@ void singleExecute(){
 		case 0x07:
 		temp=(uint32_t)machineState.reg[r0]+(uint32_t)machineState.reg[r1]+(uint32_t)(~machineState.reg[r2]&0xFFFFu);
 		machineState.reg[r1]=(uint16_t)temp;
-		machineState.reg[r0]=(temp&0x00030000)!=0?1:0;
+		machineState.reg[r0]=(temp&0x00030000)!=0;
 		break;
 		case 0x08:machineState.reg[r0]=readWord(((uint32_t)machineState.reg[r2]<<16)|machineState.reg[r1]);break;
 		case 0x09:writeWord(((uint32_t)machineState.reg[r2]<<16)|machineState.reg[r1],machineState.reg[r0]);break;
@@ -298,7 +294,7 @@ void singleExecute(){
 		case 0x0B:
 		temp=(uint32_t)machineState.reg[r1]+(uint32_t)machineState.reg[r2];
 		machineState.reg[r0]=(uint16_t)temp;
-		machineState.reg[15]=(temp&0x00010000)!=0?1:0;
+		machineState.reg[15]=(temp&0x00010000)!=0;
 		break;
 		case 0x0C:
 		temp=(uint32_t)machineState.reg[r1]+~((uint32_t)machineState.reg[r2])+(uint32_t)1;
@@ -306,7 +302,7 @@ void singleExecute(){
 		break;
 		case 0x0D:
 		temp=(uint32_t)machineState.reg[r1]+~((uint32_t)machineState.reg[r2])+(uint32_t)1;
-		machineState.reg[r0]=(temp&0x00010000)!=0?1:0;
+		machineState.reg[r0]=(temp&0x00010000)!=0;
 		break;
 		case 0x0E:
 		if (machineState.reg[r2]==0){
@@ -358,7 +354,6 @@ void singleExecute(){
 		case 0x0F:
 		default:printf("Instruction corrupted (%d)\n",type);bye();
 	}
-	//stateDump();
 }
 
 
@@ -370,9 +365,22 @@ void fullExecute(){
 				printf("Premature Exit Initiated...\n");
 				bye();
 			}
-			globalSDL_Information.eventPullCountdown=200;
+			globalSDL_Information.eventPullCountdown=20;
+		}
+		if (machineState.pc==0x04010000){
+			isTerminationTriggered=true;
+			terminationValue=readWord(0x0000FFFE);
+			return;
+		}
+		if (machineState.sp>machineState.reg[1]){
+			//printf("Over %08X:%08X\n",(unsigned int)machineState.pc,(unsigned int)instructionExecutionCount);
+		}
+		if (machineState.pc<0x00010000 | machineState.pc>=endOfExecutable){
+			printf("Error:Program Counter out of bounds %08X:%08X\n",(unsigned int)machineState.pc,(unsigned int)instructionExecutionCount);
+			bye();
 		}
 		singleExecute();
+		if (printEachInstruction) stateDump();
 	}
 }
 
@@ -429,7 +437,7 @@ int main(int argc, char** argv){
 	
 	InstructionBuffer allData;
 	initInstructionBuffer(&allData);
-	quadMergeIB(&allData,&ib_internal_div32_s_s,&ib_internal_div32_u_u,&ib_internal_mod32_s_s,&ib_internal_mod32_u_u);
+	if (!printEachInstruction) quadMergeIB(&allData,&ib_internal_div32_s_s,&ib_internal_div32_u_u,&ib_internal_mod32_s_s,&ib_internal_mod32_u_u);
 	dualMergeIB(&allData,&binContainer.functions,&binContainer.staticData);
 	//printInstructionBufferWithMessageAndNumber(&binContainer.functions,"functions:",allData.numberOfSlotsTaken);
 	//printInstructionBufferWithMessageAndNumber(&binContainer.staticData,"staticData:",allData.numberOfSlotsTaken);
@@ -448,7 +456,7 @@ int main(int argc, char** argv){
 	uint32_t storageAddress=1LU<<16;
 	for (uint32_t i=0;i<allData.numberOfSlotsTaken;i++){
 		InstructionSingle IS=allData.buffer[i];
-		//printf("addr:%08X:",storageAddress);printSingleInstructionOptCode(IS);printf("\n");
+		if (printEachInstruction) {printf("addr:%08X:",storageAddress);printSingleInstructionOptCode(IS);printf("\n");}
 		storageAddress+=backendInstructionSize(IS);
 		if (IS.id==I_LABL){
 			labelNames[labelCount]=allData.buffer[i].arg.D.a_0;
@@ -465,19 +473,21 @@ int main(int argc, char** argv){
 			labelAddresses[labelCount]=storageAddress;
 			//printf("%08X:%08X\n",labelNames[labelCount],labelAddresses[labelCount]);
 			labelCount++;
+		} else if (IS.id==I_FCEN){
+			endOfExecutable=storageAddress;
 		}
 	}
 	uint32_t storageSize=storageAddress;
 	{
-	uint32_t D32U_label_address=0;
-	uint32_t R32U_label_address=0;
-	uint32_t D32S_label_address=0;
-	uint32_t R32S_label_address=0;
+	uint32_t D32U_label_address=0x04000000;
+	uint32_t R32U_label_address=0x04000000;
+	uint32_t D32S_label_address=0x04000000;
+	uint32_t R32S_label_address=0x04000000;
 	for (uint32_t i=0;i<labelTotal;i++){
 		if (labelNames[i]<=4){
 			uint32_t v=labelAddresses[i];
 			switch (labelNames[i]){
-				case 0:printf("NULL label is invalid (0)\n");bye();
+				case 0:printf("NULL label is invalid\n");bye();
 				case 1:D32U_label_address=v;break;
 				case 2:R32U_label_address=v;break;
 				case 3:D32S_label_address=v;break;
@@ -485,7 +495,6 @@ int main(int argc, char** argv){
 			}
 		}
 	}
-	if (D32U_label_address==0 | R32U_label_address==0 | D32S_label_address==0 | R32S_label_address==0) {printf("NULL label is invalid (1)\n");bye();}
 	uint16_t func_stack_size;
 	uint8_t func_stack_initial;
 	uint8_t* temporaryStorageBuffer=cosmic_calloc(storageAddress,sizeof(uint8_t));
@@ -524,6 +533,16 @@ int main(int argc, char** argv){
 			printf("I don't wanna do that yet...");
 			bye();
 			default:;
+		}
+		switch (IS.id){
+			case I_D32U:
+			case I_R32U:
+			case I_D32S:
+			case I_R32S:
+			if (symVal==0x04000000){
+				printf("Error: div32 components not linked put were needed\n");
+				bye();
+			}
 		}
 		backendInstructionWrite(&temporaryStorageBufferWalk,symVal,func_stack_size,func_stack_initial,IS);
 	}

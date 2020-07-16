@@ -496,8 +496,8 @@ PU1_ %3
 
 "IB_comp_g_long_s":"""
 
-POP2 %3 %4
-POP2 %C %2
+POP2 %4 %3
+POP2 %2 %C
 
 RL1_ %5 #8000
 XOR_ %2 %2 %5
@@ -530,8 +530,8 @@ PU1_ %3
 
 "IB_comp_geq_long_s":"""
 
-POP2 %3 %4
-POP2 %C %2
+POP2 %4 %3
+POP2 %2 %C
 
 RL1_ %5 #8000
 XOR_ %2 %2 %5
@@ -564,8 +564,8 @@ PU1_ %3
 
 "IB_comp_l_long_s":"""
 
-POP2 %3 %4
-POP2 %C %2
+POP2 %4 %3
+POP2 %2 %C
 
 RL1_ %5 #8000
 XOR_ %2 %2 %5
@@ -598,8 +598,8 @@ PU1_ %3
 
 "IB_comp_leq_long_s":"""
 
-POP2 %3 %4
-POP2 %C %2
+POP2 %4 %3
+POP2 %2 %C
 
 RL1_ %5 #8000
 XOR_ %2 %2 %5
@@ -627,8 +627,8 @@ PU1_ %3
 
 "IB_comp_g_long_u":"""
 
-POP2 %3 %4
-POP2 %C %2
+POP2 %4 %3
+POP2 %2 %C
 BL1_ %5 $01
 SSUB %5 %4 %2
 SSUB %5 %3 %C
@@ -651,8 +651,8 @@ PU1_ %3
 
 "IB_comp_geq_long_u":"""
 
-POP2 %3 %4
-POP2 %C %2
+POP2 %4 %3
+POP2 %2 %C
 BL1_ %5 $01
 SSUB %5 %2 %4
 SSUB %5 %C %2
@@ -675,8 +675,8 @@ PU1_ %3
 
 "IB_comp_l_long_u":"""
 
-POP2 %3 %4
-POP2 %C %2
+POP2 %4 %3
+POP2 %2 %C
 BL1_ %5 $01
 SSUB %5 %2 %4
 SSUB %5 %C %3
@@ -699,8 +699,8 @@ PU1_ %3
 
 "IB_comp_leq_long_u":"""
 
-POP2 %3 %4
-POP2 %C %2
+POP2 %4 %3
+POP2 %2 %C
 BL1_ %5 $01
 SSUB %5 %4 %2
 SSUB %5 %3 %C

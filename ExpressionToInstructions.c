@@ -2396,6 +2396,17 @@ void expressionToAssembly(
 	}
 	if (isFunctionCall){
 		if (oID==65){
+			bool isVoidReturn=doStringsMatch("void",
+					stripQualifiersC(functionEntryPtr->functionTypeAnalysis.returnType,NULL,NULL));
+			if (!isVoidReturn){
+				uint32_t returnSize=getSizeofForTypeString(functionEntryPtr->functionTypeAnalysis.returnType,true);
+				assert(returnSize!=0);
+				if (returnSize>64000){
+					printf("Return size of function is too large (this should have been caught elsewhere)\n");
+					exit(1);
+				}
+				add_ALCR(&thisNode->ib,returnSize);
+			}
 			uint16_t stackSize=0;
 			if (thisNode->pre.hasRightNode){
 				stackSize=rightNode->post.sizeOnStack;
@@ -2403,8 +2414,7 @@ void expressionToAssembly(
 			}
 			insert_IB_call_nonComplex_function(
 				&thisNode->ib,functionEntryPtr->labelID,stackSize,
-				!doStringsMatch("void",
-					stripQualifiersC(functionEntryPtr->functionTypeAnalysis.returnType,NULL,NULL)));
+				!isVoidReturn);
 			thisNode->post.typeString=copyStringToHeapString(
 				singleTypicalIntegralTypePromote(functionEntryPtr->functionTypeAnalysis.returnType,NULL)); // this does trim off the qualifiers on the base of the type. is that desired?
 			genTypeStringNQ(thisNode);

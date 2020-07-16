@@ -1,20 +1,19 @@
 
 /*
-totally untested, but I think this should work.  EDIT: I think this will not work, the casting is wrong when adding to pointers
-
+totally untested, but I think this should work.
 these definitions do no runtime checks
-  and allows variable argments to be read from 
-  pushing the argument to stack in reverse order 
-  with no alignment considerations
 */
 
 #ifndef __STD_ARG
 #define __STD_ARG
 
-typedef unsigned char * va_list;
+typedef unsigned long va_list;
 
-#define va_start(vaList,num) vaList=((unsigned char *)(&num))+((unsigned char *)(sizeof(int)))
-#define va_arg(vaList,type) (*((type *)((vaList+((unsigned char *)(sizeof(type)))),vaList)))
+#define va_allign_(n) ((n)+((n)&1))
+#define va_start(vaList,lastArg) (vaList=(unsigned long)&lastArg+va_allign_(sizeof lastArg))
+#define va_arg(vaList,type) (*((type*)(vaList)));(vaList+=va_allign_(sizeof(type)))
 #define va_end(vaList) ((void)0)
 
+
 #endif
+

@@ -978,6 +978,13 @@ void doLabelMarkoffInInstructionBuffer(const InstructionBuffer* ib,uint32_t* lab
 
 // these functions that follow are to avoid using InstructionSingle in expressionToInstructions
 
+void add_ALCR(InstructionBuffer* ib, uint16_t size){
+	InstructionSingle IS;
+	IS.id=I_ALCR;
+	IS.arg.BW.a_0=13;
+	IS.arg.BW.a_1=size;
+	addInstruction(ib,IS);
+}
 
 void addVoidPop(InstructionBuffer* ib){
 	InstructionSingle IS;
