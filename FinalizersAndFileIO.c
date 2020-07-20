@@ -294,7 +294,7 @@ void applyFinalizeToGlobalStaticData(){
 							}
 						}
 						assert(foundVariable);
-						assert(i0!=0 && (buffer[i0-1].id==I_NSNB | buffer[i0-1].id==I_NSCB));
+						assert(i0!=0 && (buffer[i0-1].id==I_NSNB));
 						uint32_t bytesLeft=buffer[i0-1].arg.D.a_0;
 						buffer[i0-1].id=I_NOP_;
 						while (bytesLeft!=0){
@@ -355,7 +355,7 @@ void applyFinalizeToGlobalStaticData(){
 			totalByteCount+=globalStringLiteralEntries.entries[i0].lengthOfData;
 		}
 		InstructionSingle IS_temp;
-		IS_temp.id=I_NSCB;
+		IS_temp.id=I_NSNB;
 		IS_temp.arg.D.a_0=totalByteCount;
 		addInstruction(&ib_temp,IS_temp);
 		for (uint32_t i0=0;i0<globalStringLiteralEntries.numberOfValidEntries;i0++){
@@ -365,7 +365,7 @@ void applyFinalizeToGlobalStaticData(){
 			addInstruction(&ib_temp,IS_temp);
 			IS_temp.id=I_BYTE;
 			for (uint32_t i1=0;i1<sle.lengthOfData;i1++){
-				IS_temp.arg.B.a_0=sle.data[i1];
+				IS_temp.arg.B1.a_0=sle.data[i1];
 				addInstruction(&ib_temp,IS_temp);
 			}
 			cosmic_free(sle.data);

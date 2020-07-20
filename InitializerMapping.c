@@ -32,15 +32,14 @@ void initMemoryOrganizerForInitializer(
 // the MemoryOrganizerForInitializer is destroyed
 InstructionBuffer finalizeMemoryOrganizerForInitializer(
 		struct MemoryOrganizerForInitializer* mofi_ptr,
-		uint32_t labelNumber,bool isConst){
+		uint32_t labelNumber){
 	
 	struct MemoryOrganizerForInitializer mofi=*mofi_ptr;
-	assert(labelNumber!=0);
 	cosmic_free(mofi.isSet);
 	InstructionSingle IS_temp;
 	InstructionBuffer ib_destination;
 	uint32_t i0;
-	IS_temp.id=isConst?I_NSCB:I_NSNB;
+	IS_temp.id=I_NSNB;
 	IS_temp.arg.D.a_0=mofi.size;
 	if (mofi.ib.numberOfSlotsTaken==0){
 		// then just reuse this InstructionBuffer, there is nothing in it
@@ -185,248 +184,237 @@ uint8_t setUnitInitializer(
 			if (*(isSet+0) | *(isSet+1)) return 1;
 			*(isSet+0)=1;*(isSet+1)=1;
 			expectedResultWordSize=1;
-		} else {
-			assert(data_type==I_DWRD | data_type==I_SYDD);
+		} else if (data_type==I_DWRD | data_type==I_SYDD){
 			if ((location&1)!=0) return 2;
 			if (*(isSet+0) | *(isSet+1) | *(isSet+2) | *(isSet+3)) return 1;
 			*(isSet+0)=1;*(isSet+1)=1;*(isSet+2)=1;*(isSet+3)=1;
 			expectedResultWordSize=2;
+		} else {
+			assert(data_type==I_SYDQ);
+			if ((location&1)!=0) return 2;
+			if (*(isSet+0) | *(isSet+1) | *(isSet+2) | *(isSet+3) |
+				*(isSet+4) | *(isSet+5) | *(isSet+6) | *(isSet+7)) return 1;
+			*(isSet+0)=1;*(isSet+1)=1;*(isSet+2)=1;*(isSet+3)=1;
+			*(isSet+4)=1;*(isSet+5)=1;*(isSet+6)=1;*(isSet+7)=1;
+			expectedResultWordSize=4;
 		}
 	}
 	if (data_type!=I_BYTE & data_type!=I_WORD & data_type!=I_DWRD){
-		// todo: test value computations. especially dword, I'm not completely sure that the 2 words don't get switched at some point
 		ConstOptStart:;
-		uint16_t valueStack[100];
-		bool isValueStackConst[100];
-		int16_t valueStackLocation=0;
+		uint16_t vs[100]; // [value stack]
+		bool vsc[100]; // [is value stack constant]
+		int16_t vsl=100; // [value stack location]
+		int16_t pvsl; // [previous value stack location]
 		InstructionSingle* IS_ptr=ib->buffer+2;
 		assert(IS_ptr->id!=I_SYDE);
 		do {
-			if (valueStackLocation>97) return 3;
-			bool isResultConstant; // is false for constant loads
+			if (vsl<10) return 3;
+			pvsl=vsl;
+			bool wasLoad=false;
+			uint16_t inSize;
+			uint16_t outSize;
 			switch (IS_ptr->id){
 				case I_SYCB:
-				valueStack[valueStackLocation]=IS_ptr->arg.B.a_0;
-				isValueStackConst[valueStackLocation]=true;
-				valueStackLocation+=1;
-				isResultConstant=false;
+				vsl-=1;
+				vs[vsl]=IS_ptr->arg.B1.a_0;
+				vsc[vsl]=true;
+				wasLoad=true;
 				break;
 				case I_SYCW:
-				valueStack[valueStackLocation]=IS_ptr->arg.W.a_0;
-				isValueStackConst[valueStackLocation]=true;
-				valueStackLocation+=1;
-				isResultConstant=false;
+				vsl-=1;
+				vs[vsl]=IS_ptr->arg.W.a_0;
+				vsc[vsl]=true;
+				wasLoad=true;
 				break;
 				case I_SYCD:
-				valueStack[valueStackLocation+0]=IS_ptr->arg.D.a_0>>16;
-				valueStack[valueStackLocation+1]=IS_ptr->arg.D.a_0>> 0;
-				isValueStackConst[valueStackLocation+0]=true;
-				isValueStackConst[valueStackLocation+1]=true;
-				valueStackLocation+=2;
-				isResultConstant=false;
+				vsl-=2;
+				vs[vsl+1]=IS_ptr->arg.D.a_0>>16;
+				vs[vsl+0]=IS_ptr->arg.D.a_0>> 0;
+				vsc[vsl+1]=true;
+				vsc[vsl+0]=true;
+				wasLoad=true;
 				break;
 				case I_SYCL:
-				isValueStackConst[valueStackLocation+0]=false;
-				isValueStackConst[valueStackLocation+1]=false;
-				valueStackLocation+=2;
-				isResultConstant=false;
+				vsl-=2;
+				vsc[vsl+1]=false;
+				vsc[vsl+0]=false;
+				wasLoad=true;
 				break;
-				case I_SYC1:
-				case I_SYC3:
-				case I_SYC5:
-				case I_SYC7:
-				case I_SYC9:
-				case I_SYCY:
-				case I_SYCU:
-				case I_SYCQ:
-				isResultConstant=isValueStackConst[valueStackLocation-1]&isValueStackConst[valueStackLocation-2]&isValueStackConst[valueStackLocation-3]&isValueStackConst[valueStackLocation-4];
-				valueStackLocation-=4;
-				isValueStackConst[valueStackLocation+0]=false;
-				isValueStackConst[valueStackLocation+1]=false;
-				valueStackLocation+=2;
+				case I_SYW0:
+				case I_SYW1:
+				case I_SYW2:
+				case I_SYW3:
+				case I_SYW4:
+				case I_SYW5:
+				case I_SYW6:
+				case I_SYW7:
+				case I_SYW8:
+				case I_SYW9:
+				case I_SBLW:
+				case I_SBRW:
+				case I_SCDW:
+				case I_SCDB:
+				inSize=2;
+				outSize=1;
 				break;
-				case I_SYC0:
-				case I_SYC2:
-				case I_SYC4:
-				case I_SYC6:
-				case I_SYC8:
-				case I_SYCX:
-				case I_SYCA:
-				case I_SYCO:
-				case I_SYCT:
-				case I_SYCM:
-				isResultConstant=isValueStackConst[valueStackLocation-1]&isValueStackConst[valueStackLocation-2];
-				valueStackLocation-=2;
-				isValueStackConst[valueStackLocation]=false;
-				valueStackLocation+=1;
+				case I_SYD0:
+				case I_SYD1:
+				case I_SYD2:
+				case I_SYD3:
+				case I_SYD4:
+				case I_SYD5:
+				case I_SYD6:
+				case I_SYD7:
+				case I_SYD8:
+				case I_SYD9:
+				case I_SCQD:
+				inSize=4;
+				outSize=2;
 				break;
-				case I_SYCZ:
-				case I_SYCS:
-				isResultConstant=isValueStackConst[valueStackLocation-1];
-				valueStackLocation-=1;
-				isValueStackConst[valueStackLocation+0]=false;
-				isValueStackConst[valueStackLocation+1]=false;
-				valueStackLocation+=2;
+				case I_SYQ0:
+				case I_SYQ1:
+				case I_SYQ2:
+				case I_SYQ3:
+				case I_SYQ4:
+				case I_SYQ5:
+				case I_SYQ6:
+				case I_SYQ7:
+				case I_SYQ8:
+				case I_SYQ9:
+				inSize=8;
+				outSize=4;
 				break;
-				case I_SYCC:
-				case I_SYCN:
-				isResultConstant=isValueStackConst[valueStackLocation-1];
-				isValueStackConst[valueStackLocation-1]=false;
+				case I_SBLD:
+				case I_SBRD:
+				inSize=3;
+				outSize=2;
+				break;
+				case I_SBLQ:
+				case I_SBRQ:
+				inSize=5;
+				outSize=4;
+				break;
+				case I_SCWD:
+				case I_SCZD:
+				inSize=1;
+				outSize=2;
+				break;
+				case I_SCDQ:
+				case I_SCZQ:
+				inSize=2;
+				outSize=4;
+				break;
+				case I_SCBW:
+				case I_SCWB:
+				inSize=1;
+				outSize=1;
+				break;
+				case I_SCQB:
+				inSize=4;
+				outSize=1;
 				break;
 				default:;assert(false);
 			}
-			assert(valueStackLocation>=0);
-			if (isResultConstant){
-				//printInstructionBufferWithMessageAndNumber(ib,"Identified constant operation",0);
-				int16_t deltaToDestroy;
-				{
-					const enum InstructionTypeID id_that_is_const=IS_ptr->id;
-					uint16_t constValues[4];
-					uint32_t constValues32[2];
-					bool resultIsDword=false;
-					if (id_that_is_const==I_SYCZ | 
-						id_that_is_const==I_SYCS){
-						
-						resultIsDword=true;
-						deltaToDestroy=1;
-						valueStackLocation-=1;
-						constValues[0]=valueStack[valueStackLocation-1];
-					} else if (
-						id_that_is_const==I_SYCC | 
-						id_that_is_const==I_SYCN){
-						
-						deltaToDestroy=1;
-						constValues[0]=valueStack[valueStackLocation-1];
-					} else if (
-						id_that_is_const==I_SYC1 | 
-						id_that_is_const==I_SYC3 | 
-						id_that_is_const==I_SYC5 | 
-						id_that_is_const==I_SYC7 | 
-						id_that_is_const==I_SYC9 | 
-						id_that_is_const==I_SYCY | 
-						id_that_is_const==I_SYCU | 
-						id_that_is_const==I_SYCQ){
-						
-						resultIsDword=true;
-						deltaToDestroy=4;
-						valueStackLocation+=2;
-						constValues[0]=valueStack[valueStackLocation-4];
-						constValues[1]=valueStack[valueStackLocation-3];
-						constValues[2]=valueStack[valueStackLocation-2];
-						constValues[3]=valueStack[valueStackLocation-1];
-						constValues32[0]=(constValues[1]<<16)|(constValues[0]<< 0);
-						constValues32[1]=(constValues[3]<<16)|(constValues[2]<< 0);
-					} else {
-						deltaToDestroy=2;
-						valueStackLocation+=1;
-						constValues[0]=valueStack[valueStackLocation-2];
-						constValues[1]=valueStack[valueStackLocation-1];
+			if (!wasLoad){
+				bool rc=true;
+				for (uint16_t i=0;i<inSize;i++){
+					rc&=vsc[vsl++];
+				}
+				for (uint16_t i=0;i<outSize;i++){
+					vsc[--vsl]=false;
+				}
+				if (rc){
+					{
+					uint16_t vs_in[8];
+					uint32_t val_out; // todo: when updating to allow qword, change to uint64_t
+					for (uint16_t i=0;i<inSize;i++){
+						vs_in[i]=vs[pvsl+i];
 					}
-					switch (id_that_is_const){
-						case I_SYC1:
-						constValues32[0]+=constValues32[1];
-						break;
-						case I_SYC3:
-						constValues32[0]-=constValues32[1];
-						break;
-						case I_SYC5:
-						constValues32[0]*=constValues32[1];
-						break;
-						case I_SYC7:
-						constValues32[0]/=constValues32[1];
-						break;
-						case I_SYC9:
-						constValues32[0]%=constValues32[1];
-						break;
-						case I_SYCY:
-						constValues32[0]^=constValues32[1];
-						break;
-						case I_SYCU:
-						constValues32[0]&=constValues32[1];
-						break;
-						case I_SYCQ:
-						constValues32[0]|=constValues32[1];
-						break;
-						case I_SYC0:
-						constValues[0]+=constValues[1];
-						break;
-						case I_SYC2:
-						constValues[0]-=constValues[1];
-						break;
-						case I_SYC4:
-						constValues[0]*=constValues[1];
-						break;
-						case I_SYC6:
-						constValues[0]/=constValues[1];
-						break;
-						case I_SYC8:
-						constValues[0]%=constValues[1];
-						break;
-						case I_SYCX:
-						constValues[0]^=constValues[1];
-						break;
-						case I_SYCA:
-						constValues[0]&=constValues[1];
-						break;
-						case I_SYCO:
-						constValues[0]|=constValues[1];
-						break;
-						case I_SYCZ:
-						constValues32[0]=constValues[0];
-						break;
-						case I_SYCS:
-						constValues32[0] =((uint32_t)0xFFFF0000lu*((constValues[0]&0xA000u)!=0))|constValues[0];
-						break;
-						case I_SYCC:
-						constValues[0]&=0xFFu;
-						constValues[0]|=0xFF00u*((constValues[0]&0x00A0u)!=0);
-						break;
-						case I_SYCN:
-						constValues[0]=constValues[0]!=0;					
-						break;
-						case I_SYCM:
-						constValues[0]=(constValues[0]|constValues[1])!=0;
-						case I_SYCT:
-						break;
+					switch (IS_ptr->id){
+						case I_SYW0:val_out=vs_in[1]+vs_in[0];break;
+						case I_SYW1:val_out=vs_in[1]-vs_in[0];break;
+						case I_SYW2:val_out=vs_in[1]*vs_in[0];break;
+						case I_SYW3:val_out=(  signed)vs_in[1]/(  signed)vs_in[0];break;
+						case I_SYW4:val_out=(unsigned)vs_in[1]/(unsigned)vs_in[0];break;
+						case I_SYW5:val_out=(  signed)vs_in[1]%(  signed)vs_in[0];break;
+						case I_SYW6:val_out=(unsigned)vs_in[1]%(unsigned)vs_in[0];break;
+						case I_SYW7:val_out=vs_in[1]^vs_in[0];break;
+						case I_SYW8:val_out=vs_in[1]&vs_in[0];break;
+						case I_SYW9:val_out=vs_in[1]|vs_in[0];break;
+						case I_SBLW:val_out=(unsigned)vs_in[1]<<vs_in[0];break;
+						case I_SBRW:val_out=(unsigned)vs_in[1]>>vs_in[0];break;
+						case I_SCWB:val_out=vs_in[0]!=0u;break;
+						case I_SCDB:val_out=(vs_in[1]|vs_in[0])!=0u;break;
+						case I_SCQB:val_out=(vs_in[2]|vs_in[3]|vs_in[0]|vs_in[1])!=0u;break;
+						case I_SCZD:case I_SCDW:val_out=vs_in[0];break;
+						case I_SCBW:val_out=(((unsigned)vs_in[0]&0xA0u)*0x01FEu)|(unsigned)vs_in[0];break;
+						case I_SCWD:val_out=(((uint32_t)vs_in[0]&0xA000u)*(uint32_t)0x0001FFFELU)|(uint32_t)vs_in[0];break;
+						case I_SYD0:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16))+(((uint32_t)vs_in[0]<<0)|((uint32_t)vs_in[1]<<16));break;
+						case I_SYD1:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16))-(((uint32_t)vs_in[0]<<0)|((uint32_t)vs_in[1]<<16));break;
+						case I_SYD2:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16))*(((uint32_t)vs_in[0]<<0)|((uint32_t)vs_in[1]<<16));break;
+						case I_SYD3:val_out=((( int32_t)vs_in[2]<<0)|(( int32_t)vs_in[3]<<16))/((( int32_t)vs_in[0]<<0)|(( int32_t)vs_in[1]<<16));break;
+						case I_SYD4:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16))/(((uint32_t)vs_in[0]<<0)|((uint32_t)vs_in[1]<<16));break;
+						case I_SYD5:val_out=((( int32_t)vs_in[2]<<0)|(( int32_t)vs_in[3]<<16))%((( int32_t)vs_in[0]<<0)|(( int32_t)vs_in[1]<<16));break;
+						case I_SYD6:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16))%(((uint32_t)vs_in[0]<<0)|((uint32_t)vs_in[1]<<16));break;
+						case I_SYD7:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16))^(((uint32_t)vs_in[0]<<0)|((uint32_t)vs_in[1]<<16));break;
+						case I_SYD8:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16))&(((uint32_t)vs_in[0]<<0)|((uint32_t)vs_in[1]<<16));break;
+						case I_SYD9:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16))|(((uint32_t)vs_in[0]<<0)|((uint32_t)vs_in[1]<<16));break;
+						case I_SCQD:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16));break;
+						case I_SBLD:val_out=(((uint32_t)vs_in[1]<<0)|((uint32_t)vs_in[2]<<16))<<vs_in[0];break;
+						case I_SBRD:val_out=(((uint32_t)vs_in[1]<<0)|((uint32_t)vs_in[2]<<16))>>vs_in[0];break;
+						
+						case I_SYQ0:
+						case I_SYQ1:
+						case I_SYQ2:
+						case I_SYQ3:
+						case I_SYQ4:
+						case I_SYQ5:
+						case I_SYQ6:
+						case I_SYQ7:
+						case I_SYQ8:
+						case I_SYQ9:
+						case I_SBLQ:
+						case I_SBRQ:
+						
+						case I_SCDQ:
+						case I_SCZQ:
+						assert(false);// qword not ready yet
+						
 						default:;assert(false);
 					}
-					if (resultIsDword){
-						IS_ptr->id=I_SYCD;
-						IS_ptr->arg.D.a_0=constValues32[0];
-					} else {
-						IS_ptr->id=I_SYCW;
-						IS_ptr->arg.W.a_0=constValues[0];
+					switch (outSize){
+						case 1:IS_ptr->id=I_SYCW;IS_ptr->arg.W.a_0=val_out;break;
+						case 2:IS_ptr->id=I_SYCD;IS_ptr->arg.D.a_0=val_out;break;
+						case 4:assert(false);// qword not ready yet [will have to use insertInstructionAt()]
+						IS_ptr->id=I_SYCD;IS_ptr->arg.D.a_0=val_out;break;
+						default:assert(false);
 					}
-				}
-				//printInstructionBufferWithMessageAndNumber(ib,"After Assignment before removal",0);
-				while (deltaToDestroy!=0){
-					assert(deltaToDestroy>0);
-					--IS_ptr;
-					assert(IS_ptr>ib->buffer);
-					if (IS_ptr->id==I_SYCD){
-						if (deltaToDestroy==1){
-							printf("I don\'t think this should happen\n");
+					}
+					int16_t removeAmount=inSize;
+					while (removeAmount!=0){
+						assert(removeAmount>0);
+						enum InstructionTypeID id=(--IS_ptr)->id;
+						IS_ptr->id=I_NOP_;
+						if (id==I_SYCB | id==I_SYCW){
+							removeAmount-=1;
+						} else {
+							assert(id==I_SYCD | id==I_SYCL);
+							removeAmount-=2;
 						}
-						deltaToDestroy-=2;
-					} else {
-						assert(IS_ptr->id==I_SYCW | IS_ptr->id==I_SYCB);
-						deltaToDestroy-=1;
 					}
-					IS_ptr->id=I_NOP_;
+					removeNop(ib);
+					goto ConstOptStart;
 				}
-				//printInstructionBufferWithMessageAndNumber(ib,"After removal",0);
-				removeNop(ib);
-				goto ConstOptStart;
 			}
 		} while ((++IS_ptr)->id!=I_SYDE);
-		assert(expectedResultWordSize==valueStackLocation);
+		assert(expectedResultWordSize==100-vsl);
 		IS_ptr=ib->buffer+2;
 		do {
 			if (IS_ptr->id==I_SYCW){
 				if ((IS_ptr->arg.W.a_0&0xFF00u)==0){
 					uint8_t b=IS_ptr->arg.W.a_0;
 					IS_ptr->id=I_SYCB;
-					IS_ptr->arg.B.a_0=b;
+					IS_ptr->arg.B1.a_0=b;
 				}
 			}
 		} while ((IS_ptr++)->id!=I_SYDE);
@@ -441,10 +429,10 @@ uint8_t setUnitInitializer(
 				uint32_t val;
 				ib->numberOfSlotsTaken=2;
 				const InstructionSingle IS_temp=*(IS_ptr+1);
-				if      (IS_temp.id==I_SYCB)    val=IS_temp.arg.B.a_0;
+				if      (IS_temp.id==I_SYCB)    val=IS_temp.arg.B1.a_0;
 				else if (IS_temp.id==I_SYCW)    val=IS_temp.arg.W.a_0;
 				else{assert(IS_temp.id==I_SYCD);val=IS_temp.arg.D.a_0;}
-				if      (id0==I_SYDB) IS_ptr->arg.B.a_0=val;
+				if      (id0==I_SYDB) IS_ptr->arg.B1.a_0=val;
 				else if (id0==I_SYDW) IS_ptr->arg.W.a_0=val;
 				else                  IS_ptr->arg.D.a_0=val;
 			}
@@ -573,7 +561,7 @@ void applySymbolicOperator(ExpressionTreeNode* thisNode){
 	switch (thisNode->operatorID){
 		case 10:
 		case 14:
-		singleMergeIB(ib,ibRight);
+			singleMergeIB(ib,ibRight);
 		break;
 		case 11:{
 			if (operatorTypeID==2){
@@ -581,57 +569,69 @@ void applySymbolicOperator(ExpressionTreeNode* thisNode){
 				writeIS.arg.D.a_0=0;
 				addInstruction(ib,writeIS);
 				singleMergeIB(ib,ibRight);
-				writeIS.id=I_SYC3;
+				writeIS.id=I_SYD1;
 				addInstruction(ib,writeIS);
 			} else {
 				writeIS.id=I_SYCW;
 				writeIS.arg.W.a_0=0;
 				addInstruction(ib,writeIS);
 				singleMergeIB(ib,ibRight);
-				writeIS.id=I_SYC2;
+				writeIS.id=I_SYW1;
 				addInstruction(ib,writeIS);
 			}
 		}
 		break;
 		case 18:{
+			dualMergeIB(ib,ibLeft,ibRight);
 			if (operatorTypeID==2){
-				dualMergeIB(ib,ibLeft,ibRight);
-				writeIS.id=I_SYC5;
-				addInstruction(ib,writeIS);
+				writeIS.id=I_SYD2;
 			} else {
-				dualMergeIB(ib,ibLeft,ibRight);
-				writeIS.id=I_SYC4;
-				addInstruction(ib,writeIS);
+				writeIS.id=I_SYW2;
 			}
+			addInstruction(ib,writeIS);
 		}
 		break;
 		case 21:{
+			dualMergeIB(ib,ibLeft,ibRight);
 			if (operatorTypeID==1){
-				dualMergeIB(ib,ibLeft,ibRight);
-				writeIS.id=I_SYC1;
-				addInstruction(ib,writeIS);
+				writeIS.id=I_SYD0;
 			} else if (operatorTypeID==2){
-				dualMergeIB(ib,ibLeft,ibRight);
-				writeIS.id=I_SYC0;
-				addInstruction(ib,writeIS);
+				writeIS.id=I_SYW0;
 			} else {
 				goto GiveHasNotAddedMessage;
 			}
+			addInstruction(ib,writeIS);
 		}
 		break;
 		case 22:{
+			dualMergeIB(ib,ibLeft,ibRight);
 			if (operatorTypeID==1){
-				dualMergeIB(ib,ibLeft,ibRight);
-				writeIS.id=I_SYC3;
-				addInstruction(ib,writeIS);
+				writeIS.id=I_SYD1;
 			} else if (operatorTypeID==2){
-				dualMergeIB(ib,ibLeft,ibRight);
-				writeIS.id=I_SYC2;
-				addInstruction(ib,writeIS);
+				writeIS.id=I_SYW1;
 			} else {
 				goto GiveHasNotAddedMessage;
 			}
+			addInstruction(ib,writeIS);
 		}
+		break;
+		case 23:
+			dualMergeIB(ib,ibLeft,ibRight);
+			if (operatorTypeID==1){
+				writeIS.id=I_SBLD;
+			} else {
+				writeIS.id=I_SBLW;
+			}
+			addInstruction(ib,writeIS);			
+		break;
+		case 24:
+			dualMergeIB(ib,ibLeft,ibRight);
+			if (operatorTypeID==1){
+				writeIS.id=I_SBRD;
+			} else {
+				writeIS.id=I_SBRW;
+			}
+			addInstruction(ib,writeIS);			
 		break;
 		case 59:{
 			if (operatorTypeID==1){
@@ -658,12 +658,11 @@ void applySymbolicOperator(ExpressionTreeNode* thisNode){
 			if (operatorTypeID==1){
 				writeIS.id=I_SYCW;
 				writeIS.arg.W.a_0=extraVal;
-				addInstruction(ib,writeIS);
 			} else {
 				writeIS.id=I_SYCL;
 				writeIS.arg.D.a_0=extraVal;
-				addInstruction(ib,writeIS);
 			}
+			addInstruction(ib,writeIS);
 		}
 		break;
 		case 62:
@@ -671,13 +670,12 @@ void applySymbolicOperator(ExpressionTreeNode* thisNode){
 			if (operatorTypeID==1){
 				writeIS.id=I_SYCW;
 				writeIS.arg.W.a_0=extraVal;
-				addInstruction(ib,writeIS);
 			} else {
 		case 17:
 				writeIS.id=I_SYCD;
 				writeIS.arg.D.a_0=extraVal;
-				addInstruction(ib,writeIS);
 			}
+			addInstruction(ib,writeIS);
 		}
 		break;
 		default:
@@ -1657,7 +1655,7 @@ bool initializerImplementRoot(
 		if (isStatic){
 			initMemoryOrganizerForInitializer(&mofi,typeSize);
 			initializerImplementList(&mofi,NULL,0,root,crackedType,true);
-			InstructionBuffer ib_temp=finalizeMemoryOrganizerForInitializer(&mofi,labelNumber,false);
+			InstructionBuffer ib_temp=finalizeMemoryOrganizerForInitializer(&mofi,labelNumber);
 			singleMergeIB(ib,&ib_temp);
 			destroyInstructionBuffer(&ib_temp);
 		} else {
@@ -1727,7 +1725,7 @@ bool initializerImplementRoot(
 			addInstruction(ib,IS_temp);
 			IS_temp.id=I_BYTE;
 			for (uint32_t i=0;i<typeSize;i++){
-				IS_temp.arg.B.a_0=data[i];
+				IS_temp.arg.B1.a_0=data[i];
 				addInstruction(ib,IS_temp);
 			}
 		} else {
@@ -1758,7 +1756,7 @@ bool initializerImplementRoot(
 			}
 			initMemoryOrganizerForInitializer(&mofi,typeSize);
 			initializerImplementStaticExpression(root,&mofi,*typeStringPtr,0,false);
-			InstructionBuffer ib_temp=finalizeMemoryOrganizerForInitializer(&mofi,labelNumber,false);
+			InstructionBuffer ib_temp=finalizeMemoryOrganizerForInitializer(&mofi,labelNumber);
 			singleMergeIB(ib,&ib_temp);
 			destroyInstructionBuffer(&ib_temp);
 			return true;

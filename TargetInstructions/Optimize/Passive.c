@@ -2,13 +2,13 @@
 typedef struct InstructionInformation{
 	enum InstructionTypeID id;
 	uint32_t cv; // the constant value associated with RL2_,RL1_,BL1_,STPA,STPS,STWV,STWN,STRV,STRN,ALCR,STOF
-	uint8_t regIN[5]; // no more then 4 inputs are listed
-	uint8_t regOUT[5]; // no more then 2 outputs are listed
+	uint8_t regIN[9]; // no more then 8 inputs are listed
+	uint8_t regOUT[5]; // no more then 4 outputs are listed
 	
-	bool usesReg_E; // these are for if it uses that register in a special way that cannot be renamed
-	bool usesReg_F;
+	bool usesReg_D; // these are for if it uses that register in a special way that cannot be renamed
+	bool usesReg_E;
 	
-	bool noRename; // if true, all registers for regIN and regOUT cannot be renamed, true for D32U,D32S,R32U,R32S,PHIS,PHIE
+	bool noRename; // if true, all registers for regIN and regOUT cannot be renamed
 	bool isSymbolicInternal;
 	
 	bool isMemoryAccess;
@@ -25,7 +25,7 @@ typedef struct InstructionInformation{
 	bool stopLinearRegTrace; // true for LABL,AJMP,JJMP,JTEN,JEND
 	
 	// these 2 below are for peephole opt
-	bool inputTrivialSwapable; // true for AND_,OR__,XOR_,ADDN,ADDC,MULS
+	bool inputTrivialSwapable; // true for AND_,OR__,XOR_,ADDN,MULS
 	bool isAllowedInVTE;
 } InstructionInformation;
 
@@ -33,7 +33,7 @@ typedef struct InstructionInformation{
 bool doingSanityCheck = false;
 #endif
 
-const InstructionInformation resetII = {.regIN={16,16,16,16,16},.regOUT={16,16,16,16,16}};
+const InstructionInformation resetII = {.regIN={16,16,16,16,16,16,16,16,16},.regOUT={16,16,16,16,16}};
 
 void fillInstructionInformation(InstructionInformation* II, const InstructionBuffer* ib, uint32_t index){
 	*II=resetII;
@@ -46,47 +46,71 @@ void fillInstructionInformation(InstructionInformation* II, const InstructionBuf
 		case I_SYCW:
 		case I_SYCD:
 		case I_SYCL:
-		case I_SYC0:
-		case I_SYC1:
-		case I_SYC2:
-		case I_SYC3:
-		case I_SYC4:
-		case I_SYC5:
-		case I_SYC6:
-		case I_SYC7:
-		case I_SYC8:
-		case I_SYC9:
-		case I_SYCZ:
-		case I_SYCS:
-		case I_SYCT:
-		case I_SYCX:
-		case I_SYCY:
-		case I_SYCA:
-		case I_SYCU:
-		case I_SYCO:
-		case I_SYCQ:
-		case I_SYCC:
-		case I_SYCN:
-		case I_SYCM:
+		case I_SYW0:
+		case I_SYW1:
+		case I_SYW2:
+		case I_SYW3:
+		case I_SYW4:
+		case I_SYW5:
+		case I_SYW6:
+		case I_SYW7:
+		case I_SYW8:
+		case I_SYW9:
+		case I_SBLW:
+		case I_SBRW:
+		case I_SYD0:
+		case I_SYD1:
+		case I_SYD2:
+		case I_SYD3:
+		case I_SYD4:
+		case I_SYD5:
+		case I_SYD6:
+		case I_SYD7:
+		case I_SYD8:
+		case I_SYD9:
+		case I_SBLD:
+		case I_SBRD:
+		case I_SYQ0:
+		case I_SYQ1:
+		case I_SYQ2:
+		case I_SYQ3:
+		case I_SYQ4:
+		case I_SYQ5:
+		case I_SYQ6:
+		case I_SYQ7:
+		case I_SYQ8:
+		case I_SYQ9:
+		case I_SBLQ:
+		case I_SBRQ:
+		case I_SCBW:
+		case I_SCWD:
+		case I_SCZD:
+		case I_SCZQ:
+		case I_SCDQ:
+		case I_SCQD:
+		case I_SCDW:
+		case I_SCWB:
+		case I_SCDB:
+		case I_SCQB:
 		II->isSymbolicInternal=true;
 		{
 		enum InstructionTypeID id;
 		do {
 			assert(index!=0);
 			id=ib->buffer[--index].id;
-		} while (id!=I_SYRB & id!=I_SYRW & id!=I_SYRD);
+		} while (id!=I_SYRB & id!=I_SYRW & id!=I_SYRD & id!=I_SYRQ);
 		}
 		goto AfterReset;
 		case I_PHIS:
-		II->regIN[0]=IS.arg.B.a_0;
+		II->regIN[0]=IS.arg.B1.a_0;
 		II->doesBlockReorder=true;
 		II->noRename=true;
-		break;
+		return;
 		case I_PHIE:
-		II->regOUT[0]=IS.arg.B.a_0;
+		II->regOUT[0]=IS.arg.B1.a_0;
 		II->doesBlockReorder=true;
 		II->noRename=true;
-		break;
+		return;
 		case I_JJMP:
 		II->regIN[0]=IS.arg.BBD.a_0;
 		II->regIN[1]=IS.arg.BBD.a_1;
@@ -95,135 +119,126 @@ void fillInstructionInformation(InstructionInformation* II, const InstructionBuf
 		II->doesBlockReorder=true;
 		II->stopLinearRegTrace=true;
 		case I_NOP_:
-		break;
+		return;
 		case I_FCST:
 		case I_FCEN:
 		II->doesBlockReorder=true;
 		II->doesDestroyReg=true;
-		break;
+		return;
 		case I_PU1_:
 		case I_PUA1:
 		II->doesMoveStack=true;
 		II->doesRelyOnStack=true;
-		II->regIN[0]=IS.arg.B.a_0;
-		break;
+		II->regIN[0]=IS.arg.B1.a_0;
+		return;
 		case I_PU2_:
 		case I_PUA2:
 		II->doesMoveStack=true;
 		II->doesRelyOnStack=true;
-		II->regIN[0]=IS.arg.BB.a_0;
-		II->regIN[1]=IS.arg.BB.a_1;
-		break;
+		II->regIN[0]=IS.arg.B2.a_0;
+		II->regIN[1]=IS.arg.B2.a_1;
+		return;
 		case I_POP1:
 		II->doesMoveStack=true;
 		II->doesRelyOnStack=true;
-		II->regOUT[0]=IS.arg.B.a_0;
-		break;
+		II->regOUT[0]=IS.arg.B1.a_0;
+		return;
 		case I_POP2:
 		II->doesMoveStack=true;
 		II->doesRelyOnStack=true;
-		II->regOUT[0]=IS.arg.BB.a_0;
-		II->regOUT[1]=IS.arg.BB.a_1;
-		break;
+		II->regOUT[0]=IS.arg.B2.a_0;
+		II->regOUT[1]=IS.arg.B2.a_1;
+		return;
 		case I_BL1_:
-		II->cv=IS.arg.BB.a_1;
-		II->regOUT[0]=IS.arg.BB.a_0;
+		II->cv=IS.arg.B2.a_1;
+		II->regOUT[0]=IS.arg.B2.a_0;
 		II->isAllowedInVTE=true;
-		break;
+		return;
 		case I_RL1_:
 		II->cv=IS.arg.BW.a_1;
 		II->regOUT[0]=IS.arg.BW.a_0;
 		II->isAllowedInVTE=true;
-		break;
+		return;
 		case I_RL2_:
 		II->cv=IS.arg.BBD.a_2;
 		II->regOUT[0]=IS.arg.BBD.a_0;
 		II->regOUT[1]=IS.arg.BBD.a_1;
-		break;
+		return;
 		case I_SYRB:
-		II->regOUT[0]=IS.arg.B.a_0;
-		break;
 		case I_SYRW:
-		II->regOUT[0]=IS.arg.B.a_0;
-		break;
+		II->regOUT[0]=IS.arg.B1.a_0;
+		return;
 		case I_SYRD:
-		II->regOUT[0]=IS.arg.BB.a_0;
-		II->regOUT[1]=IS.arg.BB.a_1;
-		break;
+		II->regOUT[0]=IS.arg.B2.a_0;
+		II->regOUT[1]=IS.arg.B2.a_1;
+		return;
+		case I_SYRQ:
+		II->regOUT[0]=IS.arg.B4.a_0;
+		II->regOUT[1]=IS.arg.B4.a_1;
+		II->regOUT[2]=IS.arg.B4.a_2;
+		II->regOUT[3]=IS.arg.B4.a_3;
+		return;
 		case I_CALL:
-		II->regIN[0]=IS.arg.BB.a_0;
-		II->regIN[1]=IS.arg.BB.a_1;
+		II->regIN[0]=IS.arg.B2.a_0;
+		II->regIN[1]=IS.arg.B2.a_1;
 		II->doesRelyOnStack=true;
 		case I_RET_:
 		II->doesMoveStack=true;
 		II->doesDestroyReg=true;
 		II->doesBlockReorder=true;
-		break;
+		return;
 		case I_LABL:
 		II->stopLinearRegTrace=true;
 		II->doesBlockReorder=true;
 		II->requireRegValuePhi=true;
-		break;
+		return;
 		case I_STWV:
 		II->isMemoryAccessVolatile=true;
 		case I_STWN:
 		II->isMemoryAccess=true;
-		II->regIN[0]=IS.arg.BB.a_0;
-		II->cv=IS.arg.BB.a_1;
-		break;
+		II->regIN[0]=IS.arg.B2.a_0;
+		II->cv=IS.arg.B2.a_1;
+		return;
 		case I_STRV:
 		II->isMemoryAccessVolatile=true;
 		case I_STRN:
 		II->isMemoryAccess=true;
-		II->regOUT[0]=IS.arg.BB.a_0;
-		II->cv=IS.arg.BB.a_1;
-		break;
+		II->regOUT[0]=IS.arg.B2.a_0;
+		II->cv=IS.arg.B2.a_1;
+		return;
 		case I_ALOC:
 		II->doesMoveStack=true;
 		II->doesRelyOnStack=true;
 		II->doesBlockReorder=true;
-		/*
-		Technically, ALOC does set %1 .
-		However, the optimizer just expects that %1 is already set and stays constant,
-		so telling it ALOC sets %1 would be weird from the optimizer's perspective
-		*/
-		break;
+		return;
 		case I_ALCR:
 		II->doesMoveStack=true;
+		case I_STOF:
 		II->doesRelyOnStack=true;
 		case I_STPA:
 		case I_STPS:
 		II->cv=IS.arg.BW.a_1;
 		II->regOUT[0]=IS.arg.BW.a_0;
-		break;
-		case I_STOF:
-		II->doesRelyOnStack=true;
-		II->regOUT[0]=IS.arg.BBW.a_0;
-		II->regOUT[1]=IS.arg.BBW.a_1;
-		II->cv=IS.arg.BBW.a_2;
-		break;
+		return;
 		case I_AJMP:
 		II->doesBlockReorder=true;
 		II->stopLinearRegTrace=true;
-		II->regIN[0]=IS.arg.BB.a_0;
-		II->regIN[1]=IS.arg.BB.a_1;
-		break;
+		II->regIN[0]=IS.arg.B2.a_0;
+		II->regIN[1]=IS.arg.B2.a_1;
+		return;
 		case I_CJMP:
 		II->doesBlockReorder=true;
-		II->regIN[0]=IS.arg.BBB.a_0;
-		II->regIN[1]=IS.arg.BBB.a_1;
-		II->regIN[2]=IS.arg.BBB.a_2;
-		break;
+		II->regIN[0]=IS.arg.B3.a_0;
+		II->regIN[1]=IS.arg.B3.a_1;
+		II->regIN[2]=IS.arg.B3.a_2;
+		return;
 		case I_MOV_:
 		case I_SHFT:
 		case I_BSWP:
-		II->regOUT[0]=IS.arg.BB.a_0;
-		II->regIN[0]=IS.arg.BB.a_1;
+		II->regOUT[0]=IS.arg.B2.a_0;
+		II->regIN[0]=IS.arg.B2.a_1;
 		II->isAllowedInVTE=true;
-		break;
-		case I_ADDC:
-		II->usesReg_F=true;
-		II->regOUT[1]=15;
+		return;
 		case I_AND_:
 		case I_OR__:
 		case I_XOR_:
@@ -231,78 +246,152 @@ void fillInstructionInformation(InstructionInformation* II, const InstructionBuf
 		II->inputTrivialSwapable=true;
 		case I_SUBN:
 		case I_SUBC:
-		II->regOUT[0]=IS.arg.BBB.a_0;
-		II->regIN[0]=IS.arg.BBB.a_1;
-		II->regIN[1]=IS.arg.BBB.a_2;
+		II->regOUT[0]=IS.arg.B3.a_0;
+		II->regIN[0]=IS.arg.B3.a_1;
+		II->regIN[1]=IS.arg.B3.a_2;
 		II->isAllowedInVTE=true;
-		break;
+		return;
 		case I_SSUB:
-		II->regOUT[0]=IS.arg.BBB.a_0;
-		II->regOUT[1]=IS.arg.BBB.a_1;
-		II->regIN[0]=IS.arg.BBB.a_0;
-		II->regIN[1]=IS.arg.BBB.a_1;
-		II->regIN[2]=IS.arg.BBB.a_2;
+		II->regOUT[0]=IS.arg.B3.a_0;
+		II->regOUT[1]=IS.arg.B3.a_1;
+		II->regIN[0]=IS.arg.B3.a_0;
+		II->regIN[1]=IS.arg.B3.a_1;
+		II->regIN[2]=IS.arg.B3.a_2;
 		II->isAllowedInVTE=true;
-		break;
+		return;
 		case I_DIVM:
-		II->regOUT[1]=IS.arg.BB.a_1;
-		II->regOUT[0]=IS.arg.BB.a_0;
-		II->regIN[0]=IS.arg.BB.a_0;
-		II->regIN[1]=IS.arg.BB.a_1;
+		II->regOUT[1]=IS.arg.B2.a_1;
+		II->regOUT[0]=IS.arg.B2.a_0;
+		II->regIN[0]=IS.arg.B2.a_0;
+		II->regIN[1]=IS.arg.B2.a_1;
 		II->isAllowedInVTE=true;
-		break;
+		return;
 		case I_MULS:
-		II->regOUT[0]=IS.arg.BB.a_0;
-		II->regIN[0]=IS.arg.BB.a_0;
-		II->regIN[1]=IS.arg.BB.a_1;
+		II->regOUT[0]=IS.arg.B2.a_0;
+		II->regIN[0]=IS.arg.B2.a_0;
+		II->regIN[1]=IS.arg.B2.a_1;
 		II->isAllowedInVTE=true;
 		II->inputTrivialSwapable=true;
-		break;
+		return;
 		case I_MULL:
+		II->usesReg_D=true;
 		II->usesReg_E=true;
-		II->usesReg_F=true;
-		II->regIN[0]=IS.arg.BB.a_0;
-		II->regIN[1]=IS.arg.BB.a_1;
-		II->regIN[2]=14;
-		II->regIN[3]=15;
-		II->regOUT[0]=14;
-		II->regOUT[1]=15;
+		II->regIN[0]=IS.arg.B2.a_0;
+		II->regIN[1]=IS.arg.B2.a_1;
+		II->regIN[2]=13;
+		II->regIN[3]=14;
+		II->regOUT[0]=13;
+		II->regOUT[1]=14;
 		II->isAllowedInVTE=true;
-		break;
+		return;
 		case I_MWWV:
 		II->isMemoryAccessVolatile=true;
 		case I_MWWN:
 		II->isMemoryAccess=true;
-		II->regIN[0]=IS.arg.BBB.a_1;
-		II->regIN[1]=IS.arg.BBB.a_2;
-		II->regIN[2]=IS.arg.BBB.a_0;
-		break;
+		II->regIN[0]=IS.arg.B3.a_1;
+		II->regIN[1]=IS.arg.B3.a_2;
+		II->regIN[2]=IS.arg.B3.a_0;
+		return;
 		case I_MRWV:
 		II->isMemoryAccessVolatile=true;
 		case I_MRWN:
 		II->isMemoryAccess=true;
-		II->regOUT[0]=IS.arg.BBB.a_0;
-		II->regIN[0]=IS.arg.BBB.a_1;
-		II->regIN[1]=IS.arg.BBB.a_2;
-		break;
+		II->regOUT[0]=IS.arg.B3.a_0;
+		II->regIN[0]=IS.arg.B3.a_1;
+		II->regIN[1]=IS.arg.B3.a_2;
+		return;
 		case I_MWBV:
 		II->isMemoryAccessVolatile=true;
 		case I_MWBN:
 		II->isMemoryAccess=true;
-		II->usesReg_E=true;
-		II->regIN[0]=14;
-		II->regIN[1]=IS.arg.BB.a_1;
-		II->regIN[2]=IS.arg.BB.a_0;
-		break;
+		II->usesReg_D=true;
+		II->regIN[0]=13;
+		II->regIN[1]=IS.arg.B2.a_1;
+		II->regIN[2]=IS.arg.B2.a_0;
+		return;
 		case I_MRBV:
 		II->isMemoryAccessVolatile=true;
 		case I_MRBN:
 		II->isMemoryAccess=true;
-		II->usesReg_E=true;
-		II->regOUT[0]=IS.arg.BB.a_0;
-		II->regIN[0]=14;
-		II->regIN[1]=IS.arg.BB.a_1;
-		break;
+		II->usesReg_D=true;
+		II->regOUT[0]=IS.arg.B2.a_0;
+		II->regIN[0]=13;
+		II->regIN[1]=IS.arg.B2.a_1;
+		return;
+		case I_LSU0:
+		II->regOUT[0]=IS.arg.B4.a_0;
+		II->regOUT[1]=IS.arg.B4.a_1;
+		II->regIN[0]=IS.arg.B4.a_0;
+		II->regIN[1]=IS.arg.B4.a_1;
+		II->regIN[2]=IS.arg.B4.a_2;
+		II->regIN[3]=IS.arg.B4.a_3;
+		II->isAllowedInVTE=true;
+		return;
+		case I_LAD2:
+		II->regOUT[0]=IS.arg.B4.a_0;
+		II->regOUT[1]=IS.arg.B4.a_1;
+		II->regIN[0]=IS.arg.B4.a_2;
+		II->regIN[1]=IS.arg.B4.a_3;
+		II->isAllowedInVTE=true;
+		return;
+		case I_LAD1:
+		II->regOUT[0]=IS.arg.B5.a_0;
+		II->regOUT[1]=IS.arg.B5.a_1;
+		II->regIN[0]=IS.arg.B5.a_2;
+		II->regIN[1]=IS.arg.B5.a_3;
+		II->regIN[2]=IS.arg.B5.a_4;
+		II->isAllowedInVTE=true;
+		return;
+		case I_LAD0:
+		II->regOUT[0]=IS.arg.B6.a_0;
+		II->regOUT[1]=IS.arg.B6.a_1;
+		II->regIN[0]=IS.arg.B6.a_2;
+		II->regIN[1]=IS.arg.B6.a_3;
+		II->regIN[2]=IS.arg.B6.a_4;
+		II->regIN[3]=IS.arg.B6.a_5;
+		II->isAllowedInVTE=true;
+		return;
+		case I_LAD3:
+		case I_LSU3:
+		case I_LMU3:
+		II->regOUT[0]=IS.arg.B8.a_0;
+		II->regOUT[1]=IS.arg.B8.a_1;
+		II->regOUT[2]=IS.arg.B8.a_2;
+		II->regOUT[3]=IS.arg.B8.a_3;
+		II->regIN[0]=IS.arg.B8.a_0;
+		II->regIN[1]=IS.arg.B8.a_1;
+		II->regIN[2]=IS.arg.B8.a_2;
+		II->regIN[3]=IS.arg.B8.a_3;
+		II->regIN[4]=IS.arg.B8.a_4;
+		II->regIN[5]=IS.arg.B8.a_5;
+		II->regIN[6]=IS.arg.B8.a_6;
+		II->regIN[7]=IS.arg.B8.a_7;
+		II->isAllowedInVTE=true;
+		return;
+		case I_LLS6:
+		case I_LRS6:
+		II->noRename=true;
+		II->doesDestroyReg=true;
+		II->regIN[0]=6;
+		II->regIN[1]=7;
+		II->regIN[2]=10;
+		II->regOUT[0]=2;
+		II->regOUT[1]=3;
+		return;
+		case I_LLS7:
+		case I_LRS7:
+		II->noRename=true;
+		II->doesDestroyReg=true;
+		II->regIN[0]=6;
+		II->regIN[1]=7;
+		II->regIN[2]=8;
+		II->regIN[3]=9;
+		II->regIN[4]=10;
+		II->regOUT[0]=2;
+		II->regOUT[1]=3;
+		II->regOUT[2]=4;
+		II->regOUT[3]=5;
+		return;
 		case I_D32U:
 		case I_D32S:
 		II->noRename=true;
@@ -313,7 +402,7 @@ void fillInstructionInformation(InstructionInformation* II, const InstructionBuf
 		II->regIN[3]=5;
 		II->regOUT[0]=8;
 		II->regOUT[1]=9;
-		break;
+		return;
 		case I_R32U:
 		case I_R32S:
 		II->noRename=true;
@@ -324,14 +413,50 @@ void fillInstructionInformation(InstructionInformation* II, const InstructionBuf
 		II->regIN[3]=5;
 		II->regOUT[0]=6;
 		II->regOUT[1]=7;
-		break;
+		return;
+		case I_LAD4:
+		case I_LSU4:
+		case I_LMU4:
+		case I_LDI4:
+		II->noRename=true;
+		II->doesDestroyReg=true;
+		II->regIN[0]=4;
+		II->regIN[1]=5;
+		II->regIN[2]=6;
+		II->regIN[3]=7;
+		II->regOUT[0]=2;
+		II->regOUT[1]=3;
+		return;
+		case I_D64U:
+		case I_D64S:
+		case I_R64U:
+		case I_R64S:
+		case I_LAD5:
+		case I_LSU5:
+		case I_LMU5:
+		case I_LDI5:
+		II->noRename=true;
+		II->doesDestroyReg=true;
+		II->regIN[0]=6;
+		II->regIN[1]=7;
+		II->regIN[2]=8;
+		II->regIN[3]=9;
+		II->regIN[4]=10;
+		II->regIN[5]=11;
+		II->regIN[6]=12;
+		II->regIN[7]=13;
+		II->regOUT[0]=2;
+		II->regOUT[1]=3;
+		II->regOUT[2]=4;
+		II->regOUT[3]=5;
+		return;
 		case I_ERR_:
 		case I_INSR:
 		case I_DEPL:
 		default:
 		printf("Internal Error: fillInstructionInformation() got bad opcode\n");
 		exit(1);
-		break;
+		return;
 	}
 }
 
@@ -350,41 +475,13 @@ bool doesLabelHaveUsage(const InstructionBuffer* ib,const uint32_t labelNumber){
 }
 
 
-bool areInstructionsIdentical(const InstructionSingle* IS_0,const InstructionSingle* IS_1){
-	if (IS_0->id!=IS_1->id) return false;
-	switch (instructionContentCatagory(IS_0->id)){
-		case 0:
-		return true;
-		case 1:
-		case 2:
-		return IS_0->arg.B.a_0==IS_1->arg.B.a_0;
-		case 3:
-		case 5:
-		return IS_0->arg.BB.a_0==IS_1->arg.BB.a_0 & IS_0->arg.BB.a_1==IS_1->arg.BB.a_1;
-		case 4:
-		return IS_0->arg.BBB.a_0==IS_1->arg.BBB.a_0 & IS_0->arg.BBB.a_1==IS_1->arg.BBB.a_1 & IS_0->arg.BBB.a_2==IS_1->arg.BBB.a_2;
-		case 6:
-		return IS_0->arg.W.a_0==IS_1->arg.W.a_0;
-		case 7:
-		return IS_0->arg.BW.a_0==IS_1->arg.BW.a_0 & IS_0->arg.BW.a_1==IS_1->arg.BW.a_1;
-		case 8:
-		return IS_0->arg.BBW.a_0==IS_1->arg.BBW.a_0 & IS_0->arg.BBW.a_1==IS_1->arg.BBW.a_1 & IS_0->arg.BBW.a_2==IS_1->arg.BBW.a_2;
-		case 9:
-		return IS_0->arg.D.a_0==IS_1->arg.D.a_0;
-		case 10:
-		return IS_0->arg.BBD.a_0==IS_1->arg.BBD.a_0 & IS_0->arg.BBD.a_1==IS_1->arg.BBD.a_1 & IS_0->arg.BBD.a_2==IS_1->arg.BBD.a_2;
-		case 11:
-		return IS_0->arg.BWD.a_0==IS_1->arg.BWD.a_0 & IS_0->arg.BWD.a_1==IS_1->arg.BWD.a_1 & IS_0->arg.BWD.a_2==IS_1->arg.BWD.a_2;
-	}
-	return false; // unreachable
-}
 
 // for BL1_,RL1_,RL2_,STPA . It does not check registers, only data
 bool isDataInInstructionIdentical(const InstructionSingle* IS_0,const InstructionSingle* IS_1){
 	enum InstructionTypeID id;
 	if ((id=IS_0->id)!=IS_1->id) return false;
 	if (id==I_BL1_){
-		return IS_0->arg.BB.a_1==IS_1->arg.BB.a_1;
+		return IS_0->arg.B2.a_1==IS_1->arg.B2.a_1;
 	} else if (id==I_RL1_){
 		return IS_0->arg.BW.a_1==IS_1->arg.BW.a_1;
 	} else if (id==I_RL2_){
@@ -399,7 +496,7 @@ bool isDataInInstructionIdentical(const InstructionSingle* IS_0,const Instructio
 uint16_t findLengthOfSymbolicCalc(const InstructionBuffer* ib,const uint32_t target){
 	{
 	enum InstructionTypeID id;
-	assert((id=ib->buffer[target].id,id==I_SYRB|id==I_SYRW|id==I_SYRD));
+	assert((id=ib->buffer[target].id,id==I_SYRB|id==I_SYRW|id==I_SYRD|id==I_SYRQ));
 	}
 	uint16_t length=0;
 	InstructionInformation II;
@@ -409,9 +506,12 @@ uint16_t findLengthOfSymbolicCalc(const InstructionBuffer* ib,const uint32_t tar
 	return length;
 }
 
-// assumes regList is at maxiumum 4 items, and will contain 16 for all 4 items
 static inline bool doesRegListContain(const uint8_t* regList,const uint8_t item){
-	return regList[0]==item | regList[1]==item | regList[2]==item | regList[3]==item;
+	uint8_t r;
+	while ((r=*(regList++))!=16){
+		if (r==item) return true;
+	}
+	return false;
 }
 
 static inline bool doRegListsHaveCommon(const uint8_t* regList0,const uint8_t* regList1){
@@ -433,7 +533,7 @@ uint32_t findLowerReorderBoundry(const InstructionBuffer *ib,const uint32_t targ
 		printf("Internal Warning: findLowerReorderBoundry() was told to reorder a symbolic internal, which shouldn't happen\n");
 		return target;
 	}
-	if (targetII.doesBlockReorder | targetII.doesDestroyReg | (target==0)) return target;
+	if (targetII.doesBlockReorder | targetII.doesDestroyReg | target==0) return target;
 	bool doesTargetHaveOutput = targetII.regOUT[0]!=16;
 	uint32_t bound=target;
 	uint32_t nextBound;
@@ -468,9 +568,9 @@ uint32_t findUpperReorderBoundry(const InstructionBuffer *ib,const uint32_t targ
 		return target;
 	}
 	uint32_t lastInstruction = ib->numberOfSlotsTaken-1;
-	if (targetII.doesBlockReorder | targetII.doesDestroyReg | (target==lastInstruction)) return target;
+	if (targetII.doesBlockReorder | targetII.doesDestroyReg | target==lastInstruction) return target;
 	bool doesTargetHaveInput = targetII.regIN[0]!=16;
-	bool isTargetSymbolicStarter = targetII.id==I_SYRB | targetII.id==I_SYRW | targetII.id==I_SYRD;
+	bool isTargetSymbolicStarter = targetII.id==I_SYRB | targetII.id==I_SYRW | targetII.id==I_SYRD | targetII.id==I_SYRQ;
 	{
 	InstructionInformation nextII;
 	uint32_t nextBound;
@@ -499,7 +599,7 @@ uint32_t findUpperReorderBoundry(const InstructionBuffer *ib,const uint32_t targ
 	if (isTargetSymbolicStarter){
 		while (true){
 			fillInstructionInformation(&symPrev,ib,bound);
-			if (bound==target | (!symPrev.isSymbolicInternal & symPrev.id!=I_SYRB & symPrev.id!=I_SYRW & symPrev.id!=I_SYRD)) return bound;
+			if (bound==target | (!symPrev.isSymbolicInternal & symPrev.id!=I_SYRB & symPrev.id!=I_SYRW & symPrev.id!=I_SYRD & symPrev.id!=I_SYRQ)) return bound;
 			bound--;
 		}
 	}
@@ -522,17 +622,10 @@ bool findRegRenameBoundaryFromOrigin(const InstructionBuffer *ib, uint32_t start
 		printf("Internal Error: findRegRenameBoundaryFromOrigin() called on non-origin\n");
 		exit(1);
 	}
-	if (targetRegister==0 | targetRegister==1){
-		return false; // cannot rename those registers in any case
-	}
+	bool checkReg_D=targetRegister==13;
 	bool checkReg_E=targetRegister==14;
-	bool checkReg_F=targetRegister==15;
-	if ((checkReg_E & II.usesReg_E) |
-		(checkReg_F & II.usesReg_F) |
-		(II.noRename && 
-		(doesRegListContain(II.regIN,targetRegister) |
-		doesRegListContain(II.regOUT,targetRegister)
-		))){
+	if ((checkReg_D & II.usesReg_D) |
+		(checkReg_E & II.usesReg_E) | II.noRename){
 		// the startInstruction needs to be checked for this
 		return false;
 	}
@@ -549,10 +642,13 @@ bool findRegRenameBoundaryFromOrigin(const InstructionBuffer *ib, uint32_t start
 		if (II.isSymbolicInternal) continue;
 		bool containedRegIN = doesRegListContain(II.regIN,targetRegister);
 		bool containedRegOUT = doesRegListContain(II.regOUT,targetRegister);
-		if ((checkReg_E & II.usesReg_E)|(checkReg_F & II.usesReg_F)|(containedRegIN & II.noRename)){
+		if ((checkReg_D & II.usesReg_D)|(checkReg_E & II.usesReg_E)|(containedRegIN & II.noRename)){
 			return false; // cannot rename
 		}
-		if (II.doesDestroyReg | II.stopLinearRegTrace) break;
+		if (II.doesDestroyReg | II.stopLinearRegTrace){
+			i-=II.noRename;
+			break;
+		}
 		if (containedRegOUT & !containedRegIN){
 			i--;
 			break;
@@ -631,7 +727,7 @@ void getRegOriginInfo(const InstructionBuffer* ib, struct RegOriginInfo* regOrig
 		}
 		if (II.doesDestroyReg|II.stopLinearRegTrace) break;
 	} while (i--!=0);
-	// if targetRegister is 0 or 1, then finding the origin is wrong, and this function should not have been called
+	// if targetRegister is 0,1,F, then finding the origin is wrong, and this function should not have been called
 #ifdef OPT_DEBUG_SANITY
 	if (doingSanityCheck) printf("{ Caught during sanity check }\n");
 #endif
@@ -681,20 +777,27 @@ void sanityCheck(const InstructionBuffer* ib){
 				exit(1);
 			}
 		}
-		if (II.id==I_ADDC){
-			assert(II.regOUT[0]!=15); // detected an ADDC with a %F for it's addition result. That is not good, because ADDC should use %F for the carry, not addition result
-		}
-		if (II.id==I_SSUB){
-			assert(II.regOUT[0]!=II.regOUT[1]); // SSUB should not have both outputs be identical
-		}
-		if (II.id==I_DIVM){
-			assert(II.regOUT[0]!=II.regOUT[1]); // DIVM should not have both outputs be identical
+		{
+			uint8_t r2;
+			uint8_t r3;
+			uint8_t ri2=0;
+			uint8_t ri3=0;
+			while ((r2=II.regOUT[ri2++])!=16){
+				while ((r3=II.regOUT[ri3++])!=16){
+					if (ri2!=ri3 & r2==r3){
+						printf("{ Caught during sanity check }\n");
+						printInstructionBufferWithMessageAndNumber(ib,"Instructions cannot use identical registers for different outputs:",i);
+						exit(1);
+					}
+				}
+			}
 		}
 	}
 	for (uint32_t i=0;i<ib->numberOfSlotsTaken;i++){
 		fillInstructionInformation(&II,ib,i);
 		assert(!II.isSymbolicInternal);
-		if (II.id==I_SYRD |
+		if (II.id==I_SYRQ |
+			II.id==I_SYRD |
 			II.id==I_SYRW |
 			II.id==I_SYRB
 			){
@@ -735,11 +838,11 @@ bool traceJumpLabel(const InstructionBuffer* ib,const uint32_t locationOfJump, u
 	regOriginInfo0.targetLocation=locationOfJump;
 	regOriginInfo1.targetLocation=locationOfJump;
 	if (IS_jmp.id==I_AJMP){
-		regOriginInfo0.targetRegister=IS_jmp.arg.BB.a_0;
-		regOriginInfo1.targetRegister=IS_jmp.arg.BB.a_1;
+		regOriginInfo0.targetRegister=IS_jmp.arg.B2.a_0;
+		regOriginInfo1.targetRegister=IS_jmp.arg.B2.a_1;
 	} else if (IS_jmp.id==I_CJMP){
-		regOriginInfo0.targetRegister=IS_jmp.arg.BBB.a_0;
-		regOriginInfo1.targetRegister=IS_jmp.arg.BBB.a_1;
+		regOriginInfo0.targetRegister=IS_jmp.arg.B3.a_0;
+		regOriginInfo1.targetRegister=IS_jmp.arg.B3.a_1;
 	} else {
 		printf("traceJumpLabel() called wrong (this can be removed later)\n");
 		exit(1);
@@ -757,8 +860,8 @@ bool traceJumpLabel(const InstructionBuffer* ib,const uint32_t locationOfJump, u
 	InstructionSingle origin1 = ib->buffer[regOriginInfo0.originLocation+1];
 	InstructionSingle origin2 = ib->buffer[regOriginInfo0.originLocation+2];
 	if (origin0.id==I_SYRD & 
-		origin0.arg.BB.a_0==regOriginInfo0.targetRegister & 
-		origin0.arg.BB.a_1==regOriginInfo1.targetRegister &
+		origin0.arg.B2.a_0==regOriginInfo0.targetRegister & 
+		origin0.arg.B2.a_1==regOriginInfo1.targetRegister &
 		origin1.id==I_SYCL & 
 		origin2.id==I_SYRE){
 		
@@ -852,6 +955,27 @@ bool isValueInRegUsedAnywhereThroughoutRangeWithExtentionCheck(const Instruction
 	return false;
 }
 
+bool wouldRegRenameViolateMultiOutputLaw(const InstructionBuffer *ib,const uint32_t start,const uint32_t end,const uint8_t regFrom,const uint8_t regTo){
+	InstructionInformation II;
+	for (uint32_t i=start;i<=end;i++){
+		fillInstructionInformation(&II,ib,i);
+		uint8_t r0;
+		uint8_t ri0=0;
+		while ((r0=II.regOUT[ri0++])!=16){
+			if (r0==regFrom){
+				uint8_t r1;
+				uint8_t ri1=0;
+				while ((r1=II.regOUT[ri1++])!=16){
+					if (ri0!=ri1 & r1==regTo){
+						return true;
+					}
+				}
+			}
+		}
+	}
+	return false;
+}
+
 
 // does not check the start, uses isValueInRegUsedAnywhereThroughoutRangeWithExtentionCheck()
 // returns true if it found the desired amount
@@ -859,7 +983,7 @@ bool isValueInRegUsedAnywhereThroughoutRangeWithExtentionCheck(const Instruction
 // `count!=0` must be true
 bool findUnusedRegsInRange(const InstructionBuffer* ib,const uint32_t start,const uint32_t end, uint8_t* list,const uint8_t count){
 	uint8_t countFound=0;
-	for (uint8_t r=2;r<16;r++){
+	for (uint8_t r=2;r<15;r++){
 		if (!isValueInRegUsedAnywhereThroughoutRangeWithExtentionCheck(ib,start,end,r)){
 			list[countFound]=r;
 			if (++countFound==count) return true;
@@ -869,10 +993,9 @@ bool findUnusedRegsInRange(const InstructionBuffer* ib,const uint32_t start,cons
 }
 
 // similiar to findUnusedRegsInRange(), however it uses isValueInRegUsedAfterTarget()
-bool findUnusedRegsAfterTarget(const InstructionBuffer* ib,const uint32_t start, uint8_t* list,const uint8_t count,const bool includeRegF){
+bool findUnusedRegsAfterTarget(const InstructionBuffer* ib,const uint32_t start, uint8_t* list,const uint8_t count){
 	uint8_t countFound=0;
-	uint8_t end=includeRegF?16:15;
-	for (uint8_t r=2;r<end;r++){
+	for (uint8_t r=2;r<15;r++){
 		if (!isValueInRegUsedAfterTarget(ib,start,r,NULL)){
 			list[countFound]=r;
 			if (++countFound==count) return true;
@@ -904,11 +1027,7 @@ if regTo==16, then this function will try to find an unused register (that is no
 void getRegRenameInfo(const InstructionBuffer *ib, struct RegRenameInfo* regRenameInfo){
 	struct RegOriginInfo regOriginInfo;
 	regOriginInfo.targetLocation=regRenameInfo->target;
-	regOriginInfo.targetRegister=regRenameInfo->regFrom;
-	if (regOriginInfo.targetRegister==0 | regOriginInfo.targetRegister==1 | regRenameInfo->regTo==0 | regRenameInfo->regTo==1){
-		regRenameInfo->didSucceed=false; // then it is invalid to try to rename
-		return;
-	}	
+	regOriginInfo.targetRegister=regRenameInfo->regFrom;	
 	getRegOriginInfo(ib,&regOriginInfo);
 	uint32_t upperBound;
 	regRenameInfo->didSucceed=true;
@@ -917,16 +1036,19 @@ void getRegRenameInfo(const InstructionBuffer *ib, struct RegRenameInfo* regRena
 		regRenameInfo->upperBound=upperBound;
 		uint8_t desiredRegTo=regRenameInfo->regTo;
 		if (desiredRegTo==16){
-			for (uint8_t rTry=2;rTry<14;rTry++){
+			for (uint8_t rTry=2;rTry<13;rTry++){ // would things be generally better or worse if 13 is increased to 15?
 				if (
 				rTry!=regOriginInfo.targetRegister && 
-				!isValueInRegUsedAnywhereThroughoutRangeWithExtentionCheck(ib,regOriginInfo.originLocation,upperBound,rTry)){
+				!isValueInRegUsedAnywhereThroughoutRangeWithExtentionCheck(ib,regOriginInfo.originLocation,upperBound,rTry) &&
+				!wouldRegRenameViolateMultiOutputLaw(ib,regOriginInfo.originLocation,upperBound,regOriginInfo.targetRegister,rTry)){
 					
 					regRenameInfo->suggestedReg=rTry;
 					return;
 				}
 			}
-		} else if (!isValueInRegUsedAnywhereThroughoutRangeWithExtentionCheck(ib,regOriginInfo.originLocation,upperBound,desiredRegTo)){
+		} else if (
+				!isValueInRegUsedAnywhereThroughoutRangeWithExtentionCheck(ib,regOriginInfo.originLocation,upperBound,desiredRegTo) &&
+				!wouldRegRenameViolateMultiOutputLaw(ib,regOriginInfo.originLocation,upperBound,regOriginInfo.targetRegister,desiredRegTo)){
 			return;
 		}
 	}
@@ -956,7 +1078,7 @@ bool getValueInRegisterIfTraceableToRawConstants(const InstructionBuffer* ib,con
 			}
 			return false;
 		}
-		if ((i==0) | II.doesDestroyReg | II.stopLinearRegTrace) return false;
+		if (i==0 | II.doesDestroyReg | II.stopLinearRegTrace) return false;
 		i--;
 	}
 }
@@ -979,7 +1101,7 @@ bool getValueInSTPifTracableToSTP(const InstructionBuffer* ib,const uint32_t tar
 			}
 			return false;
 		}
-		if ((i==0) | II.doesDestroyReg | II.stopLinearRegTrace) return false;
+		if (i==0 | II.doesDestroyReg | II.stopLinearRegTrace) return false;
 		i--;
 	}
 }
@@ -1005,7 +1127,7 @@ uint8_t attemptToGetStackInfoForMemoryAccess(const InstructionBuffer* ib,const u
 	sdfma->isWord=!II.usesReg_E;
 	sdfma->isRead=II.regOUT[0]!=16;
 	if (II.regIN[1]==16){
-		sdfma->offset=ib->buffer[target].arg.BB.a_1;
+		sdfma->offset=ib->buffer[target].arg.B2.a_1;
 		sdfma->isOnStack=true;
 		sdfma->isOnStackKnown=true;
 		return true;
@@ -1054,10 +1176,8 @@ bool isTraceableToBool(const InstructionBuffer* ib,uint32_t target,uint8_t reg){
 		return true;
 		case I_SSUB:
 		return reg==II.regOUT[0];
-		case I_ADDC:
-		return reg==15;
 		case I_BL1_:
-		cv=ib->buffer[target].arg.BB.a_1;
+		cv=ib->buffer[target].arg.B2.a_1;
 		return cv==1 | cv==0;
 		case I_RL1_:
 		cv=ib->buffer[target].arg.BW.a_1;
@@ -1123,7 +1243,7 @@ bool isValueInRegUsedAfterTargetExceptAt(const InstructionBuffer *ib,const uint3
 
 // returns 16 if it couldn't find one
 uint8_t findUnusedRegisterAfter(const InstructionBuffer* ib,const uint32_t index,const uint8_t notThis0,const uint8_t notThis1){
-	for (uint8_t r=2;r<16;r++){
+	for (uint8_t r=2;r<15;r++){
 		if ((r!=notThis0 & r!=notThis1) && !isValueInRegUsedAfterTarget(ib,index,r,NULL)){
 			return r;
 		}

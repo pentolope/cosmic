@@ -342,81 +342,81 @@ void applyTypeCast(ExpressionTreeNode* thisNode,const char* typeStringTo_input, 
 		is_apply_0.id=I_NOP_;
 		is_apply_1.id=I_NOP_;
 		is_load255.id=I_SYCB;
-		is_load255.arg.B.a_0=255;
+		is_load255.arg.B1.a_0=255;
 		if (typeIdForFrom==1){
 			if (typeIdForTo>=6) {
-				is_apply_1.id=I_SYCZ;
+				is_apply_1.id=I_SCZD;
 			}
 		} else if (typeIdForFrom==2){
 			if (typeIdForTo==1){
-				is_apply_1.id=I_SYCN;
+				is_apply_1.id=I_SCWB;
 				*thisConstVal=(bool)(*thisConstVal);
 			} else if (typeIdForTo==3){
 				doLoad255=true;
-				is_apply_1.id=I_SYCA;
+				is_apply_1.id=I_SYW8;
 				*thisConstVal=0x00FF&(*thisConstVal);
 			} else if (typeIdForTo==4 | typeIdForTo==5){
-				is_apply_1.id=I_SYCC;
+				is_apply_1.id=I_SCBW;
 				*thisConstVal=(int16_t)((char)(*thisConstVal));
 			} else {
-				is_apply_0.id=I_SYCC;
-				is_apply_1.id=I_SYCS;
+				is_apply_0.id=I_SCBW;
+				is_apply_1.id=I_SCWD;
 				*thisConstVal=(int32_t)((char)(*thisConstVal));
 			}
 		} else if (typeIdForFrom==3){
 			if (typeIdForTo==1){
-				is_apply_1.id=I_SYCN;
+				is_apply_1.id=I_SCWB;
 				*thisConstVal=(bool)(*thisConstVal);
 			} else if (typeIdForTo>=6 & typeIdForTo<=9){
-				is_apply_1.id=I_SYCZ;
+				is_apply_1.id=I_SCZD;
 			}
 		} else if (typeIdForFrom==4){
 			if (typeIdForTo==1){
-				is_apply_1.id=I_SYCN;
+				is_apply_1.id=I_SCWB;
 				*thisConstVal=(bool)(*thisConstVal);
 			} else if (typeIdForTo==2 | typeIdForTo==3){
 				doLoad255=true;
-				is_apply_1.id=I_SYCA;
+				is_apply_1.id=I_SYW8;
 				*thisConstVal=0x00FF&(*thisConstVal);
 			} else if (typeIdForTo>=6 & typeIdForTo<=9){
-				is_apply_1.id=I_SYCS;
+				is_apply_1.id=I_SCWD;
 				*thisConstVal=(int32_t)((int16_t)(*thisConstVal));
 			}
 		} else if (typeIdForFrom==5){
 			if (typeIdForTo==1){
-				is_apply_1.id=I_SYCN;
+				is_apply_1.id=I_SCWB;
 				*thisConstVal=(bool)(*thisConstVal);
 			} else if (typeIdForTo==2 | typeIdForTo==3){
 				doLoad255=true;
-				is_apply_1.id=I_SYCA;
+				is_apply_1.id=I_SYW8;
 				*thisConstVal=0x00FF&(*thisConstVal);
 			} else if (typeIdForTo>=6 & typeIdForTo<=9){
-				is_apply_1.id=I_SYCZ;
+				is_apply_1.id=I_SCZD;
 			}
 		} else if (typeIdForFrom>=6 & typeIdForFrom<=8){
 			if (typeIdForTo==1){
-				is_apply_1.id=I_SYCM;
+				is_apply_1.id=I_SCDB;
 				*thisConstVal=(bool)(*thisConstVal);
 			} else if (typeIdForTo==2 | typeIdForTo==3){
 				doLoad255=true;
-				is_apply_0.id=I_SYCT;
-				is_apply_1.id=I_SYCA;
+				is_apply_0.id=I_SCDW;
+				is_apply_1.id=I_SYW8;
 				*thisConstVal=0x00FF&(*thisConstVal);
 			} else if (typeIdForTo==4 | typeIdForTo==5){
-				is_apply_1.id=I_SYCT;
+				is_apply_1.id=I_SCDW;
 				*thisConstVal=0xFFFF&(*thisConstVal);
 			}
 		} else {
 			if (typeIdForTo==1){
-				is_apply_1.id=I_SYCM;
+				is_apply_1.id=I_SCDB;
 				*thisConstVal=(bool)(*thisConstVal);
 			} else if (typeIdForTo==2 | typeIdForTo==3){
 				doLoad255=true;
-				is_apply_0.id=I_SYCT;
-				is_apply_1.id=I_SYCA;
+				is_apply_0.id=I_SCDW;
+				is_apply_1.id=I_SYW8;
 				*thisConstVal=0x00FF&(*thisConstVal);
 			} else if (typeIdForTo==4 | typeIdForTo==5){
-				is_apply_1.id=I_SYCT;
+				is_apply_1.id=I_SCDW;
 				*thisConstVal=0xFFFF&(*thisConstVal);
 			}
 		}

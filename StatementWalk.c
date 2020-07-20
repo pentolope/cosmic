@@ -163,7 +163,7 @@ void addBlankStaticVariable(const char* typeString){
 		isr.reference.variableReference.variableEntryIndex;
 	struct MemoryOrganizerForInitializer mofi;
 	initMemoryOrganizerForInitializer(&mofi,globalVariableEntry->thisSizeof);
-	InstructionBuffer ib=finalizeMemoryOrganizerForInitializer(&mofi,globalVariableEntry->labelID,false);
+	InstructionBuffer ib=finalizeMemoryOrganizerForInitializer(&mofi,globalVariableEntry->labelID);
 	singleMergeIB(&global_static_data,&ib);
 	destroyInstructionBuffer(&ib);
 }

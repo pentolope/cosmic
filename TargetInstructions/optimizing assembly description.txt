@@ -18,10 +18,7 @@
 
 
 
-
-
---Additionally, note the following, where 'H' is a hexadecimal character:
---The following are a description on what the [arg] is expected to be, which is a constant number of characters for each type of prefix
+--The following are a description on what the [arg] is expected to be, which is a constant number of characters for each type of prefix, where 'H' is a hexadecimal character:
 
 %H 
 $HH
@@ -48,6 +45,8 @@ $ - B
 @ - D
 : - D
 
+------ the registers %0 %1 %F , from the optimizer's perspective, are not available.
+------ if the C code prefix would be composed only of multiple 'B' , then it is instead 'B#' where the '#' is the number of 'B'
 
 --list of op-codes and their argument prefixes:
 
@@ -77,7 +76,7 @@ STRV % $
 
 ALOC
 ALCR % #
-STOF % % #
+STOF % #
 
 AJMP % %
 CJMP % % %
@@ -94,7 +93,6 @@ XOR_ % % %
 SSUB % % %
 
 ADDN % % %
-ADDC % % %
 SUBN % % %
 SUBC % % %
 
@@ -114,31 +112,58 @@ MRBN % %
 MWBV % %
 MRBV % %
 
+LABL :
+PHIS %
+PHIE %
+
+FCST $ # :
+FCEN
+
 D32U
 R32U
 D32S
 R32S
 
-LABL :
-PHIS
-PHIE
+D64U
+R64U
+D64S
+R64S
 
-FCST $ # :
-FCEN
+LAD0 % % % % % %
+LAD1 % % % % %
+LAD2 % % % %
+LAD3 % % % % % % % %
+LAD4
+LAD5
+
+LSU0 % % % %
+LSU3 % % % % % % % %
+LSU4
+LSU5
+
+LMU3 % % % % % % % %
+LMU4
+LMU5
+
+LDI4
+LDI5
+
+LLS6
+LLS7
+
+LRS6
+LRS7
+
 
 SYRB %
 SYRW %
 SYRD % %
+SYRQ % % % %
 SYRE
 
 NSNB !
-NSCB !
-
-NSNW !
-NSCW !
 
 ZNXB !
-ZNXW !
 
 BYTE $
 WORD #
@@ -147,6 +172,7 @@ DWRD !
 SYDB
 SYDW
 SYDD
+SYDQ
 SYDE
 
 SYCB $
@@ -154,20 +180,55 @@ SYCW #
 SYCD !
 SYCL @
 
-SYC0
-SYC1
-SYC2
-SYC3
-SYC4
-SYC5
-SYC6
-SYC7
-SYC8
-SYC9
 
-SYCZ
-SYCS
-SYCT
+
+SYW0
+SYW1
+SYW2
+SYW3
+SYW4
+SYW5
+SYW6
+SYW7
+SYW8
+SYW9
+SBLW
+SBRW
+
+SYD0
+SYD1
+SYD2
+SYD3
+SYD4
+SYD5
+SYD6
+SYD7
+SYD8
+SYD9
+SBLD
+SBRD
+
+SYQ0
+SYQ1
+SYQ2
+SYQ3
+SYQ4
+SYQ5
+SYQ6
+SYQ7
+SYQ8
+SYQ9
+SBLQ
+SBRQ
+
+SCBW
+SCWD
+SCDQ
+SCQD
+SCDW
+SCWB
+SCDB
+SCQB
 
 
 
@@ -182,33 +243,83 @@ D32U
 R32U
 D32S
 R32S
+D64U
+R64U
+D64S
+R64S
+LAD4
+LAD5
+LSU4
+LSU5
+LMU4
+LMU5
+LDI4
+LDI5
+LLS6
+LLS7
+LRS6
+LRS7
 JEND
-PHIS
-PHIE
 SYRE
 SYDB
 SYDW
 SYDD
+SYDQ
 SYDE
-SYC0
-SYC1
-SYC2
-SYC3
-SYC4
-SYC5
-SYC6
-SYC7
-SYC8
-SYC9
-SYCZ
-SYCS
-SYCT
+SYW0
+SYW1
+SYW2
+SYW3
+SYW4
+SYW5
+SYW6
+SYW7
+SYW8
+SYW9
+SBLW
+SBRW
+SYD0
+SYD1
+SYD2
+SYD3
+SYD4
+SYD5
+SYD6
+SYD7
+SYD8
+SYD9
+SBLD
+SBRD
+SYQ0
+SYQ1
+SYQ2
+SYQ3
+SYQ4
+SYQ5
+SYQ6
+SYQ7
+SYQ8
+SYQ9
+SBLQ
+SBRQ
+SCBW
+SCWD
+SCZD
+SCDQ
+SCZQ 
+SCQD
+SCDW
+SCWB
+SCDB
+SCQB
 
 PU1_ %
 PUA1 %
 POP1 %
 SYRB %
 SYRW %
+PHIS %
+PHIE %
 
 BYTE $
 SYCB $
@@ -235,7 +346,6 @@ OR__ % % %
 XOR_ % % %
 SSUB % % %
 ADDN % % %
-ADDC % % %
 SUBN % % %
 SUBC % % %
 MWWN % % %
@@ -243,6 +353,18 @@ MRWN % % %
 MWWV % % %
 MRWV % % %
 CJMP % % %
+
+SYRQ % % % %
+LSU0 % % % %
+LAD2 % % % %
+
+LAD1 % % % % %
+
+LAD0 % % % % % %
+
+LAD3 % % % % % % % %
+LSU3 % % % % % % % %
+LMU3 % % % % % % % %
 
 BL1_ % $
 STWN % $
@@ -255,10 +377,9 @@ SYCW #
 
 RL1_ % #
 ALCR % #
+STOF % #
 STPA % #
 STPS % #
-
-STOF % % #
 
 RL2_ % % !
 
@@ -271,11 +392,7 @@ FCST $ # :
 DWRD !
 SYCD !
 NSNB !
-NSCB !
-NSNW !
-NSCW !
 ZNXB !
-ZNXW !
 
 
 JTEN @
@@ -290,153 +407,80 @@ SYCL @
 
 NOP_ - no operation / no data. Used inside the optimizer as a temporary placeholder. 
 PU1_ - push one register to stack
-PU2_ - push two registers to stack (First_Reg is pushed first)
+PU2_ - push two registers to stack (r0 is pushed first)
 PUA1 - push one register to stack for argument to a function
-PUA2 - push two registers to stack for argument to a function (First_Reg is pushed first)
+PUA2 - push two registers to stack for argument to a function (r0 is pushed first)
 POP1 - pop one register to stack
-POP2 - pop two registers to stack (First_Reg is popped to first)
+POP2 - pop two registers to stack (r0 is popped to first)
 BL1_ - lower byte load to register
 RL1_ - load word to register
-RL2_ - load double word to two registers, Second_Reg gets upper word
-CALL - call to location at registers, Second_Reg is upper word. (see CALL/RET_ description at bottom)
+RL2_ - load double word to two registers, r1 gets upper word
+CALL - call to location at registers, r1 is upper word. (see CALL/RET_ description at bottom)
 RET_ - return to calling function  (see CALL/RET_ description at bottom)
-STPA - transform stack offset into real address using [ %1 + ( Stack_Size - # ) -> First_Reg ]
+STPA - transform stack offset into real address using [ %1 + ( Stack_Size - # ) -> r0 ]
 			this instruction, when combined with others, may often by optimized into STWN , STRN , STWV , STRV
 STPS - identical to STPA, however it is verified that ( ( Stack_Size - # ) <= 0x00FF ) is true, so the backend can use 1 less instruction (and ~2x less cycles)
 
-STWN - write memory ( word access, non-volatile ) at [ ( %1 + ( 2 * $ ) ) , 0 ] with data in First_Reg
-STRN - read  memory ( word access, non-volatile ) at [ ( %1 + ( 2 * $ ) ) , 0 ] into First_Reg
-STWV - write memory ( word access, volatile     ) at [ ( %1 + ( 2 * $ ) ) , 0 ] with data in First_Reg
-STRV - read  memory ( word access, volatile     ) at [ ( %1 + ( 2 * $ ) ) , 0 ] into First_Reg
+STWN - write memory ( word access, non-volatile ) at [ ( %1 + ( 2 * $ ) ) , 0 ] with data in r0
+STRN - read  memory ( word access, non-volatile ) at [ ( %1 + ( 2 * $ ) ) , 0 ] into r0
+STWV - write memory ( word access, volatile     ) at [ ( %1 + ( 2 * $ ) ) , 0 ] with data in r0
+STRV - read  memory ( word access, volatile     ) at [ ( %1 + ( 2 * $ ) ) , 0 ] into r0
 
 ALOC - move stack pointer using [ Stack_Pointer - ( Stack_Size - Initial_Stack_Size ) -> Stack_Pointer ] then [ Stack_Pointer -> %1 ]  (used when function starts, Stack_Size and Initial_Stack_Size value is held in the InstructionBuffer)
-ALCR - move stack pointer using [ # -> First_Reg ] then [ Stack_Pointer - First_Reg -> Stack_Pointer ] then [ Stack_Pointer -> First_Reg ]  (used when allocating space for return value for a CALL)
-STOF - get stack with offset using [ Stack_Pointer -> Second_Reg ] then [ # -> First_Reg ] then [ First_Reg + Second_Reg -> First_Reg ]  (used when getting return value for a CALL, in which case First_Reg is the desired output)
+ALCR - move stack pointer using [ # -> r0 ] then [ Stack_Pointer - r0 -> Stack_Pointer ] then [ Stack_Pointer -> r0 ]  (used when allocating space for return value for a CALL)
+STOF - get stack with offset using [ Stack_Pointer -> %F ] then [ # -> r0 ] then [ r0 + %F -> r0 ]  (used when getting return value for a CALL)
 		Note that in initial compiler output (do not rely on it), ALCR and STOF would probably be enclosing the parameters that go to the function call
 		however, primarily because not every function returns non-void, not every function call has a ALCR and STOF pair
-		also, STOF can be optimized out if the First_Reg from ALCR can be kept in a register while the arguments are being pushed
-		also, ALCR (and possibly STOF) can be optimized out if there is a way to calculate an address on stack to where the return value could go to avoid it getting stack space allocated by ALCR
+		also, STOF can be optimized out if the r0 from ALCR can be kept in a register while the arguments are being pushed
+		also, ALCR and STOF can be optimized out if there is a way to calculate an address on stack to where the return value could go to avoid it getting stack space allocated by ALCR
 
+AJMP - always absolute jump to address in registers, r1 is upper word
+CJMP - conditionally jump to address in first and second registers if third register is zero, r1 is upper word of address
 
-AJMP - always absolute jump to address in registers, Second_Reg is upper word
-CJMP - conditionally jump to address in first and second registers if third register is zero, Second_Reg is upper word of address
-
-JJMP - always absolute jump to address in registers, Second_Reg is upper word. This jump is for jump tables.
+JJMP - always absolute jump to address in registers, r1 is upper word. This jump is for jump tables.
 		It also acts as a LABL instruction for it's label number, which points to the 'instruction' after this one.
 		Instruction slots after this one (until a JEND) will be JTEN 'instructions' (it is data, and should not be executed, so they are not actually instructions)
 JTEN - inserts the location of the label at this location (as a dword) for a jump table. Must be between JJMP and JEND
 JEND - see JJMP. This 'instruction' does not translate to an instruction on the backend.
 
-MOV_ - move word in Second_Reg to First_Reg
+MOV_ - move word in r1 to r0
 
 AND_ - bitwise and  of second and third register into first register
 OR__ - bitwise  or  of second and third register into first register
 XOR_ - bitwise xor  of second and third register into first register
-SSUB - do First_Reg+Second_Reg+~Third_Reg -> Second_Reg, with carry stored to ones bit of First_Reg 
+SSUB - do r0+r1+~Third_Reg -> r1, with carry stored to ones bit of r0 
 		In general, carry should not extend past ones bit.
-		If the sum would have a carry greater then 1, First_Reg will still get 1.
-		First_Reg (as the input) is intended to only hold a value of 0 or 1, but could hold other values.
+		If the sum would have a carry greater then 1, r0 will still get 1.
+		r0 (as the input) is intended to only hold a value of 0 or 1, but could hold other values.
 		Note: the '~' is a bitwise invert on Third_Reg
-ADDN - add      second and third register into first register
-ADDC - add      second and third register into first register, and place carry into ones bit in %F (all other bits get 0)
-SUBN - subtract second and third register into first register
-SUBC - subtract second and third register then place carry into ones bit in first register (all other bits get 0)
+ADDN - add      r1 and r2 into r0
+SUBN - subtract r1 and r2 into r0
+SUBC - subtract r1 and r2 then place carry into ones bit in r0 (all other bits get 0)
 
 MULS - multiply first and second register then place result into first register (upper word is not generated)
-MULL - multiply double word of [%E,%F] and double word of [First_Reg,Second_Reg] then place result into double word of [%E,%F]
+MULL - multiply double word of [%D,%E] and double word of [r0,r1] then place result into double word of [%D,%E]
 DIVM - do first register divided by second register, as well as first register modulus second register, then place results into first and second register (first gets division, second gets modulus)
 
 SHFT - shift bits in second register down (to lower bits) by 1 bit, then store into first register (second register is not modified, the most significant bit of first register will be 0)
 BSWP - take word in second register, swap the byte order, then place result into first register (second register is not modified)
 
-MWWN - memory write word non-volatile - read  word   at [Second_Reg,Third_Reg] and place in First_Reg
-MRWN - memory read  word non-volatile - write word into [Second_Reg,Third_Reg] with word in First_Reg
-MWWV - memory write word volatile     - read  word   at [Second_Reg,Third_Reg] and place in First_Reg
-MRWV - memory read  word volatile     - write word into [Second_Reg,Third_Reg] with word in First_Reg
-MWBN - memory write byte non-volatile - read  byte   at [%E,Second_Reg] and place in lower byte of First_Reg
-MRBN - memory read  byte non-volatile - write byte into [%E,Second_Reg] with byte in lower byte of First_Reg
-MWBV - memory write byte volatile     - read  byte   at [%E,Second_Reg] and place in lower byte of First_Reg
-MRBV - memory read  byte volatile     - write byte into [%E,Second_Reg] with byte in lower byte of First_Reg
+MWWN - memory write word non-volatile - read  word   at [r1,Third_Reg] and place in r0
+MRWN - memory read  word non-volatile - write word into [r1,Third_Reg] with word in r0
+MWWV - memory write word volatile     - read  word   at [r1,Third_Reg] and place in r0
+MRWV - memory read  word volatile     - write word into [r1,Third_Reg] with word in r0
+MWBN - memory write byte non-volatile - read  byte   at [%D,r1] and place in lower byte of r0
+MRBN - memory read  byte non-volatile - write byte into [%D,r1] with byte in lower byte of r0
+MWBV - memory write byte volatile     - read  byte   at [%D,r1] and place in lower byte of r0
+MRBV - memory read  byte volatile     - write byte into [%D,r1] with byte in lower byte of r0
 
 LABL - marks a location. It points to whatever instruction is directly after it. This 'instruction' does not translate to an instruction on the backend.
 
-D32U - performs a 32 bit division operation for unsigned inputs. 
-		it expects the inputs to be:
-			left_lower  -> %2
-			left_upper  -> %3
-			right_lower -> %4
-			right_lower -> %5
-			
-			all other registers are ignored
-			
-		outputs division result to:
-			out_lower -> %8
-			out_upper -> %9
-			
-			all other registers are assumed to hold indeterminate values when this instruction completes
-			
-		internally, this pushes a zero to the stack, 
-		then it will load the address of label 00000001,
-		then CALL to the address
-
-R32U - performs a 32 bit remainder operation for unsigned inputs. 
-		it expects the inputs to be:
-			left_lower  -> %2
-			left_upper  -> %3
-			right_lower -> %4
-			right_lower -> %5
-			
-			all other registers are ignored
-			
-		outputs division result to:
-			out_lower -> %6
-			out_upper -> %7
-			
-			all other registers are assumed to hold indeterminate values when this instruction completes
-			
-		internally, this pushes a zero to the stack, 
-		then it will load the address of label 00000002,
-		then CALL to the address
-
-D32S - performs a 32 bit division operation for signed inputs. 
-		it expects the inputs to be:
-			left_lower  -> %2
-			left_upper  -> %3
-			right_lower -> %4
-			right_lower -> %5
-			
-			all other registers are ignored
-			
-		outputs division result to:
-			out_lower -> %8
-			out_upper -> %9
-			
-			all other registers are assumed to hold indeterminate values when this instruction completes
-			
-		internally, this pushes a zero to the stack, 
-		then it will load the address of label 00000003,
-		then CALL to the address
-
-
-R32S - performs a 32 bit remainder operation for signed inputs. 
-		it expects the inputs to be:
-			left_lower  -> %2
-			left_upper  -> %3
-			right_lower -> %4
-			right_lower -> %5
-			
-			all other registers are ignored
-			
-		outputs division result to:
-			out_lower -> %6
-			out_upper -> %7
-			
-			all other registers are assumed to hold indeterminate values when this instruction completes
-			
-		internally, this pushes a zero to the stack, 
-		then it will load the address of label 00000004,
-		then CALL to the address
-
+PHIS - phi start. according to the optimizer, contains one register of  input that is not renamable and not reorderable. backend ignores this 'instruction'
+		phi nodes are used to access register values across jumps and labels.
+		PHIS may only occur immediately prior to PHIS,LABL,CJMP,AJMP,JJMP
+PHIE - phi end.   according to the optimizer, contains one register of output that is not renamable and not reorderable. backend ignores this 'instruction'
+		phi nodes are used to access register values across jumps and labels.
+		PHIE may only occur immediately after PHIE,LABL
 
 FCST - indicates the start of a function is next. also acts as a LABL instruction.
 		The word attached is the Stack_Size
@@ -447,69 +491,174 @@ FCEN - indicates the end of a function is here (the instruction above is the las
 		This 'instruction' does not translate to an instruction on the backend.
 
 
+-- large instruction op-codes
+
+
+D32U - performs a 32bit division operation for unsigned inputs.
+		[%8,%9]=[%2,%3]/[%4,%5]
+		destroys register values, uses label 00000001
+		internally, this pushes a zero to the stack, 
+		then it will load the address of label 00000001,
+		then CALL to the address
+
+R32U - performs a 32bit remainder operation for unsigned inputs. (`/` is used for clearity of register notation)
+		[%6,%7]=[%2,%3]/[%4,%5]
+		destroys register values, uses label 00000002
+
+D32S - performs a 32bit division operation for signed inputs.
+		[%8,%9]=[%2,%3]/[%4,%5]
+		destroys register values, uses label 00000003
+
+R32S - performs a 32bit remainder operation for signed inputs. (`/` is used for clearity of register notation)
+		[%6,%7]=[%2,%3]/[%4,%5]
+		destroys register values, uses label 00000004
+
+D64U - performs a 64bit division operation for unsigned inputs.
+		[%2,%3,%4,%5]=[%6,%7,%8,%9]/[%A,%B,%C,%D]
+		destroys register values, uses label 00000005
+
+R64U - performs a 64bit remainder operation for unsigned inputs. (`/` is used for clearity of register notation)
+		[%2,%3,%4,%5]=[%6,%7,%8,%9]/[%A,%B,%C,%D]
+		destroys register values, uses label 00000006
+
+D64S - performs a 64bit division operation for signed inputs.
+		[%2,%3,%4,%5]=[%6,%7,%8,%9]/[%A,%B,%C,%D]
+		destroys register values, uses label 00000007
+
+R64S - performs a 64bit remainder operation for signed inputs. (`/` is used for clearity of register notation)
+		[%2,%3,%4,%5]=[%6,%7,%8,%9]/[%A,%B,%C,%D]
+		destroys register values, uses label 00000008
+
+LAD0 - adds two 32bit numbers, no inputs are known to be zero
+		[r0,r1]=[r2,r3]+[r4,r5]
+LAD1 - adds two 32bit numbers, word_3 is known to be zero
+		[r0,r1]=[r2,r3]+[r4,~0]
+LAD2 - adds two 32bit numbers, word_1 and word_3 are known to be zero
+		[r0,r1]=[r2,~0]+[r3,~0]
+LAD3 - adds two 64bit numbers
+		[r0,r1,r2,r3]=[r0,r1,r2,r3]+[r4,r5,r6,r7]
+LAD4 - adds two floats                               destroys register values, uses label 00000009
+		[%2,%3]=[%4,%5]+[%6,%7]
+LAD5 - adds two doubles                              destroys register values, uses label 0000000A
+		[%2,%3,%4,%5]=[%6,%7,%8,%9]+[%A,%B,%C,%D]
+
+LSU0 - subtracts two 32bit numbers
+		[r0,r1]=[r0,r1]-[r2,r3]
+LSU3 - subtracts two 64bit numbers
+		[r0,r1,r2,r3]=[r0,r1,r2,r3]-[r4,r5,r6,r7]
+LSU4 - subtracts two floats                           destroys register values, uses label 0000000B
+		[%2,%3]=[%4,%5]-[%6,%7]
+LSU5 - subtracts two doubles                          destroys register values, uses label 0000000C
+		[%2,%3,%4,%5]=[%6,%7,%8,%9]-[%A,%B,%C,%D]
+
+LMU3 - multiplies two 64bit numbers
+		[r0,r1,r2,r3]=[r0,r1,r2,r3]*[r4,r5,r6,r7]
+LMU4 - multiplies two floats                          destroys register values, uses label 0000000D
+		[%2,%3]=[%4,%5]*[%6,%7]
+LMU5 - multiplies two doubles                         destroys register values, uses label 0000000E
+		[%2,%3,%4,%5]=[%6,%7,%8,%9]*[%A,%B,%C,%D]
+
+LDI4 - divides two floats                             destroys register values, uses label 0000000F
+		[%2,%3]=[%4,%5]/[%6,%7]
+LDI5 - divides two doubles                            destroys register values, uses label 00000010
+		[%2,%3,%4,%5]=[%6,%7,%8,%9]/[%A,%B,%C,%D]
+
+LLS6 - left shift 32bit number                        destroys register values, uses label 00000011
+		[%2,%3]=[%6,%7]<<[%A]
+LLS7 - left shift 64bit number                        destroys register values, uses label 00000012
+		[%2,%3,%4,%5]=[%6,%7,%8,%9]<<[%A]
+
+LRS6 - right shift 32bit number                       destroys register values, uses label 00000013
+		[%2,%3]=[%6,%7]>>[%A]
+LRS7 - right shift 64bit number                       destroys register values, uses label 00000014
+		[%2,%3,%4,%5]=[%6,%7,%8,%9]>>[%A]
+
 
 -- the following op-codes are for symbolic constant data being loaded into registers, and may appear in code segments but not data segments
 
 
-SYRB - performs a BL1_ using the symbolic calculation that follows
-SYRW - performs a RL1_ using the symbolic calculation that follows
-SYRD - performs a RL2_ using the symbolic calculation that follows
-SYRE - ends the symbolic calculation for SYRB,SYRW,SYRD
+SYRB - performs 1 BL1_ using the symbolic calculation that follows
+SYRW - performs 1 RL1_ using the symbolic calculation that follows
+SYRD - performs 2 RL1_ using the symbolic calculation that follows
+SYRQ - performs 4 RL1_ using the symbolic calculation that follows
+SYRE - ends the symbolic calculation for SYRB,SYRW,SYRD,SYRQ
 
 
 -- the following op-codes are for symbolic constant data in data segments, and may appear in data segments but not code segments
 
 
-NSNB - the indicated number of bytes that are next cannot be split up, and the bytes are non-constant. No allignment is enforced.
-NSCB - the indicated number of bytes that are next cannot be split up, and the bytes are     constant. No allignment is enforced.
+NSNB - the indicated number of bytes that are next cannot be split up. No allignment is enforced.
 ZNXB - places the indicated number of 0 bytes at location. No allignment is enforced.
-
-NSNW - the indicated number of words that are next cannot be split up, and the words are non-constant. Word allignment is enforced.
-NSCW - the indicated number of words that are next cannot be split up, and the words are     constant. Word allignment is enforced.
-ZNXW - places the indicated number of 0 words at location. Word allignment is enforced.
 
 BYTE - places the given  byte at location. No allignment is enforced.
 WORD - places the given  word at location. Word allignment is enforced.
 DWRD - places the given dword at location. Word allignment is enforced.
 
-SYDB - places the result of the symbolic calculation that follows as a byte
-SYDW - places the result of the symbolic calculation that follows as a word
-SYDD - places the result of the symbolic calculation that follows as a double word
-SYDE - ends the symbolic calculation for SYDB,SYDW,SYDD
+SYDB - places the result of the symbolic calculation that follows as a  byte
+SYDW - places the result of the symbolic calculation that follows as a  word
+SYDD - places the result of the symbolic calculation that follows as a dword
+SYDQ - places the result of the symbolic calculation that follows as a qword
+SYDE - ends the symbolic calculation for SYDB,SYDW,SYDD,SYDQ
 
------- Note that "Word allignment is enforced" means that if that op-code is specified and the data is not currently alligned, an error will be thrown.
+------ Note that "Word allignment is enforced" means that if that op-code is specified and the data is not currently alligned, an error will be given.
 
 -- the following op-codes are for symbolic calculations, and may appear in data and code segments. they are not runtime instructions.
 
 
 SYCB - push constant byte as word (to symbolic stack)
-SYCW - push constant word (to symbolic stack)
-SYCD - push constant dword (to symbolic stack)
-SYCL - push location of label (to symbolic stack)
+SYCW - push constant word         (to symbolic stack)
+SYCD - push constant dword        (to symbolic stack)
+SYCL - push location of label     (to symbolic stack)
 
-SYC0 -  word addition
-SYC1 - dword addition
-SYC2 -  word subtraction
-SYC3 - dword subtraction
-SYC4 -  word multiplication
-SYC5 - dword multiplication
-SYC6 -  word division  (unsigned)
-SYC7 - dword division  (unsigned)
-SYC8 -  word remainder (unsigned)
-SYC9 - dword remainder (unsigned)
-SYCX -  word bitwise xor
-SYCY - dword bitwise xor
-SYCA -  word bitwise and
-SYCU - dword bitwise and
-SYCO -  word bitwise or
-SYCQ - dword bitwise or
+SYW0 -  word addition
+SYW1 -  word subtraction
+SYW2 -  word multiplication
+SYW3 -  word   signed division
+SYW4 -  word unsigned division
+SYW5 -  word   signed remainder
+SYW6 -  word unsigned remainder
+SYW7 -  word bitwise xor
+SYW8 -  word bitwise and
+SYW9 -  word bitwise or
+SBLW -  word bitshift  left by word amount
+SBRW -  word bitshift right by word amount
 
-SYCZ - zero extend word to dword
-SYCS - sign extend word to dword
-SYCC - sign extend byte (on stack as word) to  word
-SYCT - trim dword to word (simply drops the upper word)
-SYCN - convert  word to bool (if any bits are 1, the word on symbolic stack is 1)
-SYCM - convert dword to bool (if any bits are 1, the word on symbolic stack is 1)
+SYD0 - dword addition
+SYD1 - dword subtraction
+SYD2 - dword multiplication
+SYD3 - dword   signed division
+SYD4 - dword unsigned division
+SYD5 - dword   signed remainder
+SYD6 - dword unsigned remainder
+SYD7 - dword bitwise xor
+SYD8 - dword bitwise and
+SYD9 - dword bitwise or
+SBLD - dword bitshift  left by word amount
+SBRD - dword bitshift right by word amount
+
+SYQ0 - qword addition
+SYQ1 - qword subtraction
+SYQ2 - qword multiplication
+SYQ3 - qword   signed division
+SYQ4 - qword unsigned division
+SYQ5 - qword   signed remainder
+SYQ6 - qword unsigned remainder
+SYQ7 - qword bitwise xor
+SYQ8 - qword bitwise and
+SYQ9 - qword bitwise or
+SBLQ - qword bitshift  left by word amount
+SBRQ - qword bitshift right by word amount
+
+SCBW - sign extend byte (on stack as word) to word
+SCWD - sign extend  word to dword
+SCZD - zero extend  word to dword
+SCDQ - sign extend dword to qword
+SCZQ - zero extend dword to qword
+SCQD - trim qword to dword (drops upper)
+SCDW - trim dword to  word (drops upper)
+SCWB - convert  word to bool (if any bits are 1, the word on symbolic stack is 1)
+SCDB - convert dword to bool (if any bits are 1, the word on symbolic stack is 1)
+SCQB - convert qword to bool (if any bits are 1, the word on symbolic stack is 1)
 
 
 -- Using CALL/RET_ :
@@ -585,7 +734,7 @@ Then, it does [ Stack_Pointer + TempReg1 -> Stack_Pointer ]
 
 
 
---Jump Table Example
+--Jump Table Example (TODO: should be updated)
 
 The following is an example of a jump table that has been compiled:
 

@@ -168,9 +168,9 @@ void dataBytecodeReduction(InstructionBuffer* ib){
 	while (i_next<numberOfSlotsTaken){
 		InstructionSingle IS_this=*ptr_this;
 		InstructionSingle IS_next=*ptr_next;
-		if (IS_this.id==I_BYTE & IS_next.id==I_BYTE & isThisWordMisaligned==0){
+		if (IS_this.id==I_BYTE & IS_next.id==I_BYTE & !isThisWordMisaligned){
 			ptr_next->id=I_WORD;
-			ptr_next->arg.W.a_0=((unsigned)IS_next.arg.B.a_0<<8)|((unsigned)IS_this.arg.B.a_0);
+			ptr_next->arg.W.a_0=((unsigned)IS_next.arg.B1.a_0<<8)|((unsigned)IS_this.arg.B1.a_0);
 			ptr_this->id=I_NOP_;
 			numberOfSlotsTaken=ib->numberOfSlotsTaken;
 			didApplySingle=true;goto ReductionOptSingleRestart;
@@ -189,7 +189,7 @@ void dataBytecodeReduction(InstructionBuffer* ib){
 				numberOfSlotsTaken=ib->numberOfSlotsTaken;
 				didApplySingle=true;goto ReductionOptSingleRestart;
 			}
-			if (IS_this.id==I_BYTE & IS_this.arg.B.a_0==0){
+			if (IS_this.id==I_BYTE & IS_this.arg.B1.a_0==0){
 				ptr_next->arg.D.a_0++;
 				ptr_this->id=I_NOP_;
 				numberOfSlotsTaken=ib->numberOfSlotsTaken;
@@ -197,7 +197,7 @@ void dataBytecodeReduction(InstructionBuffer* ib){
 			}
 			if (IS_this.id==I_WORD & (IS_this.arg.W.a_0&0xFF00u)==0u){
 				ptr_this->id=I_BYTE;
-				ptr_this->arg.B.a_0=ptr_this->arg.W.a_0;
+				ptr_this->arg.B1.a_0=ptr_this->arg.W.a_0;
 				ptr_next->arg.D.a_0++;
 				didApplySingle=true;goto ReductionOptSingleRestart;
 			}
@@ -209,7 +209,7 @@ void dataBytecodeReduction(InstructionBuffer* ib){
 			}
 		}
 		if (IS_this.id==I_ZNXB){
-			if (IS_next.id==I_BYTE & IS_next.arg.B.a_0==0){
+			if (IS_next.id==I_BYTE & IS_next.arg.B1.a_0==0){
 				ptr_this->arg.D.a_0++;
 				ptr_next->id=I_NOP_;
 				numberOfSlotsTaken=ib->numberOfSlotsTaken;
@@ -217,7 +217,7 @@ void dataBytecodeReduction(InstructionBuffer* ib){
 			}
 			if (IS_next.id==I_WORD & (IS_next.arg.W.a_0&0x00FFu)==0u){
 				ptr_next->id=I_BYTE;
-				ptr_next->arg.B.a_0=ptr_next->arg.W.a_0>>8;
+				ptr_next->arg.B1.a_0=ptr_next->arg.W.a_0>>8;
 				ptr_this->arg.D.a_0++;
 				didApplySingle=true;goto ReductionOptSingleRestart;
 			}
@@ -230,9 +230,8 @@ void dataBytecodeReduction(InstructionBuffer* ib){
 		}
 		if      (IS_this.id==I_BYTE | IS_this.id==I_SYDB) isThisWordMisaligned^=1;
 		else if (IS_this.id==I_ZNXB) isThisWordMisaligned^=IS_this.arg.D.a_0&1;
-		else if (IS_this.id!=I_LABL & IS_this.id!=I_NOP_ & isThisWordMisaligned){
-			assert(false);
-		}
+		else if ((IS_this.id==I_WORD | IS_this.id==I_DWRD) & isThisWordMisaligned){printInstructionBufferWithMessageAndNumber(ib,"",i_this);assert(false);}
+		
 		i_this=i_next++;
 		ptr_this=ptr_next++;
 		ReductionOptSingleRestart:;

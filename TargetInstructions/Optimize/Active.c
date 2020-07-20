@@ -6,14 +6,14 @@ bool attemptSplitModify(InstructionBuffer* ib, uint32_t index){
 	InstructionSingle* IS_prev=IS-1;
 	enum InstructionTypeID id=IS->id;
 	bool b;
-	if (id==I_ADDC | id==I_ADDN){
-		if ((b=IS->arg.BBB.a_0==IS->arg.BBB.a_1) | IS->arg.BBB.a_0==IS->arg.BBB.a_2){
-			uint8_t unused=findUnusedRegisterAfter(ib,index,IS->arg.BBB.a_0,b?IS->arg.BBB.a_2:IS->arg.BBB.a_1);
+	if (id==I_ADDN){
+		if ((b=IS->arg.B3.a_0==IS->arg.B3.a_1) | IS->arg.B3.a_0==IS->arg.B3.a_2){
+			uint8_t unused=findUnusedRegisterAfter(ib,index,IS->arg.B3.a_0,b?IS->arg.B3.a_2:IS->arg.B3.a_1);
 			
-			if (unused!=16 & (id==I_ADDN | unused!=15)){
-				IS->arg.BBB.a_0=unused;
-				IS_insert.arg.BB.a_1=unused;
-				IS_insert.arg.BB.a_0=b?IS->arg.BBB.a_1:IS->arg.BBB.a_2;
+			if (unused!=16){
+				IS->arg.B3.a_0=unused;
+				IS_insert.arg.B2.a_1=unused;
+				IS_insert.arg.B2.a_0=b?IS->arg.B3.a_1:IS->arg.B3.a_2;
 				insertInstructionAt(ib,index+1,IS_insert);
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
@@ -22,12 +22,12 @@ sanityCheck(ib);
 			}
 		}
 	} else if (id==I_MOV_){
-		if (IS->arg.BB.a_0==IS->arg.BB.a_1 & IS_prev->id==I_POP1 & IS_prev->arg.B.a_0==IS->arg.BB.a_1){
+		if (IS->arg.B2.a_0==IS->arg.B2.a_1 & IS_prev->id==I_POP1 & IS_prev->arg.B1.a_0==IS->arg.B2.a_1){
 			// this is used for aggressive push->pop reduction when the pop couldn't be renamed easily
-			uint8_t unused=findUnusedRegisterAfter(ib,index,IS->arg.BB.a_0,16);
+			uint8_t unused=findUnusedRegisterAfter(ib,index,IS->arg.B2.a_0,16);
 			if (unused!=16){
-				IS_prev->arg.B.a_0=unused;
-				IS->arg.BB.a_1=unused;
+				IS_prev->arg.B1.a_0=unused;
+				IS->arg.B2.a_1=unused;
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
@@ -54,16 +54,16 @@ bool attemptJmpOpt(InstructionBuffer* ib){
 				IS=buffer[i];
 				if (id==I_CJMP){
 					uint16_t jumpValue;
-					uint8_t r0=IS.arg.BBB.a_0;
-					uint8_t r1=IS.arg.BBB.a_1;
-					uint8_t r2=IS.arg.BBB.a_2;
+					uint8_t r0=IS.arg.B3.a_0;
+					uint8_t r1=IS.arg.B3.a_1;
+					uint8_t r2=IS.arg.B3.a_2;
 					if (getValueInRegisterIfTraceableToRawConstants(ib,i-1,r2,&jumpValue)){
 						// IS is now used to fill in values, not read them
 						if (jumpValue==0){
 							IS.id=I_AJMP; 
 // this cannot run sanity check because it changes CJMP to AJMP, which will cause regs to not have origins. Which is fine, because that area is unreachable anyway, however jmp opt has to finish everything before other passes run
-							IS.arg.BB.a_0=r0;
-							IS.arg.BB.a_1=r1;
+							IS.arg.B2.a_0=r0;
+							IS.arg.B2.a_1=r1;
 							buffer[i]=IS;
 						} else {
 							buffer[i].id=I_NOP_;
@@ -96,7 +96,7 @@ bool attemptJmpOpt(InstructionBuffer* ib){
 						InstructionSingle* temp_IS_3 = temp_IS_2+1;
 						InstructionSingle* temp_IS_4 = temp_IS_3+1;
 						if ((temp_IS_1->id==I_SYRD & temp_IS_2->id==I_SYCL & temp_IS_3->id==I_SYRE & temp_IS_4->id==I_AJMP) &&
-							(temp_IS_1->arg.BB.a_0==temp_IS_4->arg.BB.a_0 & temp_IS_1->arg.BB.a_1==temp_IS_4->arg.BB.a_1)){
+							(temp_IS_1->arg.B2.a_0==temp_IS_4->arg.B2.a_0 & temp_IS_1->arg.B2.a_1==temp_IS_4->arg.B2.a_1)){
 							
 							buffer[labelLoadLocation+1].arg.D.a_0=temp_IS_2->arg.D.a_0;
 							didSucceedAtLeastOnce_1=true;
@@ -166,13 +166,13 @@ bool attemptJmpOpt(InstructionBuffer* ib){
 				((base_IS_ptr-8)->id==I_SYRD)
 				){
 					if (
-					(base_IS_ptr-8)->arg.BB.a_0==(base_IS_ptr-5)->arg.BB.a_0 &
-					(base_IS_ptr-8)->arg.BB.a_1==(base_IS_ptr-5)->arg.BB.a_1 &
-					(base_IS_ptr-4)->arg.BB.a_0==(base_IS_ptr-1)->arg.BB.a_0 &
-					(base_IS_ptr-4)->arg.BB.a_1==(base_IS_ptr-1)->arg.BB.a_1 &
+					(base_IS_ptr-8)->arg.B2.a_0==(base_IS_ptr-5)->arg.B2.a_0 &
+					(base_IS_ptr-8)->arg.B2.a_1==(base_IS_ptr-5)->arg.B2.a_1 &
+					(base_IS_ptr-4)->arg.B2.a_0==(base_IS_ptr-1)->arg.B2.a_0 &
+					(base_IS_ptr-4)->arg.B2.a_1==(base_IS_ptr-1)->arg.B2.a_1 &
 					(base_IS_ptr-7)->arg.D .a_0==(base_IS_ptr-0)->arg.D .a_0
 					){
-						uint8_t rCJMP=(base_IS_ptr-5)->arg.BBB.a_2;
+						uint8_t rCJMP=(base_IS_ptr-5)->arg.B3.a_2;
 						uint8_t rTemp;
 						(rCJMP==5)?(rTemp=4):(rTemp=5);
 						didSucceedAtLeastOnce_1=true;
@@ -182,22 +182,22 @@ bool attemptJmpOpt(InstructionBuffer* ib){
 						
 // rTemp just needs to be different then rCJMP, because there was an AJMP the reg values would be indeterminate anyway
 						temp_IS.id=I_XOR_;
-						temp_IS.arg.BBB.a_0=rCJMP;
-						temp_IS.arg.BBB.a_1=rCJMP;
-						temp_IS.arg.BBB.a_2=rTemp;
+						temp_IS.arg.B3.a_0=rCJMP;
+						temp_IS.arg.B3.a_1=rCJMP;
+						temp_IS.arg.B3.a_2=rTemp;
 						*(base_IS_ptr-5)=temp_IS;
 						temp_IS.id=I_BL1_;
-						temp_IS.arg.BB.a_0=rCJMP;
-						temp_IS.arg.BB.a_1=1;
+						temp_IS.arg.B2.a_0=rCJMP;
+						temp_IS.arg.B2.a_1=1;
 						*(base_IS_ptr-6)=temp_IS;
 						temp_IS.id=I_SSUB;
-						temp_IS.arg.BBB.a_0=rTemp;
-						temp_IS.arg.BBB.a_1=rCJMP;
-						temp_IS.arg.BBB.a_2=rTemp;
+						temp_IS.arg.B3.a_0=rTemp;
+						temp_IS.arg.B3.a_1=rCJMP;
+						temp_IS.arg.B3.a_2=rTemp;
 						*(base_IS_ptr-7)=temp_IS;
 						temp_IS.id=I_BL1_;
-						temp_IS.arg.BB.a_0=rTemp;
-						temp_IS.arg.BB.a_1=0;
+						temp_IS.arg.B2.a_0=rTemp;
+						temp_IS.arg.B2.a_1=0;
 						*(base_IS_ptr-8)=temp_IS;
 					}
 				}
@@ -242,37 +242,25 @@ printInstructionBufferWithMessageAndNumber(ib,"starting const opt",0);
 			isRegValueUnused[12]=1;
 			isRegValueUnused[13]=1;
 			isRegValueUnused[14]=1;
-			isRegValueUnused[15]=1;
 			i=ib->numberOfSlotsTaken;
 			while (i--!=0){
 				UnusedResultLoopStart:
 				fillInstructionInformation(&II,ib,i);
 				if (II.isSymbolicInternal | II.id==I_NOP_) continue;
-				if (II.id==I_ADDC & isRegValueUnused[15]){
-					buffer[i].id=I_ADDN;
-					didSucceedAtLeastOnce_1=true;
-#ifdef OPT_DEBUG_CONST
-printInstructionBufferWithMessageAndNumber(ib,"const opt by ADDC->ADDN",i);
-#endif
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-					goto UnusedResultLoopStart;
-				}
 				if (II.regIN[0]==II.regIN[1] & II.regIN[0]!=16){
 					InstructionSingle writeIS;
 					if (II.id==I_XOR_){
 						writeIS.id=I_BL1_;
-						writeIS.arg.BB.a_0=II.regOUT[0];
-						writeIS.arg.BB.a_1=0;
+						writeIS.arg.B2.a_0=II.regOUT[0];
+						writeIS.arg.B2.a_1=0;
 					} else if (II.id==I_OR__){
 						writeIS.id=I_MOV_;
-						writeIS.arg.BB.a_0=II.regOUT[0];
-						writeIS.arg.BB.a_1=II.regIN[0];
+						writeIS.arg.B2.a_0=II.regOUT[0];
+						writeIS.arg.B2.a_1=II.regIN[0];
 					} else if (II.id==I_AND_){
 						writeIS.id=I_MOV_;
-						writeIS.arg.BB.a_0=II.regOUT[0];
-						writeIS.arg.BB.a_1=II.regIN[0];
+						writeIS.arg.B2.a_0=II.regOUT[0];
+						writeIS.arg.B2.a_1=II.regIN[0];
 					} else {
 						goto ExitForNoSpecial;
 					}
@@ -288,11 +276,16 @@ sanityCheck(ib);
 				}
 				ExitForNoSpecial:
 				isRegValueUnused[16]=1;
-				bool canRemove=II.regOUT[0]!=16 & isRegValueUnused[II.regOUT[0]] & isRegValueUnused[II.regOUT[1]] & !(II.doesMoveStack | II.isMemoryAccess);
+				bool canRemove=
+					(II.regOUT[0]!=16 & !(II.doesMoveStack | II.isMemoryAccess)) && (
+					isRegValueUnused[II.regOUT[0]] &
+					isRegValueUnused[II.regOUT[1]] &
+					isRegValueUnused[II.regOUT[2]] &
+					isRegValueUnused[II.regOUT[3]]);
 				if (canRemove){
 					didSucceedAtLeastOnce_1=true;
 					buffer[i].id=I_NOP_; // by the way, this is fine for PHIE too
-					if (II.id==I_SYRB | II.id==I_SYRW | II.id==I_SYRD){
+					if (II.id==I_SYRB | II.id==I_SYRW | II.id==I_SYRD | II.id==I_SYRQ){
 						uint32_t iSub=i;
 						bool isNotEnd;
 						do {
@@ -321,16 +314,21 @@ sanityCheck(ib);
 					isRegValueUnused[12]=1;
 					isRegValueUnused[13]=1;
 					isRegValueUnused[14]=1;
-					isRegValueUnused[15]=1;
 				} else {
 					isRegValueUnused[II.regOUT[0]]=1;
 					isRegValueUnused[II.regOUT[1]]=1;
+					isRegValueUnused[II.regOUT[2]]=1;
+					isRegValueUnused[II.regOUT[3]]=1;
 				}
 				if (!canRemove){
 					isRegValueUnused[II.regIN[0]]=0;
 					isRegValueUnused[II.regIN[1]]=0;
 					isRegValueUnused[II.regIN[2]]=0;
 					isRegValueUnused[II.regIN[3]]=0;
+					isRegValueUnused[II.regIN[4]]=0;
+					isRegValueUnused[II.regIN[5]]=0;
+					isRegValueUnused[II.regIN[6]]=0;
+					isRegValueUnused[II.regIN[7]]=0;
 				}
 			}
 		}
@@ -350,8 +348,7 @@ sanityCheck(ib);
 			isRegValueConst[12]=0;
 			isRegValueConst[13]=0;
 			isRegValueConst[14]=0;
-			isRegValueConst[15]=0;
-			bool isRegINconst[4];
+			bool isRegINconst[8];
 			uint16_t constVal[17]={0};
 			uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
 			InstructionSingle writeIS;
@@ -361,7 +358,7 @@ sanityCheck(ib);
 sanityCheck(ib);
 #endif
 				fillInstructionInformation(&II,ib,i);
-				if (II.isSymbolicInternal!=0 | II.id==I_NOP_) continue;
+				if (II.isSymbolicInternal | II.id==I_NOP_) continue;
 				isRegValueConst[16]=1;
 				isRegINconst[0]=isRegValueConst[II.regIN[0]];
 				uint16_t cv0=constVal[II.regIN[0]];
@@ -371,11 +368,21 @@ sanityCheck(ib);
 				uint16_t cv2=constVal[II.regIN[2]];
 				isRegINconst[3]=isRegValueConst[II.regIN[3]];
 				uint16_t cv3=constVal[II.regIN[3]];
-				if (
-					!(II.doesMoveStack | II.isMemoryAccess) & 
-					II.id!=I_MOV_ & II.regIN[0]!=16 &
-					isRegINconst[0]!=0 & isRegINconst[1]!=0 &
-					isRegINconst[2]!=0 & isRegINconst[3]!=0
+				isRegINconst[4]=isRegValueConst[II.regIN[4]];
+				uint16_t cv4=constVal[II.regIN[4]];
+				isRegINconst[5]=isRegValueConst[II.regIN[5]];
+				uint16_t cv5=constVal[II.regIN[5]];
+				isRegINconst[6]=isRegValueConst[II.regIN[6]];
+				uint16_t cv6=constVal[II.regIN[6]];
+				isRegINconst[7]=isRegValueConst[II.regIN[7]];
+				uint16_t cv7=constVal[II.regIN[7]];
+				if ((
+					isRegINconst[0] & isRegINconst[1] &
+					isRegINconst[2] & isRegINconst[3] &
+					isRegINconst[4] & isRegINconst[5] &
+					isRegINconst[6] & isRegINconst[7]) &&
+					(!(II.doesMoveStack | II.isMemoryAccess) & 
+					II.id!=I_MOV_ & II.regIN[0]!=16)
 				){
 					writeIS.id=I_RL1_; writeIS.arg.BW.a_0=II.regOUT[0]; // this is typically what is needed there, otherwise it is modified
 					switch (II.id){
@@ -405,12 +412,6 @@ sanityCheck(ib);
 					break;
 					case I_MULS:
 					writeIS.arg.BW.a_1=cv0*cv1;
-					break;
-					case I_ADDC:
-					writeIS.id=I_RL2_;
-					writeIS.arg.BBD.a_0=II.regOUT[0];
-					writeIS.arg.BBD.a_1=15;
-					writeIS.arg.BBD.a_2=((uint32_t)cv0+(uint32_t)cv1)&(uint32_t)0x0001FFFFlu;
 					break;
 					case I_SSUB:
 					writeIS.id=I_RL2_;
@@ -468,13 +469,6 @@ printInstructionBufferWithMessageAndNumber(ib,"const opt by result known",i);
 					constVal[II.regOUT[1]]=(uint16_t)(II.cv>>16);
 					continue;
 					case I_RL1_:
-					if (II.cv<256){
-						writeIS.id=I_BL1_;
-						writeIS.arg.BB.a_0=II.regOUT[0];
-						writeIS.arg.BB.a_1=II.cv;
-						buffer[i]=writeIS;
-						goto ConstifyLoopStart;
-					}
 					case I_BL1_:
 					isRegValueConst[II.regOUT[0]]=1;
 					constVal[II.regOUT[0]]=II.cv;
@@ -483,60 +477,52 @@ printInstructionBufferWithMessageAndNumber(ib,"const opt by result known",i);
 					isRegValueConst[II.regOUT[0]]=isRegValueConst[II.regIN[0]];
 					constVal[II.regOUT[0]]=constVal[II.regIN[0]];
 					continue;
-					case I_ADDC:
 					case I_ADDN:
 					if ((t=(isRegINconst[0] & cv0==0))|(isRegINconst[1] & cv1==0)){
-						writeIS.arg.BB.a_1=t?II.regIN[1]:II.regIN[0];
+						writeIS.arg.B2.a_1=t?II.regIN[1]:II.regIN[0];
 						writeIS.id=I_MOV_;
-						writeIS.arg.BB.a_0=II.regOUT[0];
+						writeIS.arg.B2.a_0=II.regOUT[0];
 						buffer[i]=writeIS;
-						if (II.id==I_ADDC){
-							writeIS.id=I_BL1_;
-							writeIS.arg.BB.a_0=15;
-							writeIS.arg.BB.a_1=0;
-							insertInstructionAt(ib,i,writeIS);
-							buffer=ib->buffer;
-						}
 						goto ConstifyLoopStart;
 					}
 					break;
 					case I_AND_:
 					if ((isRegINconst[0] & cv0==0)|(isRegINconst[1] & cv1==0)){
 						writeIS.id=I_BL1_;
-						writeIS.arg.BB.a_0=II.regOUT[0];
-						writeIS.arg.BB.a_1=0;
+						writeIS.arg.B2.a_0=II.regOUT[0];
+						writeIS.arg.B2.a_1=0;
 						buffer[i]=writeIS;
 						goto ConstifyLoopStart;
 					}
 					if ((t=(isRegINconst[0] & cv0==0xFFFFu))|(isRegINconst[1] & cv1==0xFFFFu)){
-						writeIS.arg.BB.a_1=t?II.regIN[1]:II.regIN[0];
+						writeIS.arg.B2.a_1=t?II.regIN[1]:II.regIN[0];
 						writeIS.id=I_MOV_;
-						writeIS.arg.BB.a_0=II.regOUT[0];
+						writeIS.arg.B2.a_0=II.regOUT[0];
 						buffer[i]=writeIS;
 						goto ConstifyLoopStart;
 					}
 					break;
 					case I_OR__:
 					if ((t=(isRegINconst[0] & cv0==0))|(isRegINconst[1] & cv1==0)){
-						writeIS.arg.BB.a_1=t?II.regIN[1]:II.regIN[0];
+						writeIS.arg.B2.a_1=t?II.regIN[1]:II.regIN[0];
 						writeIS.id=I_MOV_;
-						writeIS.arg.BB.a_0=II.regOUT[0];
+						writeIS.arg.B2.a_0=II.regOUT[0];
 						buffer[i]=writeIS;
 						goto ConstifyLoopStart;
 					}
 					if ((t=(isRegINconst[0] & cv0==0xFFFFu))|(isRegINconst[1] & cv1==0xFFFFu)){
-						writeIS.arg.BB.a_1=t?II.regIN[0]:II.regIN[1];
+						writeIS.arg.B2.a_1=t?II.regIN[0]:II.regIN[1];
 						writeIS.id=I_MOV_;
-						writeIS.arg.BB.a_0=II.regOUT[0];
+						writeIS.arg.B2.a_0=II.regOUT[0];
 						buffer[i]=writeIS;
 						goto ConstifyLoopStart;
 					}
 					break;
 					case I_XOR_:
 					if ((t=(isRegINconst[0] & cv0==0))|(isRegINconst[1] & cv1==0)){
-						writeIS.arg.BB.a_1=t?II.regIN[1]:II.regIN[0];
+						writeIS.arg.B2.a_1=t?II.regIN[1]:II.regIN[0];
 						writeIS.id=I_MOV_;
-						writeIS.arg.BB.a_0=II.regOUT[0];
+						writeIS.arg.B2.a_0=II.regOUT[0];
 						buffer[i]=writeIS;
 						goto ConstifyLoopStart;
 					}
@@ -544,15 +530,15 @@ printInstructionBufferWithMessageAndNumber(ib,"const opt by result known",i);
 					case I_MULS:
 					if ((isRegINconst[0] & cv0==0)|(isRegINconst[1] & cv1==0)){
 						writeIS.id=I_BL1_;
-						writeIS.arg.BB.a_0=II.regOUT[0];
-						writeIS.arg.BB.a_1=0;
+						writeIS.arg.B2.a_0=II.regOUT[0];
+						writeIS.arg.B2.a_1=0;
 						buffer[i]=writeIS;
 						goto ConstifyLoopStart;
 					}
 					if (isRegINconst[0] & cv0==1){
 						writeIS.id=I_MOV_;
-						writeIS.arg.BB.a_0=II.regOUT[0];
-						writeIS.arg.BB.a_1=II.regIN[1];
+						writeIS.arg.B2.a_0=II.regOUT[0];
+						writeIS.arg.B2.a_1=II.regIN[1];
 						buffer[i]=writeIS;
 						goto ConstifyLoopStart;
 					}
@@ -576,11 +562,11 @@ printInstructionBufferWithMessageAndNumber(ib,"const opt by result known",i);
 					}
 					if ((isRegINconst[2] & cv2==1)&(isRegINconst[3] & cv3==0)){
 						writeIS.id=I_MOV_;
-						writeIS.arg.BB.a_0=14;
-						writeIS.arg.BB.a_1=II.regIN[0];
+						writeIS.arg.B2.a_0=14;
+						writeIS.arg.B2.a_1=II.regIN[0];
 						buffer[i]=writeIS;
-						writeIS.arg.BB.a_0=15;
-						writeIS.arg.BB.a_1=II.regIN[1];
+						writeIS.arg.B2.a_0=15;
+						writeIS.arg.B2.a_1=II.regIN[1];
 						insertInstructionAt(ib,i,writeIS);
 						buffer=ib->buffer;
 						goto ConstifyLoopStart;
@@ -588,7 +574,7 @@ printInstructionBufferWithMessageAndNumber(ib,"const opt by result known",i);
 					break;
 					// todo: add more checks here (mainly for MULL and 32 bit division)
 					
-					default:((void)0); // used to avoid warnings about missing enumeration values
+					default:; // used to avoid warnings about missing enumeration values
 				}
 				isRegValueConst[II.regOUT[0]]=0;
 				isRegValueConst[II.regOUT[1]]=0;
@@ -606,22 +592,21 @@ printInstructionBufferWithMessageAndNumber(ib,"const opt by result known",i);
 					isRegValueConst[12]=0;
 					isRegValueConst[13]=0;
 					isRegValueConst[14]=0;
-					isRegValueConst[15]=0;
 				}
 			}
 		}
-		if (didSucceedAtLeastOnce_1) continue; // seperating RL2_ should not happen yet if either of the two passes above succeed
+		if (didSucceedAtLeastOnce_1) continue; // seperating RL2_ and RL1_->BL1_ don't need to happen yet if either of the two passes above succeed
 		{
+			InstructionSingle IS_0;
+			InstructionSingle IS_1;
+			IS_0.id=I_RL1_;
+			IS_1.id=I_RL1_;
 			isQuickEndTriggered=true;
 			i=ib->numberOfSlotsTaken;
 			while (i--!=0){
 				if (buffer[i].id==I_RL2_){
 					didSucceedAtLeastOnce_1=true;
-					InstructionSingle IS_0;
-					InstructionSingle IS_1;
 					InstructionSingle IS_this=buffer[i];
-					IS_0.id=I_RL1_;
-					IS_1.id=I_RL1_;
 					IS_0.arg.BW.a_0=IS_this.arg.BBD.a_0;
 					IS_1.arg.BW.a_0=IS_this.arg.BBD.a_1;
 					IS_0.arg.BW.a_1=IS_this.arg.BBD.a_2>> 0;
@@ -637,6 +622,18 @@ sanityCheck(ib);
 #endif
 				}
 			}
+			IS_0.id=I_BL1_;
+			i=ib->numberOfSlotsTaken;
+			while (i--!=0){
+				if (buffer[i].id==I_RL1_){
+					IS_1=buffer[i];
+					if (IS_1.arg.BW.a_1<256){
+						IS_0.arg.B2.a_0=IS_1.arg.BW.a_0;
+						IS_0.arg.B2.a_1=IS_1.arg.BW.a_1;
+						buffer[i]=IS_0;
+					}
+				}
+			}
 		}
 		if (!didSucceedAtLeastOnce_1) break;
 	}
@@ -644,521 +641,6 @@ sanityCheck(ib);
 	return didSucceedAtLeastOnce_0;
 }
 
-
-
-#if 0
-bool attemptConstOptOld(InstructionBuffer* ib){
-	bool didSucceedAtLeastOnce=false;
-	Start:;
-	uint32_t i=ib->numberOfSlotsTaken;
-	InstructionSingle IS;
-	while (i--!=0){
-		if (ib->buffer[i].id==I_RL2_){
-			IS = ib->buffer[i];
-			uint32_t fullConstantValue = IS.arg.BBD.a_2;
-			uint8_t r0 = IS.arg.BBD.a_0;
-			uint8_t r1 = IS.arg.BBD.a_1;
-			uint16_t lowerConstantValue = *(((uint16_t*)(&fullConstantValue))+0);
-			uint16_t upperConstantValue = *(((uint16_t*)(&fullConstantValue))+1);
-			// IS is now used to fill in values, not read them
-			IS.id=I_RL1_;
-			IS.arg.BW.a_0=r0;
-			IS.arg.BW.a_1=lowerConstantValue;
-			ib->buffer[i]=IS;
-			IS.arg.BW.a_0=r1;
-			IS.arg.BW.a_1=upperConstantValue;
-			insertInstructionAt(ib,i+1,IS);
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-			didSucceedAtLeastOnce=true;
-		}
-	}
-	bool didPreviousCauseOpt=false;
-	struct InstructionInformation II;
-	i=ib->numberOfSlotsTaken;
-	// going backwards is typically more efficient, partially because less inserts are performed
-	while (i--!=0){
-		if (didPreviousCauseOpt){
-			didPreviousCauseOpt=false;
-#ifdef OPT_DEBUG_CONST
-			printInstructionBufferWithMessageAndNumber(ib,"const opt around",i+1);
-#endif
-			i+=2;
-			if (i>=ib->numberOfSlotsTaken){
-				i=ib->numberOfSlotsTaken-1;
-			}
-		}
-		enum InstructionTypeID id;
-		InstructionSingle* IS_ptr;
-		IS_ptr = ib->buffer+i;
-		id=IS_ptr->id;
-		if (id==I_MOV_) continue;
-		if (id==I_ADDC && !isValueInRegUsedAfterTarget(ib,i,15,NULL)){
-			ib->buffer[i].id=I_ADDN;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-			didSucceedAtLeastOnce=true;
-			didPreviousCauseOpt=true;
-			continue;
-		}
-		if (id==I_RL2_){
-			// this usually should never happen, but just in case it does
-			goto Start;
-		} else if (id==I_RL1_){
-			uint16_t fullConstantValue = IS_ptr->arg.BW.a_1;
-			if ((fullConstantValue&0xFF00)==0){
-				uint8_t r0 = IS_ptr->arg.BW.a_0;
-				IS.id=I_BL1_;
-				IS.arg.BB.a_0 = r0;
-				IS.arg.BB.a_1 = (uint8_t)fullConstantValue;
-				ib->buffer[i] = IS;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-				didSucceedAtLeastOnce=true;
-				didPreviousCauseOpt=true;
-				continue;
-			}
-		}
-		fillInstructionInformation(&II,ib,i);
-		if (!II.doesMoveStack & !II.isMemoryAccess & !II.isSymbolicInternal & id!=I_PHIS){
-			uint8_t r;
-			uint8_t ri=0;
-			bool isNoneUsed=true;
-			while ((r=II.regOUT[ri++])!=16){
-				isNoneUsed=isNoneUsed && !isValueInRegUsedAfterTarget(ib,i,r,NULL);
-			}
-			if (ri!=1){
-				// if ri==1, then there were no output registers
-				
-				if (isNoneUsed){
-					if (id==I_SYRB | id==I_SYRW | id==I_SYRD){
-						uint32_t iSub=i;
-						bool isNotEnd;
-						do {
-							isNotEnd=ib->buffer[++iSub].id!=I_SYRE;
-							ib->buffer[iSub].id=I_NOP_;
-						} while (isNotEnd);
-					}
-					ib->buffer[i].id=I_NOP_; //  this is fine for PHIE too
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-					didSucceedAtLeastOnce=true;
-					didPreviousCauseOpt=true;
-					continue;
-				}
-				if (id!=I_BL1_ & id!=I_RL1_ & id!=I_SYRB & id!=I_SYRW & id!=I_SYRD & id!=I_PHIS & id!=I_PHIE){
-					uint16_t values[6];
-					bool isAllConstant=true;
-					ri=0;
-					while ((r=II.regOUT[ri++])!=16){
-						isAllConstant=isAllConstant && getValueInRegisterIfTraceableToRawConstants(ib,i,r,&(values[ri-1]),CONST_SEARCH_DEPTH);
-					}
-					ri=0;
-					if (isAllConstant){
-						IS.id = I_RL1_;
-						while ((r=II.regOUT[ri++])!=16){
-							IS.arg.BW.a_0=r;
-							IS.arg.BW.a_1=values[ri-1];
-							insertInstructionAt(ib,i+1,IS);
-						}
-
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-						didSucceedAtLeastOnce=true;
-						didPreviousCauseOpt=true;
-						continue;
-					}
-					bool isSpecificConstant[6]={0};
-					bool didSucceedAtLeastOnceInternal=false;
-					if (i!=0){
-						while ((r=II.regIN[ri++])!=16){
-							didSucceedAtLeastOnceInternal|=(isSpecificConstant[ri-1]=getValueInRegisterIfTraceableToRawConstants(ib,i-1,r,&(values[ri-1]),CONST_SEARCH_DEPTH));
-						}
-					}
-					if (didSucceedAtLeastOnceInternal){
-						// IS is now used to fill in values, not read them
-						IS.id=I_MOV_;
-						if (II.id==I_ADDC){
-							if (isSpecificConstant[0]&(values[0]==0)){
-								IS.arg.BB.a_0 = II.regOUT[0];
-								IS.arg.BB.a_1 = II.regIN[1];
-								ib->buffer[i]=IS;
-								IS.id=I_BL1_;
-								IS.arg.BB.a_0 = II.regOUT[1];
-								IS.arg.BB.a_1 = 0;
-								insertInstructionAt(ib,i+1,IS);
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-								didSucceedAtLeastOnce=true;
-								didPreviousCauseOpt=true;
-								continue;
-							}
-							if (isSpecificConstant[1]&(values[1]==0)){
-								IS.arg.BB.a_0 = II.regOUT[0];
-								IS.arg.BB.a_1 = II.regIN[0];
-								ib->buffer[i]=IS;
-								IS.id=I_BL1_;
-								IS.arg.BB.a_0 = II.regOUT[1];
-								IS.arg.BB.a_1 = 0;
-								insertInstructionAt(ib,i+1,IS);
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-								didSucceedAtLeastOnce=true;
-								didPreviousCauseOpt=true;
-								continue;
-							}
-						} else if (II.id==I_ADDN){
-							if (isSpecificConstant[0]&(values[0]==0)){
-								IS.arg.BB.a_0 = II.regOUT[0];
-								IS.arg.BB.a_1 = II.regIN[1];
-								ib->buffer[i]=IS;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-								didSucceedAtLeastOnce=true;
-								didPreviousCauseOpt=true;
-								continue;
-							}
-							if (isSpecificConstant[1]&(values[1]==0)){
-								IS.arg.BB.a_0 = II.regOUT[0];
-								IS.arg.BB.a_1 = II.regIN[0];
-								ib->buffer[i]=IS;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-								didSucceedAtLeastOnce=true;
-								didPreviousCauseOpt=true;
-								continue;
-							}
-						} else if (II.id==I_SUBN){
-							if (isSpecificConstant[1]&(values[1]==0)){
-								IS.arg.BB.a_0 = II.regOUT[0];
-								IS.arg.BB.a_1 = II.regIN[0];
-								ib->buffer[i]=IS;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-								didSucceedAtLeastOnce=true;
-								didPreviousCauseOpt=true;
-								continue;
-							}
-						} else if (II.id==I_SUBC){
-							if (isSpecificConstant[1]&(values[1]==0)){
-								IS.id=I_BL1_;
-								IS.arg.BB.a_0 = II.regOUT[0];
-								IS.arg.BB.a_1 = 1;
-								ib->buffer[i]=IS;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-								didSucceedAtLeastOnce=true;
-								didPreviousCauseOpt=true;
-								continue;
-							}
-						} else if (II.id==I_SSUB){
-							if (isSpecificConstant[1]&isSpecificConstant[2]&(values[1]==0)&(values[2]==0xFFFF)){
-								IS.arg.BB.a_0 = II.regIN[1];
-								IS.arg.BB.a_1 = II.regIN[0];
-								ib->buffer[i]=IS;
-								IS.id=I_BL1_;
-								IS.arg.BB.a_0 = II.regIN[0];
-								IS.arg.BB.a_1 = 0;
-								insertInstructionAt(ib,i+1,IS);
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-								didSucceedAtLeastOnce=true;
-								didPreviousCauseOpt=true;
-								continue;
-							}
-							if (isSpecificConstant[0]&isSpecificConstant[2]&(values[0]==0)&(values[2]==0xFFFF)){
-								ib->buffer[i].id=I_NOP_;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-								didSucceedAtLeastOnce=true;
-								didPreviousCauseOpt=true;
-								continue;
-							}
-						} else if (II.id==I_AND_){
-							if ((isSpecificConstant[0]&(values[0]==0))|(isSpecificConstant[1]&(values[1]==0))){
-								IS.id=I_BL1_;
-								IS.arg.BB.a_0 = II.regOUT[0];
-								IS.arg.BB.a_1 = 0;
-								ib->buffer[i]=IS;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-								didSucceedAtLeastOnce=true;
-								didPreviousCauseOpt=true;
-								continue;
-							}
-							if (isSpecificConstant[0]&(values[0]==0xFFFF)){
-								IS.arg.BB.a_0 = II.regOUT[0];
-								IS.arg.BB.a_1 = II.regIN[1];
-								ib->buffer[i]=IS;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-								didSucceedAtLeastOnce=true;
-								didPreviousCauseOpt=true;
-								continue;
-							}
-							if (isSpecificConstant[1]&(values[1]==0xFFFF)){
-								IS.arg.BB.a_0 = II.regOUT[0];
-								IS.arg.BB.a_1 = II.regIN[0];
-								ib->buffer[i]=IS;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-								didSucceedAtLeastOnce=true;
-								didPreviousCauseOpt=true;
-								continue;
-							}
-						} else if (II.id==I_XOR_){
-							if (isSpecificConstant[0]&(values[0]==0)){
-								IS.arg.BB.a_0 = II.regOUT[0];
-								IS.arg.BB.a_1 = II.regIN[1];
-								ib->buffer[i]=IS;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-								didSucceedAtLeastOnce=true;
-								didPreviousCauseOpt=true;
-								continue;
-							}
-							if (isSpecificConstant[1]&(values[1]==0)){
-								IS.arg.BB.a_0 = II.regOUT[0];
-								IS.arg.BB.a_1 = II.regIN[0];
-								ib->buffer[i]=IS;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-								didSucceedAtLeastOnce=true;
-								didPreviousCauseOpt=true;
-								continue;
-							}
-						} else if (II.id==I_OR__){
-							if ((isSpecificConstant[0]&(values[0]==0xFFFF))|(isSpecificConstant[1]&(values[1]==0xFFFF))){
-								IS.id=I_RL1_;
-								IS.arg.BW.a_0 = II.regOUT[0];
-								IS.arg.BW.a_1 = 0xFFFF;
-								ib->buffer[i]=IS;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-								didSucceedAtLeastOnce=true;
-								didPreviousCauseOpt=true;
-								continue;
-							}
-							if (isSpecificConstant[0]&(values[0]==0)){
-								IS.arg.BB.a_0 = II.regOUT[0];
-								IS.arg.BB.a_1 = II.regIN[1];
-								ib->buffer[i]=IS;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-								didSucceedAtLeastOnce=true;
-								didPreviousCauseOpt=true;
-								continue;
-							}
-							if (isSpecificConstant[1]&(values[1]==0)){
-								IS.arg.BB.a_0 = II.regOUT[0];
-								IS.arg.BB.a_1 = II.regIN[0];
-								ib->buffer[i]=IS;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-								didSucceedAtLeastOnce=true;
-								didPreviousCauseOpt=true;
-								continue;
-							}
-						} else if (II.id==I_MULS){
-							if (isSpecificConstant[0]){
-								if (values[0]==0){
-									IS.id=I_BL1_;
-									IS.arg.BB.a_0 = II.regOUT[0];
-									IS.arg.BB.a_1 = 0;
-									ib->buffer[i]=IS;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-									didSucceedAtLeastOnce=true;
-									didPreviousCauseOpt=true;
-									continue;
-								} else if (values[0]==1){
-									IS.arg.BB.a_0 = II.regOUT[0];
-									IS.arg.BB.a_1 = II.regIN[1];
-									ib->buffer[i]=IS;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-									didSucceedAtLeastOnce=true;
-									didPreviousCauseOpt=true;
-									continue;
-								}
-							}
-							if (isSpecificConstant[1]){
-								if (values[1]==0){
-									IS.id=I_BL1_;
-									IS.arg.BB.a_0 = II.regOUT[0];
-									IS.arg.BB.a_1 = 0;
-									ib->buffer[i]=IS;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-									didSucceedAtLeastOnce=true;
-									didPreviousCauseOpt=true;
-									continue;
-								} else if (values[1]==1){
-									ib->buffer[i].id=I_NOP_;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-									didSucceedAtLeastOnce=true;
-									didPreviousCauseOpt=true;
-									continue;
-								}
-							}
-						} else if (II.id==I_MULL){
-							if (isSpecificConstant[0]&isSpecificConstant[1]){
-								bool isV0a0 = values[0]==0;
-								bool isV0a1 = values[0]==1;
-								bool isV1a0 = values[1]==0;
-								bool isV1a1 = values[1]==1;
-								if (isV0a0 | isV0a1 | isV1a0 | isV1a1){
-									if (isV0a0 & isV1a0){
-										IS.id=I_BL1_;
-										IS.arg.BB.a_0 = 14;
-										IS.arg.BB.a_1 = 0;
-										ib->buffer[i]=IS;
-										IS.arg.BB.a_0 = 15;
-										insertInstructionAt(ib,i,IS);
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-										didSucceedAtLeastOnce=true;
-										didPreviousCauseOpt=true;
-										continue;
-									} else if (isV0a1 & isV1a0){
-										ib->buffer[i].id=I_NOP_;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-										didSucceedAtLeastOnce=true;
-										didPreviousCauseOpt=true;
-										continue;
-									} else if (isV0a0 & isV1a1){
-										IS.arg.BB.a_0 = 15;
-										IS.arg.BB.a_1 = 14;
-										ib->buffer[i]=IS;
-										IS.id=I_BL1_;
-										IS.arg.BB.a_0 = 14;
-										IS.arg.BB.a_1 = 0;
-										insertInstructionAt(ib,i+1,IS);
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-										didSucceedAtLeastOnce=true;
-										didPreviousCauseOpt=true;
-										continue;
-									}
-								}
-							}
-							if (isSpecificConstant[2]&isSpecificConstant[3]){
-								bool isV2a0 = values[2]==0;
-								bool isV2a1 = values[2]==1;
-								bool isV3a0 = values[3]==0;
-								bool isV3a1 = values[3]==1;
-								if (isV2a0 | isV2a1 | isV3a0 | isV3a1){
-									if (isV2a0 & isV3a0){
-										IS.id=I_BL1_;
-										IS.arg.BB.a_0 = 14;
-										IS.arg.BB.a_1 = 0;
-										ib->buffer[i]=IS;
-										IS.arg.BB.a_0 = 15;
-										insertInstructionAt(ib,i,IS);
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-										didSucceedAtLeastOnce=true;
-										didPreviousCauseOpt=true;
-										continue;
-									} else if (isV2a1 & isV3a0){
-										IS.arg.BB.a_0 = 14;
-										IS.arg.BB.a_1 = II.regIN[0];
-										ib->buffer[i]=IS;
-										IS.arg.BB.a_0 = 15;
-										IS.arg.BB.a_1 = II.regIN[1];
-										insertInstructionAt(ib,i,IS);
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-										didSucceedAtLeastOnce=true;
-										didPreviousCauseOpt=true;
-										continue;
-									} else if (isV2a0 & isV3a1){
-										IS.arg.BB.a_0 = 15;
-										IS.arg.BB.a_1 = II.regIN[0];
-										ib->buffer[i]=IS;
-										IS.id=I_BL1_;
-										IS.arg.BB.a_0 = 14;
-										IS.arg.BB.a_1 = 0;
-										insertInstructionAt(ib,i+1,IS);
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-										didSucceedAtLeastOnce=true;
-										didPreviousCauseOpt=true;
-										continue;
-									}
-								}
-							}
-						} else if (II.id==I_DIVM){
-							if (isSpecificConstant[1]){
-								if (values[1]==1){
-									IS.id=I_BL1_;
-									IS.arg.BB.a_0 = II.regIN[1];
-									IS.arg.BB.a_1 = 0;
-									ib->buffer[i]=IS;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-									didSucceedAtLeastOnce=true;
-									didPreviousCauseOpt=true;
-									continue;
-								}
-								if (values[1]==0 && !compileSettings.hasGivenConstDivByZeroWarning){
-									compileSettings.hasGivenConstDivByZeroWarning=true;
-err_00__0("Optimizer detected a constant division by zero\n  no source location avalible\n  future warnings of this type will be suppressed");
-								}
-								// could add a few more on division for divising by 2**x but ehhh not now
-							}
-						}
-						// could add I_D32U , I_R32U , I_D32S , I_R32S
-					}
-				}
-			}
-		}
-	}
-#ifdef OPT_DEBUG_CONST
-	if (didPreviousCauseOpt){
-		printInstructionBufferWithMessageAndNumber(ib,"const opt (after terminate) around",i+1);
-	}
-#endif
-	if (didSucceedAtLeastOnce){
-		removeNop(ib);
-	}
-	return didSucceedAtLeastOnce;
-}
-#endif
 
 
 // expandPushPop() should be run on the input before this is run (unless ib.isPushPopOptLocked==true, then it doesn't matter)
@@ -1172,40 +654,19 @@ bool attemptMovPushPopOpt(InstructionBuffer* ib){
 		enum InstructionTypeID id0 = IS_i0->id;
 		if (id0==I_MOV_){
 			/*
-			This message is old, and MAY be applicable. I have added some changes since this was written.
-			
-			mov opt has a potential improvement, however it is quite complicated due to the way that the InstructionInformation is designed.
-			it deals with how different instructions sometimes use the same argument for an input and an output while for other instructions they can be completely seperate and yet have the same register listed on different arguments
-			the following segment has optimization potential, the MOV could be eliminated through seperating the names of the registers inside the MRWN instruction:
-			
-			ADDC %2 %3 %4
-			MOV_ %5 %F
-			MRWN %5 %2 %5
-			ADDN %6 %5 %F
-			
-			
-			however, the following could not be optimized:
-			ADDC %2 %3 %4
-			MOV_ %5 %F
-			MULS %5 %2
-			ADDN %6 %5 %F
-			*/
-			
-			
-			/*
-			This message is new:
+			This message is relatively new:
 			
 			Rarely, this situation gets past mov opt, which should eliminate the second instruction:
 			
-			MOV_ %2 %E
-			MOV_ %E %2
+			MOV_ %2 %D
+			MOV_ %D %2
 			
 			This case was spotted without any instructions inbetween, 
 			but the analysis would get more complicated if there were any instructions in between.
 			*/
 			bool didThisReduceSucceed=false;
-			uint8_t rFrom = IS_i0->arg.BB.a_1;
-			uint8_t rTo = IS_i0->arg.BB.a_0;
+			uint8_t rFrom = IS_i0->arg.B2.a_1;
+			uint8_t rTo = IS_i0->arg.B2.a_0;
 			if (rFrom==rTo){
 				// moving a register to itself obviously always does nothing
 				IS_i0->id=I_NOP_;
@@ -1216,9 +677,6 @@ sanityCheck(ib);
 				didThisReduceSucceed=true;
 			} else {
 				InstructionInformation II_1;
-				bool isFromChangable = !( rFrom==0 | rFrom==1 );
-				bool isToChangable = !( rTo==0 | rTo==1 );
-				if (!isFromChangable & !isToChangable) continue;
 				bool isToWritten = false;
 				bool isFromWritten = false;
 				bool wasToWrittenWhenFromWritten = false;
@@ -1314,10 +772,13 @@ sanityCheck(ib);
 #endif
 					didSucceedAtLeastOnce=true;
 					didThisReduceSucceed=true;
-				} else if (!wasToUsedAfterFromChanged & !wasFromUsedAfterToChanged & isToChangable){
+				} else if (!wasToUsedAfterFromChanged & !wasFromUsedAfterToChanged){
 					uint32_t upperRenameBound;
 					if (findRegRenameBoundaryFromOrigin(ib,i0,rTo,&upperRenameBound)){
+						//printf("{mov calling doRegRename at place 1 start}\n");
+						if (wouldRegRenameViolateMultiOutputLaw(ib,i0,upperRenameBound,rTo,rFrom)) {makeColor(COLOR_TO_TEXT,COLOR_RED);makeColor(COLOR_TO_BACKGROUND,COLOR_CYAN);printf("WARNING: THIS WILL BE WRONG!\n");resetColor();exit(1);}
 						doRegRename(ib,i0,upperRenameBound,rTo,rFrom);
+						//printf("{mov calling doRegRename at place 1 end}\n");
 						IS_i0->id=I_NOP_; // do not need this mov instruction anymore, it is moving to the same register it is coming from
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
@@ -1326,26 +787,28 @@ sanityCheck(ib);
 						didThisReduceSucceed=true;
 					}
 				}
-				if (!isFromUsed & !didThisReduceSucceed & isFromChangable){
+				if (!isFromUsed & !didThisReduceSucceed){
 					uint32_t backwardsRenameStart = i0;
 					bool didFindFailingUsage = false;
 					while (backwardsRenameStart!=0 && isValueInRegUsedAfterTarget(ib,backwardsRenameStart-1,rFrom,NULL)){
 						--backwardsRenameStart;
 						fillInstructionInformation(&II_1,ib,backwardsRenameStart);
-						if ((II_1.usesReg_E & rFrom==14) | (II_1.usesReg_F & rFrom==15)){
+						if ((II_1.usesReg_D & rFrom==13) | (II_1.usesReg_E & rFrom==14)){
 							didFindFailingUsage = true; // can't rename
 							break;
 						}
 						if (doesRegListContain(II_1.regIN,rTo) || doesRegListContain(II_1.regOUT,rTo)){
+							//printf("{mov may call attemptRegRename at place 2 start}\n");
 							if (!II_1.noRename && attemptRegRename(ib,backwardsRenameStart,rTo,16)){
 #ifdef OPT_DEBUG_PUSH_POP_MOV
-								printInstructionBufferWithMessageAndNumber(ib,"mov rename to attempt to reduce",i0);
+printInstructionBufferWithMessageAndNumber(ib,"mov rename to attempt to reduce",i0);
 #endif
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
 								goto LoopStart; // if this rename succeeds, then try this instruction again from the start
 							}
+							//printf("{mov may call attemptRegRename at place 2 end}\n");
 							didFindFailingUsage = true;
 							break;
 						}
@@ -1354,7 +817,7 @@ sanityCheck(ib);
 						// this protects against a few invalid edge cases that get past the typical method above
 						fillInstructionInformation(&II_1,ib,backwardsRenameStart);
 						didFindFailingUsage=
-							((II_1.usesReg_E & rFrom==14) | (II_1.usesReg_F & rFrom==15)) |
+							((II_1.usesReg_D & rFrom==13) | (II_1.usesReg_E & rFrom==14)) |
 							(II_1.noRename && 
 							(doesRegListContain(II_1.regIN,rTo) |
 							doesRegListContain(II_1.regOUT,rTo) |
@@ -1363,6 +826,8 @@ sanityCheck(ib);
 							));
 					}
 					if (!didFindFailingUsage){
+						//printf("{mov calling doRegRename at place 3 start}\n");
+						if (wouldRegRenameViolateMultiOutputLaw(ib,backwardsRenameStart,i0,rFrom,rTo)) {makeColor(COLOR_TO_TEXT,COLOR_RED);makeColor(COLOR_TO_BACKGROUND,COLOR_CYAN);printf("WARNING: THIS WILL BE WRONG!\n");resetColor();exit(1);}
 						doRegRename(ib,backwardsRenameStart,i0,rFrom,rTo);
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
@@ -1371,18 +836,21 @@ sanityCheck(ib);
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
+						//printf("{mov calling doRegRename at place 3 end}\n");
 						didSucceedAtLeastOnce=true;
 						didThisReduceSucceed=true;
 					}
 				}
 				if (!didThisReduceSucceed){
 					if (isToModified){
+						//printf("{mov calling attemptSplitModify at place 4}\n");
 						if (attemptSplitModify(ib,indexOfToModify)){
 							numberOfSlotsTaken=ib->numberOfSlotsTaken;
 							goto LoopStart;
 						}
 					}
 					if (isFromModified){
+						//printf("{mov calling attemptSplitModify at place 5}\n");
 						if (attemptSplitModify(ib,indexOfFromModify)){
 							numberOfSlotsTaken=ib->numberOfSlotsTaken;
 							goto LoopStart;
@@ -1399,6 +867,7 @@ sanityCheck(ib);
 						}
 						++upperReorderBoundry;
 						if (doReorder){
+							//printf("{mov calling applyReorder at place 6}\n");
 							applyReorder(ib,i0,upperReorderBoundry);
 							
 							// This (probably) will not cause infinite loops, because of the checking done above
@@ -1427,7 +896,7 @@ sanityCheck(ib);
 			uint32_t i1;
 			bool didFind=false;
 			bool hitImpossible=false;
-			uint8_t rFrom = IS_i0->arg.B.a_0;
+			uint8_t rFrom = IS_i0->arg.B1.a_0;
 			for (i1=i0+1;i1<numberOfSlotsTaken;i1++){
 				InstructionInformation II_1;
 				fillInstructionInformation(&II_1,ib,i1);
@@ -1444,7 +913,7 @@ sanityCheck(ib);
 				uint8_t rTo;
 				bool isProperlyReorderable = i0+1==lowerBoundry;
 				if (!isProperlyReorderable){
-					rTo = ib->buffer[i1].arg.B.a_0;
+					rTo = ib->buffer[i1].arg.B1.a_0;
 					uint32_t temp=i0;
 					bool couldRename=true;
 					while (isRegMentionedAtOrAfterTarget(ib,temp+1,rTo,&temp)){
@@ -1452,16 +921,16 @@ sanityCheck(ib);
 							break;
 						}
 						if (!attemptRegRename(ib,temp,rTo,16)){
-							if (rTo==14 | rTo==15){
+							if (rTo==13 | rTo==14){
 								if (attemptRegRename(ib,i1,rTo,16)){
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
-									rTo = ib->buffer[i1].arg.B.a_0;
+									rTo = ib->buffer[i1].arg.B1.a_0;
 									temp=i0;
 									continue;
 								}
-								InstructionSingle IS_temp={.id=I_MOV_,.arg.BB.a_0=rTo,.arg.BB.a_1=rTo};
+								InstructionSingle IS_temp={.id=I_MOV_,.arg.B2.a_0=rTo,.arg.B2.a_1=rTo};
 								insertInstructionAt(ib,i1+1,IS_temp);
 #ifdef OPT_DEBUG_GENERAL_ACTIVE
 									printf(".");
@@ -1497,13 +966,13 @@ sanityCheck(ib);
 					}
 				}
 				if (isProperlyReorderable){
-					rFrom = IS_i0->arg.B.a_0;
+					rFrom = IS_i0->arg.B1.a_0;
 					applyReorder(ib,i1,lowerBoundry);
 					InstructionSingle* IS_i1 = IS_i0+1;
-					rTo = IS_i1->arg.B.a_0;
+					rTo = IS_i1->arg.B1.a_0;
 					IS_i0->id = I_MOV_;
-					IS_i0->arg.BB.a_0 = rTo;
-					IS_i0->arg.BB.a_1 = rFrom;
+					IS_i0->arg.B2.a_0 = rTo;
+					IS_i0->arg.B2.a_1 = rFrom;
 					IS_i1->id = I_NOP_;
 					didSucceedAtLeastOnce=true;
 #ifdef OPT_DEBUG_PUSH_POP_MOV
@@ -1542,7 +1011,7 @@ bool attemptStackMemoryOpt(InstructionBuffer* ib){
 	InstructionInformation II_1;
 	InstructionSingle IS_BL1;
 	IS_BL1.id=I_BL1_;
-	IS_BL1.arg.BB.a_1=0;
+	IS_BL1.arg.B2.a_1=0;
 	InstructionSingle IS_temp;
 	for (i0=0;i0<numberOfSlotsTaken;i0++){
 		enum InstructionTypeID id=buffer[i0].id;
@@ -1554,7 +1023,6 @@ bool attemptStackMemoryOpt(InstructionBuffer* ib){
 				stackSize=IS_temp.arg.BWD.a_1;
 			}
 		} else if (
-// previously was ` II_0.isMemoryAccess & II_0.regIN[1]!=16 `
 				id==I_MWWV |
 				id==I_MWWN |
 				id==I_MRWV |
@@ -1566,7 +1034,7 @@ bool attemptStackMemoryOpt(InstructionBuffer* ib){
 			
 			i1=i0;
 			fillInstructionInformation(&II_0,ib,i0);
-			IS_BL1.arg.BB.a_0=(target_1=II_0.regIN[1]);
+			IS_BL1.arg.B2.a_0=(target_1=II_0.regIN[1]);
 			while (true){
 				assert(i1!=0);
 				i1--;
@@ -1575,7 +1043,9 @@ bool attemptStackMemoryOpt(InstructionBuffer* ib){
 					if (II_1.id==I_MOV_){
 						target_1=II_1.regIN[0];
 					} else {
-						if (II_1.id==I_ADDC & target_1==15){
+						if (II_1.id==I_ADDN & target_1==16){  // MIGRATION: FIND NEW WAY TO DO THIS (This was the detection that 32bit add with upper words zero going into a memory instruction meant that the carry could be assumed to be 0 because it could only be 0 or 1 and only from a carry from addition)
+							assert(false);
+							/*
 							insertInstructionAt(ib,i0--,IS_BL1);
 							didSucceedAtLeastOnce=true;
 							buffer=ib->buffer;
@@ -1583,9 +1053,10 @@ bool attemptStackMemoryOpt(InstructionBuffer* ib){
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
-						} else if (II_1.id==I_BL1_ & !II_0.usesReg_E & isStackSizeKnown){
-							// `!II_0.usesReg_E` is to check if the memory operation is not a byte instruction
-							if (buffer[i1].arg.BB.a_1==0){
+*/
+						} else if (II_1.id==I_BL1_ & !II_0.usesReg_D & isStackSizeKnown){
+							// `!II_0.usesReg_D` is to check if the memory operation is not a byte instruction
+							if (buffer[i1].arg.B2.a_1==0){
 								// i1, II_1, target_1  are now going to be used for a different loop
 								i1=i0;
 								target_1=II_0.regIN[0];
@@ -1600,12 +1071,12 @@ sanityCheck(ib);
 											if (II_1.id==I_STPA | II_1.id==I_STPS){
 												offsetValue=stackSize-buffer[i1].arg.BW.a_1;
 												if (!((offsetValue&1) | (offsetValue>510U))){
-													if      (II_0.id==I_MWWN) IS_temp.id=I_STWN, IS_temp.arg.BB.a_0=II_0.regIN[2];
-													else if (II_0.id==I_MRWN) IS_temp.id=I_STRN, IS_temp.arg.BB.a_0=II_0.regOUT[0];
-													else if (II_0.id==I_MWWV) IS_temp.id=I_STWV, IS_temp.arg.BB.a_0=II_0.regIN[2];
-													else if (II_0.id==I_MRWV) IS_temp.id=I_STRV, IS_temp.arg.BB.a_0=II_0.regOUT[0];
+													if      (II_0.id==I_MWWN) IS_temp.id=I_STWN, IS_temp.arg.B2.a_0=II_0.regIN[2];
+													else if (II_0.id==I_MRWN) IS_temp.id=I_STRN, IS_temp.arg.B2.a_0=II_0.regOUT[0];
+													else if (II_0.id==I_MWWV) IS_temp.id=I_STWV, IS_temp.arg.B2.a_0=II_0.regIN[2];
+													else if (II_0.id==I_MRWV) IS_temp.id=I_STRV, IS_temp.arg.B2.a_0=II_0.regOUT[0];
 													else assert(false);
-													IS_temp.arg.BB.a_1=offsetValue/2U;
+													IS_temp.arg.B2.a_1=offsetValue/2U;
 													buffer[i0]=IS_temp;
 													didSucceedAtLeastOnce=true;
 #ifdef OPT_DEBUG_SANITY
@@ -1640,10 +1111,10 @@ void applyMovFromSmallConstOpt(InstructionBuffer* ib){
 	while (i--!=0){
 		if (buffer[i].id==I_MOV_){
 			IS_ptr=buffer+i;
-			if (getValueInRegisterIfTraceableToRawConstants(ib,i-1,IS_ptr->arg.BB.a_1,&value)){
+			if (getValueInRegisterIfTraceableToRawConstants(ib,i-1,IS_ptr->arg.B2.a_1,&value)){
 				if ((value&0xFF00)==0){
-					IS.arg.BB.a_0=IS_ptr->arg.BB.a_0;
-					IS.arg.BB.a_1=(uint8_t)value;
+					IS.arg.B2.a_0=IS_ptr->arg.B2.a_0;
+					IS.arg.B2.a_1=(uint8_t)value;
 					*IS_ptr=IS;
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
@@ -1665,9 +1136,9 @@ bool attemptDupeConstOpt(InstructionBuffer* ib){
 		id_0=buffer[i0].id;
 		if (id_0==I_BL1_ | id_0==I_RL1_ | id_0==I_STPA | id_0==I_STPS){
 			uint8_t thisReg;
-			if (id_0==I_BL1_) thisReg=buffer[i0].arg.BB.a_0;
+			if (id_0==I_BL1_) thisReg=buffer[i0].arg.B2.a_0;
 			else              thisReg=buffer[i0].arg.BW.a_0;
-			if (thisReg==14 | thisReg==15) attemptRegRename(ib,i0,thisReg,16); // don't care if it succeeds, we just want to try
+			if (thisReg==13 | thisReg==14) attemptRegRename(ib,i0,thisReg,16); // don't care if it succeeds, we just want to try
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
@@ -1700,17 +1171,16 @@ sanityCheck(ib);
 			regTrack[12].isValueConst=0;
 			regTrack[13].isValueConst=0;
 			regTrack[14].isValueConst=0;
-			regTrack[15].isValueConst=0;
 		} else if (II_0.id==I_BL1_ | II_0.id==I_RL1_ | II_0.id==I_STPA | II_0.id==I_STPS){
 			uint16_t thisConstValue;
-			if (II_0.id==I_BL1_) thisConstValue=buffer[i0].arg.BB.a_1;
+			if (II_0.id==I_BL1_) thisConstValue=buffer[i0].arg.B2.a_1;
 			else                 thisConstValue=buffer[i0].arg.BW.a_1;
 			bool isThisRawConst=II_0.id==I_BL1_ | II_0.id==I_RL1_;
 			uint8_t thisReg=II_0.regOUT[0];
 			bool didFind=false;
 			uint8_t minMovCount=8;
 			uint8_t regWithMinMovCount=16;
-			for (uint8_t r=2;r<16;r++){
+			for (uint8_t r=2;r<15;r++){
 				if (regTrack[r].isRawConst==isThisRawConst & 
 					regTrack[r].constValue==thisConstValue &
 					regTrack[r].isValueConst){
@@ -1732,8 +1202,8 @@ sanityCheck(ib);
 				regTrack[thisReg].movCount=minMovCount+1;
 				didSucceedAtLeastOnce=true;
 				buffer[i0].id=I_MOV_;
-				buffer[i0].arg.BB.a_0=thisReg;
-				buffer[i0].arg.BB.a_1=regWithMinMovCount;
+				buffer[i0].arg.B2.a_0=thisReg;
+				buffer[i0].arg.B2.a_1=regWithMinMovCount;
 				i0--;
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
@@ -1747,6 +1217,8 @@ sanityCheck(ib);
 		} else {
 			regTrack[II_0.regOUT[0]].isValueConst=0;
 			regTrack[II_0.regOUT[1]].isValueConst=0;
+			regTrack[II_0.regOUT[2]].isValueConst=0;
+			regTrack[II_0.regOUT[3]].isValueConst=0;
 		}
 	}
 	if (didSucceedAtLeastOnce){
@@ -1800,16 +1272,11 @@ bool attemptSTPoffsetOpt(InstructionBuffer* ib){
 	InstructionInformation II_0;
 	InstructionSingle IS_stp;
 	IS_stp.id=I_STPA;
-	InstructionSingle IS_bl1;
-	IS_bl1.id=I_BL1_;
-	IS_bl1.arg.BB.a_0=15;
-	IS_bl1.arg.BB.a_1=0;
 	bool didSucceedAtLeastOnce=false;
-	bool b1;
 	uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
 	uint32_t i0=numberOfSlotsTaken;
 	while (i0--!=0){
-		if ((b1=ib->buffer[i0].id==I_ADDC) | ib->buffer[i0].id==I_ADDN){
+		if (ib->buffer[i0].id==I_ADDN){
 			fillInstructionInformation(&II_0,ib,i0);
 			uint16_t valTraceRaw0;
 			bool traceRaw0;
@@ -1829,7 +1296,6 @@ bool attemptSTPoffsetOpt(InstructionBuffer* ib){
 						IS_stp.arg.BW.a_0=II_0.regOUT[0];
 						ib->buffer[i0]=IS_stp;
 						didSucceedAtLeastOnce=true;
-						if (b1) insertInstructionAt(ib,i0,IS_bl1);
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
@@ -1861,7 +1327,7 @@ sanityCheck(ib);
 	while (i--!=0){
 		InstructionInformation II;
 		fillInstructionInformation(&II,ib,i);
-		if (!II.isSymbolicInternal & II.id!=I_SYRB & II.id!=I_SYRW & II.id!=I_SYRD){
+		if (!II.isSymbolicInternal & II.id!=I_SYRB & II.id!=I_SYRW & II.id!=I_SYRD & II.id!=I_SYRQ){
 			upperReorderBoundry=findUpperReorderBoundry(ib,i);
 			if (upperReorderBoundry!=i) applyReorder(ib,i,upperReorderBoundry);
 #ifdef OPT_DEBUG_SANITY
@@ -1872,11 +1338,11 @@ sanityCheck(ib);
 #ifdef OPT_DEBUG_GENERAL_ACTIVE
 	printf(".");
 #endif
-	// SYRB,SYRW,SYRD have priority, so they get a seperate pass after the other reorder pass
+	// SYRB,SYRW,SYRD,I_SYRQ have priority, so they get a seperate pass after the other reorder pass
 	i=ib->numberOfSlotsTaken;
 	while (i--!=0){
 		enum InstructionTypeID id=ib->buffer[i].id;
-		if (id==I_SYRB | id==I_SYRW | id==I_SYRD){
+		if (id==I_SYRB | id==I_SYRW | id==I_SYRD | id==I_SYRQ){
 			upperReorderBoundry=findUpperReorderBoundry(ib,i);
 			if (upperReorderBoundry!=i) applyReorder(ib,i,upperReorderBoundry);
 #ifdef OPT_DEBUG_SANITY
@@ -1971,24 +1437,24 @@ switch (state){
 			didSucceedAtLeastOnce=true;
 			//printInstructionBufferWithMessageAndNumber(ib,"Before:",i1);
 			ib->buffer[i0].id=I_MOV_;
-			ib->buffer[i0].arg.BB.a_0=II_0.regOUT[0];
-			ib->buffer[i0].arg.BB.a_1=regList[0];
+			ib->buffer[i0].arg.B2.a_0=II_0.regOUT[0];
+			ib->buffer[i0].arg.B2.a_1=regList[0];
 			IS.id=I_BSWP;
-			IS.arg.BB.a_0=II_0.regOUT[0];
-			IS.arg.BB.a_1=II_0.regOUT[0];
+			IS.arg.B2.a_0=II_0.regOUT[0];
+			IS.arg.B2.a_1=II_0.regOUT[0];
 			insertInstructionAt(ib,i0+1,IS);
 			IS.id=I_BL1_;
-			IS.arg.BB.a_0=regList[0];
-			IS.arg.BB.a_1=0xFF;
+			IS.arg.B2.a_0=regList[0];
+			IS.arg.B2.a_1=0xFF;
 			insertInstructionAt(ib,i0+2,IS);
 			IS.id=I_AND_;
-			IS.arg.BBB.a_0=II_0.regOUT[0];
-			IS.arg.BBB.a_1=II_0.regOUT[0];
-			IS.arg.BBB.a_2=regList[0];
+			IS.arg.B3.a_0=II_0.regOUT[0];
+			IS.arg.B3.a_1=II_0.regOUT[0];
+			IS.arg.B3.a_2=regList[0];
 			insertInstructionAt(ib,i0+3,IS);
 			IS.id=I_MOV_;
-			IS.arg.BB.a_0=regList[0];
-			IS.arg.BB.a_1=sdfma_1.isDiscrete?II_1.regIN[2]:II_1.regIN[0];
+			IS.arg.B2.a_0=regList[0];
+			IS.arg.B2.a_1=sdfma_1.isDiscrete?II_1.regIN[2]:II_1.regIN[0];
 			insertInstructionAt(ib,i1+1,IS);
 			//printInstructionBufferWithMessageAndNumber(ib,"After:",i0);
 #ifdef OPT_DEBUG_SANITY
@@ -2070,20 +1536,20 @@ sanityCheck(ib);
 			didSucceedAtLeastOnce=true;
 			//printInstructionBufferWithMessageAndNumber(ib,"Before:",i1);
 			ib->buffer[i0].id=I_MOV_;
-			ib->buffer[i0].arg.BB.a_0=II_0.regOUT[0];
-			ib->buffer[i0].arg.BB.a_1=regList[0];
+			ib->buffer[i0].arg.B2.a_0=II_0.regOUT[0];
+			ib->buffer[i0].arg.B2.a_1=regList[0];
 			IS.id=I_BL1_;
-			IS.arg.BB.a_0=regList[0];
-			IS.arg.BB.a_1=0xFF;
+			IS.arg.B2.a_0=regList[0];
+			IS.arg.B2.a_1=0xFF;
 			insertInstructionAt(ib,i0+1,IS);
 			IS.id=I_AND_;
-			IS.arg.BBB.a_0=II_0.regOUT[0];
-			IS.arg.BBB.a_1=II_0.regOUT[0];
-			IS.arg.BBB.a_2=regList[0];
+			IS.arg.B3.a_0=II_0.regOUT[0];
+			IS.arg.B3.a_1=II_0.regOUT[0];
+			IS.arg.B3.a_2=regList[0];
 			insertInstructionAt(ib,i0+2,IS);
 			IS.id=I_MOV_;
-			IS.arg.BB.a_0=regList[0];
-			IS.arg.BB.a_1=sdfma_1.isDiscrete?II_1.regIN[2]:II_1.regIN[0];
+			IS.arg.B2.a_0=regList[0];
+			IS.arg.B2.a_1=sdfma_1.isDiscrete?II_1.regIN[2]:II_1.regIN[0];
 			insertInstructionAt(ib,i1+1,IS);
 			//printInstructionBufferWithMessageAndNumber(ib,"After:",i0);
 #ifdef OPT_DEBUG_SANITY
@@ -2103,11 +1569,11 @@ sanityCheck(ib);
 			didSucceedAtLeastOnce=true;
 			//printInstructionBufferWithMessageAndNumber(ib,"Before:",0);
 			ib->buffer[i0].id=I_MOV_;
-			ib->buffer[i0].arg.BB.a_0=II_0.regOUT[0];
-			ib->buffer[i0].arg.BB.a_1=regList[0];
+			ib->buffer[i0].arg.B2.a_0=II_0.regOUT[0];
+			ib->buffer[i0].arg.B2.a_1=regList[0];
 			IS.id=I_MOV_;
-			IS.arg.BB.a_0=regList[0];
-			IS.arg.BB.a_1=sdfma_1.isDiscrete?II_1.regIN[2]:II_1.regIN[0];
+			IS.arg.B2.a_0=regList[0];
+			IS.arg.B2.a_1=sdfma_1.isDiscrete?II_1.regIN[2]:II_1.regIN[0];
 			insertInstructionAt(ib,i1+1,IS);
 			//printInstructionBufferWithMessageAndNumber(ib,"After:",0);
 #ifdef OPT_DEBUG_SANITY
@@ -2128,11 +1594,11 @@ sanityCheck(ib);
 			didSucceedAtLeastOnce=true;
 			//printInstructionBufferWithMessageAndNumber(ib,"Before:",0);
 			ib->buffer[i0].id=I_MOV_;
-			ib->buffer[i0].arg.BB.a_0=II_0.regOUT[0];
-			ib->buffer[i0].arg.BB.a_1=regList[0];
+			ib->buffer[i0].arg.B2.a_0=II_0.regOUT[0];
+			ib->buffer[i0].arg.B2.a_1=regList[0];
 			IS.id=I_MOV_;
-			IS.arg.BB.a_0=regList[0];
-			IS.arg.BB.a_1=II_1.regOUT[0];
+			IS.arg.B2.a_0=regList[0];
+			IS.arg.B2.a_1=II_1.regOUT[0];
 			insertInstructionAt(ib,i1+1,IS);
 			//printInstructionBufferWithMessageAndNumber(ib,"After:",0);
 #ifdef OPT_DEBUG_SANITY
@@ -2158,11 +1624,11 @@ sanityCheck(ib);
 			didSucceedAtLeastOnce=true;
 			//printInstructionBufferWithMessageAndNumber(ib,"Before:",0);
 			ib->buffer[i0].id=I_MOV_;
-			ib->buffer[i0].arg.BB.a_0=II_0.regOUT[0];
-			ib->buffer[i0].arg.BB.a_1=regList[0];
+			ib->buffer[i0].arg.B2.a_0=II_0.regOUT[0];
+			ib->buffer[i0].arg.B2.a_1=regList[0];
 			IS.id=I_MOV_;
-			IS.arg.BB.a_0=regList[0];
-			IS.arg.BB.a_1=II_1.regOUT[0];
+			IS.arg.B2.a_0=regList[0];
+			IS.arg.B2.a_1=II_1.regOUT[0];
 			insertInstructionAt(ib,i1+1,IS);
 			//printInstructionBufferWithMessageAndNumber(ib,"After:",0);
 #ifdef OPT_DEBUG_SANITY
@@ -2224,7 +1690,7 @@ sanityCheck(ib);
 bool attemptSinglePeepHoleTransform(ValueTraceEntriesApplicableRepeatedParams* vtearp){
 	uint8_t unusedReg[6]={16,16,16,16,16,16};
 	if (vtearp->template->nUnusedReg!=0){
-		if (!findUnusedRegsAfterTarget(vtearp->ib,vtearp->startIndex,unusedReg,vtearp->template->nUnusedReg,true)){
+		if (!findUnusedRegsAfterTarget(vtearp->ib,vtearp->startIndex,unusedReg,vtearp->template->nUnusedReg)){
 			return false;
 		}
 	}
@@ -2259,7 +1725,7 @@ sanityCheck(vtearp->ib);
 	InstructionInformation II;
 	do {
 		fillInstructionInformation(&II,vtearp->ib,i);
-		if (!II.doesMoveStack & !II.isMemoryAccess & !II.isSymbolicInternal & II.id!=I_SYRB & II.id!=I_SYRW & II.id!=I_SYRD){
+		if (!II.doesMoveStack & !II.isMemoryAccess & !II.isSymbolicInternal & II.id!=I_SYRB & II.id!=I_SYRW & II.id!=I_SYRD & II.id!=I_SYRQ){
 			bool isNoneUsed=true;
 			uint8_t r;
 			uint8_t ri=0;
@@ -2380,10 +1846,10 @@ printf("peephole opt now attempting to apply `%02X`\n",ph_template_i);
 								didSucceedAtLeastOnce=true;
 								InstructionSingle IS;
 								IS.id=I_POP1;
-								IS.arg.B.a_0=ladpl.reg;
+								IS.arg.B1.a_0=ladpl.reg;
 								insertInstructionAt(ib,regSource+1,IS);
 								IS.id=I_PU1_;
-								IS.arg.B.a_0=II.regIN[1];
+								IS.arg.B1.a_0=II.regIN[1];
 								insertInstructionAt(ib,regSource,IS);
 								++i;
 #ifdef OPT_PEEPHOLE_PRINT_TREE
@@ -2436,6 +1902,7 @@ void attemptAllActiveOptPhase1(InstructionBuffer* ib){
 	}
 	applyMovFromSmallConstOpt(ib);
 }
+
 void attemptAllActiveOptPhase2(InstructionBuffer* ib){
 	uint16_t i=0;
 	bool v0=1;

@@ -10,9 +10,4 @@
 #include "BlockFrame.c"
 #include "DataLiteralReferencer.c"
 
-
-/*
-Remember that the preprocesser needs main to run "initMacros();" before the preprocesser starts
-*/
-
 #endif

@@ -2246,9 +2246,6 @@ int32_t getIndexOfNextDirectiveThatEndsIfStatement(int32_t indexOfNewlineToStart
 }
 
 
-// things with if directives are todo. also, the things with chaining if directives are very untested.
-// actually, basically everything with directives is untested. so yeah. expect some of that to fail right now.
-
 // beginningFileName should have quotes around it
 void insertBeginningFileAndRunPreprocesser(const char *beginningFileName){
 	checkArchitecture();

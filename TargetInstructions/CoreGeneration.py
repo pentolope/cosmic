@@ -60,12 +60,6 @@ def removeC_comments(s):
 
 
 instructionListWithPrefix = [
-'PHIS %',
-'PHIE %',
-'STPI % #',
-'ERR_',
-'DEPL',
-'PEPH',
 'NOP_',
 'PU1_ %',
 'PU2_ % %',
@@ -79,14 +73,14 @@ instructionListWithPrefix = [
 'CALL % %',
 'RET_',
 'STPA % #',
-'STPS % #' ,
+'STPS % #',
 'STWN % $',
 'STRN % $',
 'STWV % $',
 'STRV % $',
 'ALOC',
 'ALCR % #',
-'STOF % % #',
+'STOF % #',
 'AJMP % %',
 'CJMP % % %',
 'JJMP % % :',
@@ -98,7 +92,6 @@ instructionListWithPrefix = [
 'XOR_ % % %',
 'SSUB % % %',
 'ADDN % % %',
-'ADDC % % %',
 'SUBN % % %',
 'SUBC % % %',
 'MULS % %',
@@ -114,114 +107,165 @@ instructionListWithPrefix = [
 'MRBN % %',
 'MWBV % %',
 'MRBV % %',
+'LABL :',# the label is symbolic and is used to discern between multiple labels
+'PHIS %',
+'PHIE %',
+'FCST $ # :',
+'FCEN',
 'D32U',
 'R32U',
 'D32S',
 'R32S',
-'FCST $ # :',
-'FCEN',
+'D64U',
+'R64U',
+'D64S',
+'R64S',
+'LAD0 % % % % % %',
+'LAD1 % % % % %',
+'LAD2 % % % %',
+'LAD3 % % % % % % % %',
+'LAD4',
+'LAD5',
+'LSU0 % % % %',
+'LSU3 % % % % % % % %',
+'LSU4',
+'LSU5',
+'LMU3 % % % % % % % %',
+'LMU4',
+'LMU5',
+'LDI4',
+'LDI5',
+'LLS6',
+'LLS7',
+'LRS6',
+'LRS7',
 'SYRB %',
 'SYRW %',
 'SYRD % %',
+'SYRQ % % % %',
 'SYRE',
 'NSNB !',
-'NSCB !',
-'NSNW !',
-'NSCW !',
 'ZNXB !',
-'ZNXW !',
 'BYTE $',
 'WORD #',
 'DWRD !',
 'SYDB',
 'SYDW',
 'SYDD',
+'SYDQ',
 'SYDE',
-'LOFF !',
 'SYCB $',
 'SYCW #',
 'SYCD !',
-'SYC0',
-'SYC1',
-'SYC2',
-'SYC3',
-'SYC4',
-'SYC5',
-'SYC6',
-'SYC7',
-'SYC8',
-'SYC9',
-'SYCX',
-'SYCY',
-'SYCA',
-'SYCU',
-'SYCO',
-'SYCQ',
-'SYCC',
-'SYCN',
-'SYCM',
-'SYCZ',
-'SYCS',
-'SYCT',
-"SYCL @", # the label is symbolic and is used to discern between multiple labels
-"LABL :", # the label is symbolic and is used to discern between multiple labels
+'SYCL @',# the label is symbolic and is used to discern between multiple labels
+'SYW0',
+'SYW1',
+'SYW2',
+'SYW3',
+'SYW4',
+'SYW5',
+'SYW6',
+'SYW7',
+'SYW8',
+'SYW9',
+'SBLW',
+'SBRW',
+'SYD0',
+'SYD1',
+'SYD2',
+'SYD3',
+'SYD4',
+'SYD5',
+'SYD6',
+'SYD7',
+'SYD8',
+'SYD9',
+'SBLD',
+'SBRD',
+'SYQ0',
+'SYQ1',
+'SYQ2',
+'SYQ3',
+'SYQ4',
+'SYQ5',
+'SYQ6',
+'SYQ7',
+'SYQ8',
+'SYQ9',
+'SBLQ',
+'SBRQ',
+'SCBW',
+'SCWD',
+'SCDQ',
+'SCQD',
+'SCDW',
+'SCWB',
+'SCDB',
+'SCQB',
+'SCZD',
+'SCZQ',
 
-"INSR &" # the & prefix contains 1 hex character
+'ERR_',
+'DEPL',
+'PEPH',
+'STPI % #',
+'LOFF !',
+'INSR &' # the & prefix contains 1 hex character
 ]
 
 
 dictionaryOfInitializationContents = {
 "IB_stack_dupe_word":"""
 
-POP1 %C
-PU2_ %C %C
+POP1 %2
+PU2_ %2 %2
 
 """,
 
 
 "IB_stack_dupe_dword":"""
 
-POP2 %C %2
-PU2_ %2 %C
-PU2_ %2 %C
+POP2 %3 %2
+PU2_ %2 %3
+PU2_ %2 %3
 
 """,
 
 
 "IB_stack_swp_11":"""
 
-POP2 %3 %4
-PU2_ %3 %4
+POP2 %2 %3
+PU2_ %2 %3
 
 """,
 
 
 "IB_stack_swp_12":"""
 
-POP2 %5 %6
-POP1 %3
-PU2_ %6 %5
-PU1_ %3
+POP2 %3 %4
+POP1 %2
+PU2_ %4 %3
+PU1_ %2
 
 """,
 
 
 "IB_stack_swp_21":"""
 
-POP1 %5
-POP2 %3 %4
-PU1_ %5
-PU2_ %4 %3
+POP1 %4
+POP2 %2 %3
+PU1_ %4
+PU2_ %3 %2
 
 """,
 
 
 "IB_stack_swp_22":"""
 
-POP2 %3 %4
-POP2 %5 %6
-PU2_ %4 %3
-PU2_ %6 %5
+POP2 %2 %3
+POP2 %4 %5
+PU2_ %3 %2
+PU2_ %5 %4
 
 """,
 
@@ -249,78 +293,74 @@ PU2_ %4 %3
 
 "IB_i_16add":"""
 
-POP2 %2 %C
-ADDN %3 %C %2
-PU1_ %3
+POP2 %3 %2
+ADDN %4 %2 %3
+PU1_ %4
 
 """,
 
 
 "IB_i_32add":"""
 
-POP2 %3 %4
-POP2 %C %2
-ADDC %5 %C %3
-ADDN %6 %4 %2
-ADDN %6 %6 %F
-PU2_ %6 %5
+POP2 %4 %5
+POP2 %6 %7
+LAD0 %2 %3 %4 %5 %6 %7
+PU2_ %3 %2
 
 """,
 
 
 "IB_i_16sub":"""
 
-POP2 %2 %C
-SUBN %3 %C %2
-PU1_ %3
+POP2 %2 %3
+SUBN %4 %3 %2
+PU1_ %4
 
 """,
 
 
 "IB_i_32sub":"""
 
-POP2 %3 %4
-POP2 %C %2
-BL1_ %5 $01
-SSUB %5 %C %3
-SSUB %5 %2 %4
-PU2_ %C %2
+POP2 %4 %5
+POP2 %2 %3
+LSU0 %2 %3 %4 %5
+PU2_ %3 %2
 
 """,
 
 
 "IB_i_16mul":"""
 
-POP2 %2 %C
-MULS %C %2
-PU1_ %C
+POP2 %2 %3
+MULS %3 %2
+PU1_ %3
 
 """,
 
 
 "IB_i_32mul":"""
 
-POP2 %C %2
-POP2 %E %F
-MULL %C %2
-PU2_ %F %E
+POP2 %2 %3
+POP2 %D %E
+MULL %2 %3
+PU2_ %E %D
 
 """,
 
 
 "IB_i_16div_u_u":"""
 
-POP2 %2 %C
-DIVM %C %2
-PU1_ %C
+POP2 %2 %3
+DIVM %3 %2
+PU1_ %3
 
 """,
 
 
 "IB_i_16mod_u_u":"""
 
-POP2 %2 %C
-DIVM %C %2
+POP2 %2 %3
+DIVM %3 %2
 PU1_ %2
 
 """,
@@ -333,15 +373,15 @@ RL1_ %9 #8000
 RL1_ %3 #FFFF
 MOV_ %4 %3
 AND_ %7 %C %9
-ADDC %7 %7 %9
-MULS %3 %F
-MOV_ %5 %F
+LAD2 %7 %A %7 %9
+MULS %3 %A
+MOV_ %5 %A
 XOR_ %C %C %3
 ADDN %C %C %5
 AND_ %7 %2 %9
-ADDC %7 %7 %9
-MULS %4 %F
-MOV_ %6 %F
+LAD2 %7 %A %7 %9
+MULS %4 %A
+MOV_ %6 %A
 XOR_ %2 %2 %4
 ADDN %2 %2 %6
 XOR_ %3 %3 %4
@@ -361,15 +401,15 @@ RL1_ %9 #8000
 RL1_ %3 #FFFF
 MOV_ %4 %3
 AND_ %7 %C %9
-ADDC %7 %7 %9
-MULS %3 %F
-MOV_ %5 %F
+LAD2 %7 %A %7 %9
+MULS %3 %A
+MOV_ %5 %A
 XOR_ %C %C %3
 ADDN %C %C %5
 AND_ %7 %2 %9
-ADDC %7 %7 %9
-MULS %4 %F
-MOV_ %6 %F
+LAD2 %7 %A %7 %9
+MULS %4 %A
+MOV_ %6 %A
 XOR_ %2 %2 %4
 ADDN %2 %2 %6
 DIVM %C %2
@@ -583,15 +623,15 @@ PU1_ %5
 
 "IB_comp_leq_int_s":"""
 
-POP2 %C %2
+POP2 %3 %2
 
-RL1_ %3 #8000
-XOR_ %C %C %3
-XOR_ %2 %2 %3
+RL1_ %4 #8000
+XOR_ %3 %3 %4
+XOR_ %2 %2 %4
 
-BL1_ %3 $01
-SSUB %3 %C %2
-PU1_ %3
+BL1_ %4 $01
+SSUB %4 %3 %2
+PU1_ %4
 
 """,
 
@@ -711,9 +751,9 @@ PU1_ %5
 
 "IB_b_and_int":"""
 
-POP2 %2 %C
-AND_ %3 %2 %C
-PU1_ %3
+POP2 %2 %3
+AND_ %4 %2 %3
+PU1_ %4
 
 """,
 
@@ -731,9 +771,9 @@ PU2_ %6 %5
 
 "IB_b_or_int":"""
 
-POP2 %2 %C
-OR__ %3 %2 %C
-PU1_ %3
+POP2 %2 %3
+OR__ %4 %2 %3
+PU1_ %4
 
 """,
 
@@ -751,9 +791,9 @@ PU2_ %6 %5
 
 "IB_b_xor_int":"""
 
-POP2 %2 %C
-XOR_ %3 %2 %C
-PU1_ %3
+POP2 %2 %3
+XOR_ %4 %2 %3
+PU1_ %4
 
 """,
 
@@ -771,9 +811,9 @@ PU2_ %6 %5
 
 "IB_b_not_int":"""
 
-POP1 %C
+POP1 %4
 RL1_ %3 #FFFF
-XOR_ %2 %3 %C
+XOR_ %2 %3 %4
 PU1_ %2
 
 """,
@@ -781,9 +821,9 @@ PU1_ %2
 
 "IB_b_not_long":"""
 
-POP2 %C %2
+POP2 %6 %2
 RL1_ %5 #FFFF
-XOR_ %3 %C %5
+XOR_ %3 %6 %5
 XOR_ %4 %2 %5
 PU2_ %4 %3
 
@@ -830,12 +870,12 @@ LABL :00000000
 
 "IB_char_s_TO_int_s":"""
 
-POP1 %C
+POP1 %4
 BL1_ %2 $80
-AND_ %3 %2 %C
+AND_ %3 %2 %4
 RL1_ %2 #01FE
 MULS %3 %2
-OR__ %2 %C %3
+OR__ %2 %4 %3
 PU1_ %2
 
 """,
@@ -843,49 +883,49 @@ PU1_ %2
 
 "IB_int_s_TO_long_s":"""
 
-POP1 %C
-ADDC %2 %C %C
+POP1 %4
+LAD2 %2 %3 %4 %4
 RL1_ %2 #FFFF
-MULS %2 %F
-PU2_ %2 %C
+MULS %2 %3
+PU2_ %2 %4
 
 """,
 
 
 "IB_int_u_TO_long":"""
 
-POP1 %C
-BL1_ %2 $00
-PU2_ %2 %C
+POP1 %2
+BL1_ %3 $00
+PU2_ %3 %2
 
 """,
 
 
 "IB_long_TO_int":"""
 
-POP2 %C %2
-PU1_ %C
+POP2 %2 %3
+PU1_ %2
 
 """,
 
 
 "IB_long_TO_bool":"""
 
-POP2 %C %2
-OR__ %2 %C %2
-BL1_ %3 $00
-SSUB %3 %2 %3
-PU1_ %3
+POP2 %2 %3
+OR__ %3 %2 %3
+BL1_ %4 $00
+SSUB %4 %3 %4
+PU1_ %4
 
 """,
 
 
 "IB_int_TO_bool":"""
 
-POP1 %C
-BL1_ %2 $00
-SSUB %2 %C %2
-PU1_ %2
+POP1 %2
+BL1_ %4 $00
+SSUB %4 %2 %4
+PU1_ %4
 
 """,
 
@@ -902,20 +942,20 @@ PU2_ %B %A
 
 "IB_mem_byte_write_n":"""
 
-POP2 %E %2
-POP1 %C
-MWBN %C %2
-PU1_ %C
+POP2 %D %3
+POP1 %2
+MWBN %2 %3
+PU1_ %2
 
 """,
 
 
 "IB_mem_byte_write_v":"""
 
-POP2 %E %2
-POP1 %C
-MWBV %C %2
-PU1_ %C
+POP2 %D %3
+POP1 %2
+MWBV %2 %3
+PU1_ %2
 
 """,
 
@@ -923,9 +963,9 @@ PU1_ %C
 "IB_mem_word_write_n":"""
 
 POP2 %2 %3
-POP1 %C
-MWWN %C %2 %3
-PU1_ %C
+POP1 %4
+MWWN %4 %2 %3
+PU1_ %4
 
 """,
 
@@ -933,9 +973,9 @@ PU1_ %C
 "IB_mem_word_write_v":"""
 
 POP2 %2 %3
-POP1 %C
-MWWV %C %2 %3
-PU1_ %C
+POP1 %4
+MWWV %4 %2 %3
+PU1_ %4
 
 """,
 
@@ -943,13 +983,12 @@ PU1_ %C
 "IB_mem_dword_write_n":"""
 
 POP2 %3 %4
-POP2 %C %2
-MWWN %C %3 %4
-BL1_ %5 $02
-ADDC %3 %3 %5
-ADDN %4 %4 %F
-MWWN %2 %3 %4
-PU2_ %2 %C
+POP2 %6 %5
+MWWN %6 %3 %4
+BL1_ %7 $02
+LAD1 %3 %4 %3 %4 %7
+MWWN %5 %3 %4
+PU2_ %5 %6
 
 """,
 
@@ -957,44 +996,43 @@ PU2_ %2 %C
 "IB_mem_dword_write_v":"""
 
 POP2 %3 %4
-POP2 %C %2
-MWWV %C %3 %4
-BL1_ %5 $02
-ADDC %3 %3 %5
-ADDN %4 %4 %F
+POP2 %6 %5
+MWWV %6 %3 %4
+BL1_ %7 $02
+LAD1 %3 %4 %3 %4 %7
 MWWV %2 %3 %4
-PU2_ %2 %C
+PU2_ %5 %6
 
 """,
 
 
 "IB_mem_byte_read_n":"""
 
-POP2 %E %2
-MRBN %C %2
-PU1_ %C
+POP2 %D %2
+MRBN %3 %2
+PU1_ %3
 
 """,
 
 
 "IB_mem_byte_read_v":"""
 
-POP2 %E %2
-MRBV %C %2
-PU1_ %C
+POP2 %D %2
+MRBV %3 %2
+PU1_ %3
 
 """,
 
 
 "IB_mem_sbyte_read_n":"""
 
-POP2 %E %2
-MRBN %C %2
+POP2 %D %2
+MRBN %4 %2
 BL1_ %2 $80
-AND_ %3 %2 %C
+AND_ %3 %2 %4
 RL1_ %2 #01FE
 MULS %3 %2
-OR__ %2 %C %3
+OR__ %2 %4 %3
 PU1_ %2
 
 """,
@@ -1002,13 +1040,13 @@ PU1_ %2
 
 "IB_mem_sbyte_read_v":"""
 
-POP2 %E %2
-MRBV %C %2
+POP2 %D %2
+MRBV %4 %2
 BL1_ %2 $80
-AND_ %3 %2 %C
+AND_ %3 %2 %4
 RL1_ %2 #01FE
 MULS %3 %2
-OR__ %2 %C %3
+OR__ %2 %4 %3
 PU1_ %2
 
 """,
@@ -1017,8 +1055,8 @@ PU1_ %2
 "IB_mem_word_read_n":"""
 
 POP2 %2 %3
-MRWN %C %2 %3
-PU1_ %C
+MRWN %4 %2 %3
+PU1_ %4
 
 """,
 
@@ -1026,8 +1064,8 @@ PU1_ %C
 "IB_mem_word_read_v":"""
 
 POP2 %2 %3
-MRWV %C %2 %3
-PU1_ %C
+MRWV %4 %2 %3
+PU1_ %4
 
 """,
 
@@ -1035,12 +1073,11 @@ PU1_ %C
 "IB_mem_dword_read_n":"""
 
 POP2 %3 %4
-MRWN %C %3 %4
-BL1_ %5 $02
-ADDC %3 %3 %5
-ADDN %4 %4 %F
-MRWN %2 %3 %4
-PU2_ %2 %C
+MRWN %6 %3 %4
+BL1_ %7 $02
+LAD1 %3 %4 %3 %4 %7
+MRWN %5 %3 %4
+PU2_ %5 %6
 
 """,
 
@@ -1048,46 +1085,41 @@ PU2_ %2 %C
 "IB_mem_dword_read_v":"""
 
 POP2 %3 %4
-MRWV %C %3 %4
-BL1_ %5 $02
-ADDC %3 %3 %5
-ADDN %4 %4 %F
-MRWV %2 %3 %4
-PU2_ %2 %C
+MRWV %6 %3 %4
+BL1_ %7 $02
+LAD1 %3 %4 %3 %4 %7
+MRWV %5 %3 %4
+PU2_ %5 %6
 
 """,
 
 
 "IB_mem_word_copy_n_n":"""
 
-POP2 %C %2
-POP2 %3 %4
-BL1_ %6 $02
-MRWN %5 %C %2
-MWWN %5 %3 %4
-ADDC %C %C %6
-ADDN %2 %2 %F
-ADDC %3 %3 %6
-ADDN %4 %4 %F
-PU2_ %4 %3
-PU2_ %2 %C
+POP2 %2 %3
+POP2 %4 %5
+BL1_ %7 $02
+MRWN %6 %2 %3
+MWWN %6 %4 %5
+LAD1 %2 %3 %2 %3 %7
+LAD1 %4 %5 %4 %5 %7
+PU2_ %5 %4
+PU2_ %3 %2
 
 """,
 
 
 "IB_mem_word_copy_n_v":"""
 
-POP2 %C %2
-POP2 %3 %4
-BL1_ %6 $02
-MRWN %5 %C %2
-MWWV %5 %3 %4
-ADDC %C %C %6
-ADDN %2 %2 %F
-ADDC %3 %3 %6
-ADDN %4 %4 %F
-PU2_ %4 %3
-PU2_ %2 %C
+POP2 %2 %3
+POP2 %4 %5
+BL1_ %7 $02
+MRWN %6 %2 %3
+MWWV %6 %4 %5
+LAD1 %2 %3 %2 %3 %7
+LAD1 %4 %5 %4 %5 %7
+PU2_ %5 %4
+PU2_ %3 %2
 
 """,
 
@@ -1095,34 +1127,30 @@ PU2_ %2 %C
 
 "IB_mem_word_copy_v_n":"""
 
-POP2 %C %2
-POP2 %3 %4
-BL1_ %6 $02
-MRWV %5 %C %2
-MWWN %5 %3 %4
-ADDC %C %C %6
-ADDN %2 %2 %F
-ADDC %3 %3 %6
-ADDN %4 %4 %F
-PU2_ %4 %3
-PU2_ %2 %C
+POP2 %2 %3
+POP2 %4 %5
+BL1_ %7 $02
+MRWV %6 %2 %3
+MWWN %6 %4 %5
+LAD1 %2 %3 %2 %3 %7
+LAD1 %4 %5 %4 %5 %7
+PU2_ %5 %4
+PU2_ %3 %2
 
 """,
 
 
 "IB_mem_word_copy_v_v":"""
 
-POP2 %C %2
-POP2 %3 %4
-BL1_ %6 $02
-MRWV %5 %C %2
-MWWV %5 %3 %4
-ADDC %C %C %6
-ADDN %2 %2 %F
-ADDC %3 %3 %6
-ADDN %4 %4 %F
-PU2_ %4 %3
-PU2_ %2 %C
+POP2 %2 %3
+POP2 %4 %5
+BL1_ %7 $02
+MRWV %6 %2 %3
+MWWV %6 %4 %5
+LAD1 %2 %3 %2 %3 %7
+LAD1 %4 %5 %4 %5 %7
+PU2_ %5 %4
+PU2_ %3 %2
 
 """,
 
@@ -1268,24 +1296,24 @@ POP2 %B %C
 
 "IB_load_byte":"""
 
-BL1_ %C $00
-PU1_ %C
+BL1_ %2 $00
+PU1_ %2
 
 """,
 
 
 "IB_load_word":"""
 
-RL1_ %C #0000
-PU1_ %C
+RL1_ %2 #0000
+PU1_ %2
 
 """,
 
 
 "IB_load_dword":"""
 
-RL2_ %2 %C !00000000
-PU2_ %C %2
+RL2_ %2 %3 !00000000
+PU2_ %3 %2
 
 """,
 
@@ -1389,8 +1417,8 @@ LABL :00000001
 
 "IB_direct_jump":"""
 
-POP2 %C %2
-AJMP %C %2
+POP2 %2 %3
+AJMP %2 %3
 
 """,
 
@@ -1710,853 +1738,18 @@ PU1_ %2
 
 "IB_Lshift32":"""
 
-POP1 %7
-POP2 %E %F
-BL1_ %B $01
-BL1_ %5 $02
-RL1_ %D #FFFF
-BL1_ %C $00
-BL1_ %2 $00
-BL1_ %3 $00
-
-SUBC %A %C %7
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $01
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $02
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $03
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $04
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $05
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $06
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $07
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $08
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $09
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $0A
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $0B
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $0C
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $0D
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $0E
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $0F
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $10
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $11
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $12
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $13
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $14
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $15
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $16
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $17
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $18
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $19
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $1A
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $1B
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $1C
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $1D
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $1E
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
-MULL %C %5
-BL1_ %A $1F
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %E
-OR__ %2 %2 %6
-AND_ %6 %A %F
-OR__ %3 %3 %6
-
+POP1 %A
+POP2 %6 %7
+LLS6
 PU2_ %3 %2
 
 """,
 
 "IB_Rshift32":"""
 
-POP1 %7
-POP2 %8 %9
-BL1_ %B $01
-RL1_ %D #FFFF
-BL1_ %C $00
-BL1_ %2 $00
-BL1_ %3 $00
-BL1_ %4 $01
-RL1_ %5 #1000
-
-SUBC %A %C %7
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $01
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $02
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $03
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $04
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $05
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $06
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $07
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $08
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $09
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $0A
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $0B
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $0C
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $0D
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $0E
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $0F
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $10
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $11
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $12
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $13
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $14
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $15
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $16
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $17
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $18
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $19
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $1A
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $1B
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $1C
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $1D
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $1E
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
-AND_ %6 %4 %9
-MULS %6 %5
-SHFT %8 %8
-SHFT %9 %9
-OR__ %8 %8 %6
-BL1_ %A $1F
-XOR_ %A %A %7
-SUBC %A %C %A
-XOR_ %A %A %B
-MULS %A %D
-AND_ %6 %A %8
-OR__ %2 %2 %6
-AND_ %6 %A %9
-OR__ %3 %3 %6
-
+POP1 %A
+POP2 %6 %7
+LRS6
 PU2_ %3 %2
 
 """,
@@ -2564,913 +1757,7 @@ PU2_ %3 %2
 "IB_internal_div32_u_u":"""
 
 FCST $0A #000A :00000001
-PHIE %2
-PHIE %3
-PHIE %4
-PHIE %5
-BL1_ %6 $00
-BL1_ %7 $00
-BL1_ %7 $00
-BL1_ %9 $00
-RL1_ %C #FFFF
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-PHIS %8
-PHIS %9
+
 RET_
 FCEN
 
@@ -3479,753 +1766,7 @@ FCEN
 "IB_internal_mod32_u_u":"""
 
 FCST $0A #000A :00000002
-PHIE %2
-PHIE %3
-PHIE %4
-PHIE %5
-BL1_ %6 $00
-BL1_ %7 $00
-BL1_ %7 $00
-BL1_ %9 $00
-RL1_ %C #FFFF
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-PHIS %6
-PHIS %7
+
 RET_
 FCEN
 
@@ -4234,943 +1775,7 @@ FCEN
 "IB_internal_div32_s_s":"""
 
 FCST $0A #000A :00000003
-PHIE %2
-PHIE %3
-PHIE %4
-PHIE %5
-RL1_ %C #FFFF
-BL1_ %D $80
-BSWP %D %D
-AND_ %6 %3 %D
-ADDC %6 %6 %D
-ADDN %6 %F %C
-XOR_ %6 %6 %C
-MOV_ %A %6
-MOV_ %7 %F
-XOR_ %2 %2 %6
-XOR_ %3 %3 %6
-ADDC %2 %2 %7
-ADDN %3 %3 %F
-AND_ %6 %5 %D
-ADDC %6 %6 %D
-ADDN %6 %F %C
-XOR_ %6 %6 %C
-XOR_ %A %A %6
-MOV_ %7 %F
-XOR_ %4 %4 %6
-XOR_ %5 %5 %6
-ADDC %4 %4 %7
-ADDN %5 %5 %F
-PU1_ %A
-BL1_ %6 $00
-BL1_ %7 $00
-BL1_ %7 $00
-BL1_ %9 $00
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %7 %7 %7
-OR__ %7 %7 %D
-MOV_ %D %F
-ADDN %9 %9 %9
-OR__ %9 %9 %D
-POP1 %A
-BL1_ %B $01
-AND_ %B %B %A
-XOR_ %7 %7 %A
-XOR_ %9 %9 %A
-ADDC %7 %7 %B
-ADDN %9 %9 %F
-PHIS %8
-PHIS %9
+
 RET_
 FCEN
 
@@ -5179,782 +1784,7 @@ FCEN
 "IB_internal_mod32_s_s":"""
 
 FCST $0A #000A :00000004
-PHIE %2
-PHIE %3
-PHIE %4
-PHIE %5
-RL1_ %C #FFFF
-BL1_ %D $80
-BSWP %D %D
-AND_ %6 %3 %D
-ADDC %6 %6 %D
-ADDN %6 %F %C
-XOR_ %6 %6 %C
-MOV_ %A %6
-MOV_ %7 %F
-XOR_ %2 %2 %6
-XOR_ %3 %3 %6
-ADDC %2 %2 %7
-ADDN %3 %3 %F
-AND_ %6 %5 %D
-ADDC %6 %6 %D
-ADDN %6 %F %C
-XOR_ %6 %6 %C
-MOV_ %7 %F
-XOR_ %4 %4 %6
-XOR_ %5 %5 %6
-ADDC %4 %4 %7
-ADDN %5 %5 %F
-PU1_ %A
-BL1_ %6 $00
-BL1_ %7 $00
-BL1_ %7 $00
-BL1_ %9 $00
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-ADDC %4 %4 %4
-MOV_ %D %F
-ADDC %5 %5 %5
-OR__ %5 %5 %D
-MOV_ %D %F
-ADDC %6 %6 %6
-OR__ %6 %6 %D
-MOV_ %D %F
-ADDN %7 %7 %7
-OR__ %7 %7 %D
-BL1_ %D $01
-MOV_ %A %6
-MOV_ %B %7
-SSUB %D %A %2
-SSUB %D %B %3
-ADDN %E %C %D
-AND_ %6 %6 %E
-AND_ %7 %7 %E
-XOR_ %E %E %C
-AND_ %A %A %E
-AND_ %B %B %E
-OR__ %6 %6 %A
-OR__ %7 %7 %B
-POP1 %A
-BL1_ %B $01
-AND_ %B %B %A
-XOR_ %6 %6 %A
-XOR_ %7 %7 %A
-ADDC %6 %6 %B
-ADDN %7 %7 %F
-PHIS %6
-PHIS %7
+
 RET_
 FCEN
 
@@ -5966,20 +1796,16 @@ FCEN
 
 def splitInstructionString(s):
     l = s.split('\n')
-    if len(l)>0 and len(l[-1])==0:
-        l=l[:-1]
+    if len(l)>0 and len(l[-1])==0:l=l[:-1]
     return l
 
 def checkArgument(singleArgWithPrefix):
     c=singleArgWithPrefix[0]
-    if c=='%' or c=='&':
-        assert len(singleArgWithPrefix)==2
-    if c=='$':
-        assert len(singleArgWithPrefix)==3
-    if c=='#':
-        assert len(singleArgWithPrefix)==5
-    if c=='!' or c==':' or c=='@':
-        assert len(singleArgWithPrefix)==9
+    if c=='%' or c=='&':assert len(singleArgWithPrefix)==2
+    elif c=='$':assert len(singleArgWithPrefix)==3
+    elif c=='#':assert len(singleArgWithPrefix)==5
+    elif c=='!' or c==':' or c=='@':assert len(singleArgWithPrefix)==9
+    else:assert False
 
 
 for k in dictionaryOfInitializationContents.keys():
@@ -6026,8 +1852,8 @@ def genInitializerForArguments(index,instrList):
        ':':'D'
        }
     s=''.join([d[i[0]] for i in instrList])
+    if s=='B'*len(s):s='B'+str(len(s))
     r=','.join([genInitializerForSingleArgument(index,s,arg,i) for i,arg in enumerate(instrList)])
-    if s=='BWD':print r
     return r
 
 def genInitializerForSplitInstructions(tpl):
@@ -6124,25 +1950,21 @@ if 3!=len(splitInstructionString(dictionaryOfInitializationContents['IB_STPA']))
     print "Warning: 'IB_STPA' does not have two instructions in it. Make sure to change the LiteralLoadsAndCall.c file to respect this."
 
 f.write('\n')
-print '\nDone'
 f.close()
 
-
-
-
-
-def getPrintoutCode():
+def genPrintoutCode():
+    finalString='void printSingleInstructionOptCode(const InstructionSingle instructionSingle){\n'
     def getPref(strWithI):
         for i in instructionListWithPrefix:
             if strWithI[2:]==i.split(' ')[0]:
                 return i
         raise ValueError
     l=map(lambda x:'I_'+x.split(' ')[0],instructionListWithPrefix)
-    print 'switch(instructionSingle.id){'
+    finalString+='switch(instructionSingle.id){\n'
     for j in l:
         p=getPref(j).split(' ')
         acc=''
-        acc+='\tcase '+j+':printf("'+j[2:]
+        acc+='case '+j+':printf("'+j[2:]
         for pref in p[1:]:
             acc+=' '
             if pref in '%&':
@@ -6154,35 +1976,49 @@ def getPrintoutCode():
             if pref in '!@:':
                 acc+=pref+'%08X'
         acc+='"'
-        stuctName=''
+        structName=''
         for pref in p[1:]:
             if pref=='&':
-                stuctName+='B'
+                structName+='B'
             if pref=='%':
-                stuctName+='B'
+                structName+='B'
             if pref=='$':
-                stuctName+='B'
+                structName+='B'
             if pref=='#':
-                stuctName+='W'
+                structName+='W'
             if pref=='!':
-                stuctName+='D'
+                structName+='D'
             if pref=='@':
-                stuctName+='D'
+                structName+='D'
             if pref==':':
-                stuctName+='D'
+                structName+='D'
+        if structName=='B'*len(structName):structName='B'+str(len(structName))
         for i,pref in enumerate(p[1:]):
             acc+=','
             if pref=='&':
-                acc+='instructionSingle.arg.'+stuctName+'.a_'+str(i)
+                acc+='instructionSingle.arg.'+structName+'.a_'+str(i)
             if pref=='%':
-                acc+='instructionSingle.arg.'+stuctName+'.a_'+str(i)
+                acc+='instructionSingle.arg.'+structName+'.a_'+str(i)
             if pref=='$':
-                acc+='instructionSingle.arg.'+stuctName+'.a_'+str(i)
+                acc+='instructionSingle.arg.'+structName+'.a_'+str(i)
             if pref=='#':
-                acc+='instructionSingle.arg.'+stuctName+'.a_'+str(i)
+                acc+='instructionSingle.arg.'+structName+'.a_'+str(i)
             if pref in '!@:':
-                acc+='instructionSingle.arg.'+stuctName+'.a_'+str(i)
-        acc+=');break;'
-        print acc
-    print '}'
+                acc+='instructionSingle.arg.'+structName+'.a_'+str(i)
+        acc+=');break;\n'
+        finalString+=acc
+    finalString+='}\n}\n'
+    f=open('PrintSingleInstruction.c','w')
+    f.write(finalString)
+    f.close()
+
+genPrintoutCode()
+
+print '\nDone'
+
+
+
+
+
+
 

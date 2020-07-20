@@ -23,6 +23,9 @@ NOTE: the following instructions are not allowed in ValueTraceEntry trees:
 -- all raw data inserts
 -- all push and pop
 -- all jumps
+-- all instructions that take more then 4 inputs
+-- all instructions that have more then 2 outputs
+-- all instructions that destroy registers
 
 ALOC
 ALCR
@@ -33,11 +36,6 @@ RET_
 LABL
 
 RL2_
-
-D32U
-R32U
-D32S
-R32S
 
 FCST
 FCEN
@@ -800,7 +798,7 @@ printf("  [INSERT DEPL]\n");
 	if (II.id==I_BL1_ | II.id==I_RL1_){
 		InstructionSingle* thisIS=vtearp->ib->buffer+currentIndex;
 		thisSource->id=I_RL1_; // id is overwritten on purpose
-		if (II.id==I_BL1_) thisSource->cv=thisIS->arg.BB.a_1;
+		if (II.id==I_BL1_) thisSource->cv=thisIS->arg.B2.a_1;
 		else thisSource->cv=thisIS->arg.BW.a_1;
 	}
 	bool isSecondRegOut=II.regOUT[0]!=currentReg;
@@ -1072,7 +1070,7 @@ void applyInitialPeepHoleTransform(ValueTraceEntriesApplicableRepeatedParams* vt
 		InstructionSingle IS;
 		const enum InstructionTypeID ids[2]={I_POP1,I_PU1_};
 		IS.id=ids[(vte->entryType&0xF0)==0x60];
-		IS.arg.B.a_0=thisSource->regOUT;
+		IS.arg.B1.a_0=thisSource->regOUT;
 		vtearp->ib->buffer[target+1]=IS;
 		vtearp->pushPopRecord[vtearp->pushPopWalk++]=target+1;
 		vte=vtearp->template->vte+ ++vtearp->walkTemplate;
@@ -1251,10 +1249,10 @@ uint16_t applyPostPeepHole_2(ValueTraceEntriesApplicableRepeatedParams* vtearp, 
 	for (uint8_t i=0;i<length;i++){
 		IS.id=iip[i].id;
 		if (IS.id==I_BL1_){
-			IS.arg.BB.a_0=regs[iip[i].r0];
-			IS.arg.BB.a_1=iip[i].cv;
+			IS.arg.B2.a_0=regs[iip[i].r0];
+			IS.arg.B2.a_1=iip[i].cv;
 		} else if (IS.id==I_RL1_){
-			IS.arg.BB.a_0=regs[iip[i].r0];
+			IS.arg.BW.a_0=regs[iip[i].r0];
 			IS.arg.BW.a_1=iip[i].cv;
 		} else {
 			uint8_t rCount=0;
@@ -1262,14 +1260,14 @@ uint16_t applyPostPeepHole_2(ValueTraceEntriesApplicableRepeatedParams* vtearp, 
 			if (iip[i].r1!=16) ++rCount;
 			if (iip[i].r2!=16) ++rCount;
 			if (rCount==1){
-				IS.arg.B.a_0=regs[iip[i].r0];
+				IS.arg.B1.a_0=regs[iip[i].r0];
 			} else if (rCount==2){
-				IS.arg.BB.a_0=regs[iip[i].r0];
-				IS.arg.BB.a_1=regs[iip[i].r1];
+				IS.arg.B2.a_0=regs[iip[i].r0];
+				IS.arg.B2.a_1=regs[iip[i].r1];
 			} else {
-				IS.arg.BBB.a_0=regs[iip[i].r0];
-				IS.arg.BBB.a_1=regs[iip[i].r1];
-				IS.arg.BBB.a_2=regs[iip[i].r2];
+				IS.arg.B3.a_0=regs[iip[i].r0];
+				IS.arg.B3.a_1=regs[iip[i].r1];
+				IS.arg.B3.a_2=regs[iip[i].r2];
 			}
 		}
 		insertInstructionAt(ib,++insertionIndex,IS);
@@ -1290,32 +1288,32 @@ uint16_t applyPostPeepHole_1(ValueTraceEntriesApplicableRepeatedParams* vtearp, 
 		case 2:
 		case 6:// these cases need two unused registers
 		IS.id=I_POP1;
-		IS.arg.B.a_0=regOUT;
+		IS.arg.B1.a_0=regOUT;
 		insertInstructionAt(ib,++insertionIndex,IS);
 		IS.id=I_POP1;
-		IS.arg.B.a_0=unusedRegs[0];
+		IS.arg.B1.a_0=unusedRegs[0];
 		insertInstructionAt(ib,++insertionIndex,IS);
 		IS.id=I_POP1;
-		IS.arg.B.a_0=unusedRegs[1];
+		IS.arg.B1.a_0=unusedRegs[1];
 		insertInstructionAt(ib,++insertionIndex,IS);
 		IS.id=id;
 		if (id==I_MULS){
-			IS.arg.BB.a_0=unusedRegs[0];
-			IS.arg.BB.a_1=unusedRegs[1];
+			IS.arg.B2.a_0=unusedRegs[0];
+			IS.arg.B2.a_1=unusedRegs[1];
 		} else {
-			IS.arg.BBB.a_0=unusedRegs[0];
-			IS.arg.BBB.a_1=unusedRegs[0];
-			IS.arg.BBB.a_2=unusedRegs[1];
+			IS.arg.B3.a_0=unusedRegs[0];
+			IS.arg.B3.a_1=unusedRegs[0];
+			IS.arg.B3.a_2=unusedRegs[1];
 		}
 		insertInstructionAt(ib,++insertionIndex,IS);
 		IS.id=id;
 		if (id==I_MULS){
-			IS.arg.BB.a_0=regOUT;
-			IS.arg.BB.a_1=unusedRegs[0];
+			IS.arg.B2.a_0=regOUT;
+			IS.arg.B2.a_1=unusedRegs[0];
 		} else {
-			IS.arg.BBB.a_0=regOUT;
-			IS.arg.BBB.a_1=regOUT;
-			IS.arg.BBB.a_2=unusedRegs[0];
+			IS.arg.B3.a_0=regOUT;
+			IS.arg.B3.a_1=regOUT;
+			IS.arg.B3.a_2=unusedRegs[0];
 		}
 		insertInstructionAt(ib,++insertionIndex,IS);
 		break;
@@ -1323,32 +1321,32 @@ uint16_t applyPostPeepHole_1(ValueTraceEntriesApplicableRepeatedParams* vtearp, 
 		case 0:
 		case 7:
 		IS.id=I_POP1;
-		IS.arg.B.a_0=unusedRegs[0];
+		IS.arg.B1.a_0=unusedRegs[0];
 		insertInstructionAt(ib,++insertionIndex,IS);
 		IS.id=I_POP1;
-		IS.arg.B.a_0=regOUT;
+		IS.arg.B1.a_0=regOUT;
 		insertInstructionAt(ib,++insertionIndex,IS);
 		IS.id=I_POP1;
-		IS.arg.B.a_0=unusedRegs[1];
+		IS.arg.B1.a_0=unusedRegs[1];
 		insertInstructionAt(ib,++insertionIndex,IS);
 		IS.id=id;
 		if (id==I_MULS){
-			IS.arg.BB.a_0=unusedRegs[0];
-			IS.arg.BB.a_1=unusedRegs[1];
+			IS.arg.B2.a_0=unusedRegs[0];
+			IS.arg.B2.a_1=unusedRegs[1];
 		} else {
-			IS.arg.BBB.a_0=unusedRegs[0];
-			IS.arg.BBB.a_1=unusedRegs[0];
-			IS.arg.BBB.a_2=unusedRegs[1];
+			IS.arg.B3.a_0=unusedRegs[0];
+			IS.arg.B3.a_1=unusedRegs[0];
+			IS.arg.B3.a_2=unusedRegs[1];
 		}
 		insertInstructionAt(ib,++insertionIndex,IS);
 		IS.id=id;
 		if (id==I_MULS){
-			IS.arg.BB.a_0=regOUT;
-			IS.arg.BB.a_1=unusedRegs[0];
+			IS.arg.B2.a_0=regOUT;
+			IS.arg.B2.a_1=unusedRegs[0];
 		} else {
-			IS.arg.BBB.a_0=regOUT;
-			IS.arg.BBB.a_1=regOUT;
-			IS.arg.BBB.a_2=unusedRegs[0];
+			IS.arg.B3.a_0=regOUT;
+			IS.arg.B3.a_1=regOUT;
+			IS.arg.B3.a_2=unusedRegs[0];
 		}
 		insertInstructionAt(ib,++insertionIndex,IS);
 		break;
@@ -1356,32 +1354,32 @@ uint16_t applyPostPeepHole_1(ValueTraceEntriesApplicableRepeatedParams* vtearp, 
 		case 1:
 		case 3:// these cases only need one unused register
 		IS.id=I_POP1;
-		IS.arg.B.a_0=regOUT;
+		IS.arg.B1.a_0=regOUT;
 		insertInstructionAt(ib,++insertionIndex,IS);
 		IS.id=I_POP1;
-		IS.arg.B.a_0=unusedRegs[0];
+		IS.arg.B1.a_0=unusedRegs[0];
 		insertInstructionAt(ib,++insertionIndex,IS);
 		IS.id=id;
 		if (id==I_MULS){
-			IS.arg.BB.a_0=regOUT;
-			IS.arg.BB.a_1=unusedRegs[0];
+			IS.arg.B2.a_0=regOUT;
+			IS.arg.B2.a_1=unusedRegs[0];
 		} else {
-			IS.arg.BBB.a_0=regOUT;
-			IS.arg.BBB.a_1=regOUT;
-			IS.arg.BBB.a_2=unusedRegs[0];
+			IS.arg.B3.a_0=regOUT;
+			IS.arg.B3.a_1=regOUT;
+			IS.arg.B3.a_2=unusedRegs[0];
 		}
 		insertInstructionAt(ib,++insertionIndex,IS);
 		IS.id=I_POP1;
-		IS.arg.B.a_0=unusedRegs[0];
+		IS.arg.B1.a_0=unusedRegs[0];
 		insertInstructionAt(ib,++insertionIndex,IS);
 		IS.id=id;
 		if (id==I_MULS){
-			IS.arg.BB.a_0=regOUT;
-			IS.arg.BB.a_1=unusedRegs[0];
+			IS.arg.B2.a_0=regOUT;
+			IS.arg.B2.a_1=unusedRegs[0];
 		} else {
-			IS.arg.BBB.a_0=regOUT;
-			IS.arg.BBB.a_1=regOUT;
-			IS.arg.BBB.a_2=unusedRegs[0];
+			IS.arg.B3.a_0=regOUT;
+			IS.arg.B3.a_1=regOUT;
+			IS.arg.B3.a_2=unusedRegs[0];
 		}
 		insertInstructionAt(ib,++insertionIndex,IS);
 		break;
@@ -1445,30 +1443,30 @@ uint16_t applyPostPeepHole_6(ValueTraceEntriesApplicableRepeatedParams* vtearp, 
 	InstructionBuffer* ib=vtearp->ib;
 	InstructionSingle IS;
 	IS.id=I_POP1;
-	IS.arg.B.a_0=r[0];
+	IS.arg.B1.a_0=r[0];
 	insertInstructionAt(ib,++insertionIndex,IS);
-	IS.arg.B.a_0=r[1];
+	IS.arg.B1.a_0=r[1];
 	insertInstructionAt(ib,++insertionIndex,IS);
-	IS.arg.B.a_0=r[2];
+	IS.arg.B1.a_0=r[2];
 	insertInstructionAt(ib,++insertionIndex,IS);
-	IS.arg.B.a_0=r[3];
+	IS.arg.B1.a_0=r[3];
 	insertInstructionAt(ib,++insertionIndex,IS);
 	IS.id=id;
-	IS.arg.BBB.a_0=p[0];
-	IS.arg.BBB.a_1=p[0];
-	IS.arg.BBB.a_2=p[1];
+	IS.arg.B3.a_0=p[0];
+	IS.arg.B3.a_1=p[0];
+	IS.arg.B3.a_2=p[1];
 	insertInstructionAt(ib,++insertionIndex,IS);
-	IS.arg.BBB.a_0=p[2];
-	IS.arg.BBB.a_1=p[2];
-	IS.arg.BBB.a_2=p[3];
+	IS.arg.B3.a_0=p[2];
+	IS.arg.B3.a_1=p[2];
+	IS.arg.B3.a_2=p[3];
 	insertInstructionAt(ib,++insertionIndex,IS);
-	IS.arg.BBB.a_0=p[0];
-	IS.arg.BBB.a_1=p[0];
-	IS.arg.BBB.a_2=p[2];
+	IS.arg.B3.a_0=p[0];
+	IS.arg.B3.a_1=p[0];
+	IS.arg.B3.a_2=p[2];
 	insertInstructionAt(ib,++insertionIndex,IS);
 	IS.id=I_MOV_;
-	IS.arg.BB.a_0=r[0];
-	IS.arg.BB.a_1=p[0];
+	IS.arg.B2.a_0=r[0];
+	IS.arg.B2.a_1=p[0];
 	insertInstructionAt(ib,++insertionIndex,IS);
 	return 8;
 }

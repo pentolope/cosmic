@@ -49,12 +49,12 @@ instructions:
 2 - 0,1,0,1, - swap bytes in r1, place result in r0 (r1 is not modified)
 2 - 0,1,1,0, - shift r1 down one bit towards lower bits and store in r0 (r1 is not modified)
 2 - 0,1,1,1, - r0 * r1 -> r0 (the upper word is not generated)
-2 - 1,0,0,0, - %E,%F * r0,r1 -> %E,%F  (32 bit multiplication, lower 32 bits are stored. %F is the upper word.)
+2 - 1,0,0,0, - %D,%E * r0,r1 -> %D,%E  (32 bit multiplication, lower 32 bits are stored. %E is the upper word.)
 2 - 1,0,0,1, - r0 / r1 -> r0 , r0 % r1 -> r1   (% is the remainder of the division)
 2 - 1,0,1,0, - call to address at r0,r1
 2 - 1,0,1,1, - ret
-2 - 1,1,0,0, - memory read byte into lower byte of r0 at %E,r1
-2 - 1,1,0,1, - memory write byte in  lower byte of r0 at %E,r1
+2 - 1,1,0,0, - memory read byte into lower byte of r0 at %D,r1
+2 - 1,1,0,1, - memory write byte in  lower byte of r0 at %D,r1
 2 - 1,1,1,0, - jump to r0,r1 (must be aligned to word boundry)
 2 - 1,1,1,1, - SP - r0 -> SP , then SP -> r0
 

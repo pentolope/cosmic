@@ -3,7 +3,7 @@
 void insert_IB_load_byte(InstructionBuffer *ib_ToAppendTo,uint8_t literalValue){
 	uint32_t insertSpot = ib_ToAppendTo->numberOfSlotsTaken;
 	addInstruction(ib_ToAppendTo,ib_load_byte.buffer[0]);
-	ib_ToAppendTo->buffer[insertSpot].arg.BB.a_1 = literalValue;
+	ib_ToAppendTo->buffer[insertSpot].arg.B2.a_1 = literalValue;
 	addInstruction(ib_ToAppendTo,ib_load_byte.buffer[1]);
 }
 void insert_IB_load_word(InstructionBuffer *ib_ToAppendTo,uint16_t literalValue){
@@ -39,12 +39,11 @@ void insert_IB_call_nonComplex_function(InstructionBuffer *ib_ToAppendTo,uint32_
 	InstructionSingle iS;
 	if (returnsNonVoid){
 		iS.id = I_STOF;
-		iS.arg.BBW.a_0 = 2;
-		iS.arg.BBW.a_1 = 3;
-		iS.arg.BBW.a_2 = stackSize;
+		iS.arg.BW.a_0 = 2;
+		iS.arg.BW.a_1 = stackSize;
 		addInstruction(ib_ToAppendTo,iS);
 		iS.id = I_PUA1;
-		iS.arg.B.a_0 = 2;
+		iS.arg.B1.a_0 = 2;
 		addInstruction(ib_ToAppendTo,iS);
 		stackSize+=2;
 	}
@@ -53,11 +52,11 @@ void insert_IB_call_nonComplex_function(InstructionBuffer *ib_ToAppendTo,uint32_
 	iS.arg.BW.a_1 = stackSize;
 	addInstruction(ib_ToAppendTo,iS);
 	iS.id = I_PUA1;
-	iS.arg.B.a_0 = 2;
+	iS.arg.B1.a_0 = 2;
 	addInstruction(ib_ToAppendTo,iS);
 	iS.id = I_SYRD;
-	iS.arg.BB.a_0 = 10;
-	iS.arg.BB.a_1 = 11;
+	iS.arg.B2.a_0 = 10;
+	iS.arg.B2.a_1 = 11;
 	addInstruction(ib_ToAppendTo,iS);
 	iS.id = I_SYCL;
 	iS.arg.D.a_0 = labelNumber;
@@ -65,7 +64,7 @@ void insert_IB_call_nonComplex_function(InstructionBuffer *ib_ToAppendTo,uint32_
 	iS.id = I_SYRE;
 	addInstruction(ib_ToAppendTo,iS);
 	iS.id = I_CALL;
-	iS.arg.BB.a_0 = 10;
-	iS.arg.BB.a_1 = 11;
+	iS.arg.B2.a_0 = 10;
+	iS.arg.B2.a_1 = 11;
 	addInstruction(ib_ToAppendTo,iS);
 }

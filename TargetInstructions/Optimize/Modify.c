@@ -26,7 +26,7 @@ void applyReorderNoArea(InstructionBuffer* ib,const uint32_t target,const uint32
 void applyReorder(InstructionBuffer* ib,const uint32_t target,const uint32_t destination){
 	if (target==destination) return;
 	enum InstructionTypeID id=ib->buffer[target].id;
-	if (id==I_SYRB | id==I_SYRW | id==I_SYRD){
+	if (id==I_SYRB | id==I_SYRW | id==I_SYRD | id==I_SYRQ){
 		uint16_t length = findLengthOfSymbolicCalc(ib,target);
 		uint16_t offset;
 		bool isDestSmaller=destination<target;
@@ -92,61 +92,66 @@ void doRegRename(InstructionBuffer* ib, uint32_t start, uint32_t end, uint8_t fr
 	InstructionSingle* buffer = ib->buffer;
 	for (uint32_t i=start;i<=end;i++){
 		ISP = &(buffer[i]);
-		if (ISP->id==I_STPI){
-			printf("Internal Error: I_STPI got through\n");
-			exit(1);
-		}
 		switch (ISP->id){
-			case I_INSR:
-			case I_ERR_:
-			case I_DEPL:
-			default:
-			printInstructionBufferWithMessageAndNumber(ib,"here",i);
-			printf("Internal Error: invalid opcode during reg rename\n");
-			exit(1);
 			case I_NOP_:
-			case I_RET_:
-			case I_LABL:
-			case I_D32U:
-			case I_R32U:
-			case I_D32S:
-			case I_R32S:
-			case I_FCST:
-			case I_FCEN:
-			case I_JTEN:
-			case I_JEND:
-			case I_SYRE:
-			case I_SYDB:
-			case I_SYDW:
-			case I_SYDD:
-			case I_SYDE:
-			case I_SYC0:
-			case I_SYC1:
-			case I_SYC2:
-			case I_SYC3:
-			case I_SYC4:
-			case I_SYC5:
-			case I_SYC6:
-			case I_SYC7:
-			case I_SYC8:
-			case I_SYC9:
 			case I_SYCB:
 			case I_SYCW:
 			case I_SYCD:
 			case I_SYCL:
-			case I_SYCZ:
-			case I_SYCS:
-			case I_SYCT:
+			case I_SYRE:
+			case I_SYW0:
+			case I_SYW1:
+			case I_SYW2:
+			case I_SYW3:
+			case I_SYW4:
+			case I_SYW5:
+			case I_SYW6:
+			case I_SYW7:
+			case I_SYW8:
+			case I_SYW9:
+			case I_SBLW:
+			case I_SBRW:
+			case I_SYD0:
+			case I_SYD1:
+			case I_SYD2:
+			case I_SYD3:
+			case I_SYD4:
+			case I_SYD5:
+			case I_SYD6:
+			case I_SYD7:
+			case I_SYD8:
+			case I_SYD9:
+			case I_SBLD:
+			case I_SBRD:
+			case I_SYQ0:
+			case I_SYQ1:
+			case I_SYQ2:
+			case I_SYQ3:
+			case I_SYQ4:
+			case I_SYQ5:
+			case I_SYQ6:
+			case I_SYQ7:
+			case I_SYQ8:
+			case I_SYQ9:
+			case I_SBLQ:
+			case I_SBRQ:
+			case I_SCBW:
+			case I_SCWD:
+			case I_SCZD:
+			case I_SCDQ:
+			case I_SCZQ:
+			case I_SCQD:
+			case I_SCDW:
+			case I_SCWB:
+			case I_SCDB:
+			case I_SCQB:
 			break;
 			case I_PU1_:
 			case I_PUA1:
 			case I_POP1:
-			case I_ALOC:
 			case I_SYRW:
 			case I_SYRB:
-			if (ISP->arg.B.a_0==from){
-				ISP->arg.B.a_0=to;
-			}
+			if (ISP->arg.B1.a_0==from) ISP->arg.B1.a_0=to;
 			break;
 			case I_PU2_:
 			case I_PUA2:
@@ -164,19 +169,19 @@ void doRegRename(InstructionBuffer* ib, uint32_t start, uint32_t end, uint8_t fr
 			case I_MWBV:
 			case I_MRBV:
 			case I_SYRD:
-			if (ISP->arg.BB.a_0==from){
-				ISP->arg.BB.a_0=to;
-			}
-			if (ISP->arg.BB.a_1==from){
-				ISP->arg.BB.a_1=to;
-			}
+			if (ISP->arg.B2.a_1==from) ISP->arg.B2.a_1=to;
+			case I_BL1_:
+			case I_STWN:
+			case I_STRN:
+			case I_STWV:
+			case I_STRV:
+			if (ISP->arg.B2.a_0==from) ISP->arg.B2.a_0=to;
 			break;
 			case I_CJMP:
 			case I_AND_:
 			case I_OR__:
 			case I_XOR_:
 			case I_ADDN:
-			case I_ADDC:
 			case I_SSUB:
 			case I_MWWN:
 			case I_MRWN:
@@ -184,50 +189,81 @@ void doRegRename(InstructionBuffer* ib, uint32_t start, uint32_t end, uint8_t fr
 			case I_MRWV:
 			case I_SUBN:
 			case I_SUBC:
-			if (ISP->arg.BBB.a_0==from){
-				ISP->arg.BBB.a_0=to;
-			}
-			if (ISP->arg.BBB.a_1==from){
-				ISP->arg.BBB.a_1=to;
-			}
-			if (ISP->arg.BBB.a_2==from){
-				ISP->arg.BBB.a_2=to;
-			}
-			break;
-			case I_BL1_:
-			case I_STWN:
-			case I_STRN:
-			case I_STWV:
-			case I_STRV:
-			if (ISP->arg.BB.a_0==from){
-				ISP->arg.BB.a_0=to;
-			}
+			if (ISP->arg.B3.a_0==from) ISP->arg.B3.a_0=to;
+			if (ISP->arg.B3.a_1==from) ISP->arg.B3.a_1=to;
+			if (ISP->arg.B3.a_2==from) ISP->arg.B3.a_2=to;
 			break;
 			case I_RL1_:
 			case I_ALCR:
 			case I_STPA:
 			case I_STPS:
-			if (ISP->arg.BW.a_0==from){
-				ISP->arg.BW.a_0=to;
-			}
-			break;
 			case I_STOF:
-			if (ISP->arg.BBW.a_0==from){
-				ISP->arg.BBW.a_0=to;
-			}
-			if (ISP->arg.BBW.a_1==from){
-				ISP->arg.BBW.a_1=to;
-			}
+			if (ISP->arg.BW.a_0==from) ISP->arg.BW.a_0=to;
 			break;
 			case I_RL2_:
 			case I_JJMP:
-			if (ISP->arg.BBD.a_0==from){
-				ISP->arg.BBD.a_0=to;
-			}
-			if (ISP->arg.BBD.a_1==from){
-				ISP->arg.BBD.a_1=to;
-			}
+			if (ISP->arg.BBD.a_0==from) ISP->arg.BBD.a_0=to;
+			if (ISP->arg.BBD.a_1==from) ISP->arg.BBD.a_1=to;
 			break;
+			case I_LAD2:
+			if (ISP->arg.B4.a_0==from) ISP->arg.B4.a_0=to;
+			if (ISP->arg.B4.a_1==from) ISP->arg.B4.a_1=to;
+			if (ISP->arg.B4.a_2==from) ISP->arg.B4.a_2=to;
+			if (ISP->arg.B4.a_3==from) ISP->arg.B4.a_3=to;
+			break;
+			case I_LAD1:
+			if (ISP->arg.B5.a_0==from) ISP->arg.B5.a_0=to;
+			if (ISP->arg.B5.a_1==from) ISP->arg.B5.a_1=to;
+			if (ISP->arg.B5.a_2==from) ISP->arg.B5.a_2=to;
+			if (ISP->arg.B5.a_3==from) ISP->arg.B5.a_3=to;
+			if (ISP->arg.B5.a_4==from) ISP->arg.B5.a_4=to;
+			break;
+			case I_LSU0:
+			case I_LAD0:
+			if (ISP->arg.B6.a_0==from) ISP->arg.B6.a_0=to;
+			if (ISP->arg.B6.a_1==from) ISP->arg.B6.a_1=to;
+			if (ISP->arg.B6.a_2==from) ISP->arg.B6.a_2=to;
+			if (ISP->arg.B6.a_3==from) ISP->arg.B6.a_3=to;
+			if (ISP->arg.B6.a_4==from) ISP->arg.B6.a_4=to;
+			if (ISP->arg.B6.a_5==from) ISP->arg.B6.a_5=to;
+			break;
+			case I_LAD3:
+			case I_LSU3:
+			case I_LMU3:
+			if (ISP->arg.B8.a_0==from) ISP->arg.B8.a_0=to;
+			if (ISP->arg.B8.a_1==from) ISP->arg.B8.a_1=to;
+			if (ISP->arg.B8.a_2==from) ISP->arg.B8.a_2=to;
+			if (ISP->arg.B8.a_3==from) ISP->arg.B8.a_3=to;
+			if (ISP->arg.B8.a_4==from) ISP->arg.B8.a_4=to;
+			if (ISP->arg.B8.a_5==from) ISP->arg.B8.a_5=to;
+			if (ISP->arg.B8.a_6==from) ISP->arg.B8.a_6=to;
+			if (ISP->arg.B8.a_7==from) ISP->arg.B8.a_7=to;
+			break;
+			case I_RET_:
+			case I_LABL:
+			case I_D32U:
+			case I_R32U:
+			case I_D32S:
+			case I_R32S:
+			case I_D64U:
+			case I_R64U:
+			case I_D64S:
+			case I_R64S:
+			case I_FCST:
+			case I_FCEN:
+			case I_JTEN:
+			case I_JEND:
+			printInstructionBufferWithMessageAndNumber(ib,"here",i);
+			printf("Internal Error: I don\'t think reg rename should be going across that\n");
+			exit(1);
+			//case I_INSR:
+			//case I_ERR_:
+			//case I_DEPL:
+			default:
+			printInstructionBufferWithMessageAndNumber(ib,"here",i);
+			printf("Internal Error: invalid opcode during reg rename[%08X:%08X]{%01X->%01X}\n",start,end,from,to);
+			exit(1);
+			
 		}
 	}
 }
@@ -238,9 +274,6 @@ the target does not need to be the origin
 if regTo==16, then this function will try to find an unused register and use it
 */
 bool attemptRegRename(InstructionBuffer* ib, uint32_t target, uint8_t regFrom, uint8_t regTo){
-	if ( regFrom==0 | regFrom==1 | regTo==0 | regTo==1 ){
-		return false; // then it is invalid to try to rename
-	}
 	struct RegRenameInfo regRenameInfo;
 	regRenameInfo.target=target;
 	regRenameInfo.regFrom=regFrom;
@@ -248,7 +281,14 @@ bool attemptRegRename(InstructionBuffer* ib, uint32_t target, uint8_t regFrom, u
 	getRegRenameInfo(ib,&regRenameInfo);
 	if (regRenameInfo.didSucceed){
 		if (regTo==16) regTo=regRenameInfo.suggestedReg;
+		//printf("{attemptRegRename() performing reg rename start}\n");
+		//printf("[%08X:%08X | %01X:%01X]\n",regRenameInfo.lowerBound,regRenameInfo.upperBound,regFrom,regTo);
+		//printInstructionBufferWithMessageAndNumber(ib,"before rename",target);
 		doRegRename(ib,regRenameInfo.lowerBound,regRenameInfo.upperBound,regFrom,regTo);
+#ifdef OPT_DEBUG_SANITY
+sanityCheck(ib);
+#endif
+		//printf("{attemptRegRename() performing reg rename end}\n");
 	}
 	return regRenameInfo.didSucceed;
 }
@@ -300,12 +340,12 @@ void contractPushPop(InstructionBuffer* ib){
 								id2=I_POP2;
 							}
 							IS_i0->id=id2;
-							IS_i0->arg.BB.a_0=IS_i0->arg.B.a_0;
-							IS_i0->arg.BB.a_1=IS_i1->arg.B.a_0;
+							IS_i0->arg.B2.a_0=IS_i0->arg.B1.a_0;
+							IS_i0->arg.B2.a_1=IS_i1->arg.B1.a_0;
 							IS_i1->id=I_NOP_;
 							count++;
 						}
-					}					
+					}
 					break;
 				}
 			}
@@ -347,14 +387,14 @@ void expandPushPop(InstructionBuffer* ib){
 	while (i--!=iNext--){
 		id=(IS_i=buffer+i)->id;
 		if (id==I_PU2_){
-			IS_push.arg.B.a_0=IS_i->arg.BB.a_1;
+			IS_push.arg.B1.a_0=IS_i->arg.B2.a_1;
 			buffer[iNext--]=IS_push;
-			IS_push.arg.B.a_0=IS_i->arg.BB.a_0;
+			IS_push.arg.B1.a_0=IS_i->arg.B2.a_0;
 			buffer[iNext  ]=IS_push;
 		} else if (id==I_POP2){
-			IS_pop.arg.B.a_0=IS_i->arg.BB.a_1;
+			IS_pop.arg.B1.a_0=IS_i->arg.B2.a_1;
 			buffer[iNext--]=IS_pop;
-			IS_pop.arg.B.a_0=IS_i->arg.BB.a_0;
+			IS_pop.arg.B1.a_0=IS_i->arg.B2.a_0;
 			buffer[iNext  ]=IS_pop;
 		} else {
 			buffer[iNext  ]=*IS_i;

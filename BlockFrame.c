@@ -100,8 +100,8 @@ struct BlockFrameArray{
 
 
 // this number is used to make unique numbers for assembly labels (one is added directly prior to each use)
-// it starts at 4 because labels 0,1,2,3,4 are reserved for several things
-uint32_t globalLabelID = 4;
+// it starts at 0x1F because labels below that are usually are reserved for several things
+uint32_t globalLabelID = 0x1F;
 
 
 
@@ -111,13 +111,8 @@ uint32_t addBlockFrame(){
 		blockFrameArray.maxStackSize=0;
 	}
 	if (blockFrameArray.numberOfValidSlots>=blockFrameArray.numberOfAllocatedSlots){
-		if (blockFrameArray.numberOfAllocatedSlots==0){
-			blockFrameArray.numberOfAllocatedSlots = 10;
-			blockFrameArray.entries = cosmic_malloc(10*sizeof(struct BlockFrameEntry));
-		} else {
-			blockFrameArray.numberOfAllocatedSlots += 10;
-			blockFrameArray.entries = cosmic_realloc(blockFrameArray.entries,blockFrameArray.numberOfAllocatedSlots*sizeof(struct BlockFrameEntry));
-		}
+		blockFrameArray.numberOfAllocatedSlots += 10;
+		blockFrameArray.entries = cosmic_realloc(blockFrameArray.entries,blockFrameArray.numberOfAllocatedSlots*sizeof(struct BlockFrameEntry));
 	}
 	uint32_t thisBlockIndex = blockFrameArray.numberOfValidSlots++;
 	memZero(&(blockFrameArray.entries[thisBlockIndex]),sizeof(struct BlockFrameEntry));
@@ -199,24 +194,15 @@ struct IdentifierSearchResult{
 };
 
 
-
 bool areIdentifierStringsEquivalent(const char* string1,const char* string2){
-	uint32_t i=0;
 	do {
-		char c1 = string1[i];
-		char c2 = string2[i];
+		char c1 = *(string1++);
+		char c2 = *(string2++);
 		bool terminate1 = (c1==' ') | (c1==0);
 		bool terminate2 = (c2==' ') | (c2==0);
-		if (terminate1 & terminate2){
-			return true;
-		}
-		if (terminate1 | terminate2 | (c1!=c2)){
-			return false;
-		}
-		i++;
+		if (terminate1 | terminate2 | (c1!=c2)) return terminate1 & terminate2;
 	} while (true);
 }
-
 
 
 /*

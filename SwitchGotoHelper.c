@@ -115,7 +115,7 @@ bool resolveSwitch(){
 		{
 		singleMergeIB(&currentSwitchManagment.ibFinal,&currentSwitchManagment.ibSwitchItem);
 		IS.id=I_POP1;
-		IS.arg.B.a_0=3;
+		IS.arg.B1.a_0=3;
 		addInstruction(&currentSwitchManagment.ibFinal,IS);
 		for (uint16_t i=0;i<currentSwitchManagment.caseLabelPairLen;i++){
 			struct CaseLabelPair* clp = currentSwitchManagment.caseLabelPair+i;
@@ -150,8 +150,8 @@ bool resolveSwitch(){
 		singleMergeIB(&currentSwitchManagment.ibFinal,&ib_i_32add);
 		
 		IS.id=I_POP2;
-		IS.arg.BB.a_0=2;
-		IS.arg.BB.a_1=3;
+		IS.arg.B2.a_0=2;
+		IS.arg.B2.a_1=3;
 		addInstruction(&currentSwitchManagment.ibFinal,IS);
 		IS.id=I_JJMP;
 		IS.arg.BBD.a_0=2;

@@ -17,42 +17,31 @@ typedef struct InstructionSingle{
 		I_RET_,
 		I_STPA,
 		I_STPS,
-
 		I_STWN,
 		I_STRN,
 		I_STWV,
 		I_STRV,
-
 		I_ALOC,
 		I_ALCR,
 		I_STOF,
-		
 		I_AJMP,
 		I_CJMP,
-		
 		I_JJMP,
 		I_JTEN,
 		I_JEND,
-
 		I_MOV_,
-
 		I_AND_,
 		I_OR__,
 		I_XOR_,
 		I_SSUB,
-
 		I_ADDN,
-		I_ADDC,
 		I_SUBN,
 		I_SUBC,
-
 		I_MULS,
 		I_MULL,
 		I_DIVM,
-
 		I_SHFT,
 		I_BSWP,
-
 		I_MWWN,
 		I_MRWN,
 		I_MWWV,
@@ -61,70 +50,106 @@ typedef struct InstructionSingle{
 		I_MRBN,
 		I_MWBV,
 		I_MRBV,
-
 		I_LABL,
-		
 		I_PHIS,
 		I_PHIE,
-		
+		I_FCST,
+		I_FCEN,
 		I_D32U,
 		I_R32U,
 		I_D32S,
 		I_R32S,
-		
-		I_FCST,
-		I_FCEN,
-		
+		I_D64U,
+		I_R64U,
+		I_D64S,
+		I_R64S,
+		I_LAD0,
+		I_LAD1,
+		I_LAD2,
+		I_LAD3,
+		I_LAD4,
+		I_LAD5,
+		I_LSU0,
+		I_LSU3,
+		I_LSU4,
+		I_LSU5,
+		I_LMU3,
+		I_LMU4,
+		I_LMU5,
+		I_LDI4,
+		I_LDI5,
+		I_LLS6,
+		I_LLS7,
+		I_LRS6,
+		I_LRS7,
 		I_SYRB,
 		I_SYRW,
 		I_SYRD,
+		I_SYRQ,
 		I_SYRE,
-
+		
 		I_SYCB,
 		I_SYCW,
 		I_SYCD,
 		I_SYCL,
-
-		I_SYC0,
-		I_SYC1,
-		I_SYC2,
-		I_SYC3,
-		I_SYC4,
-		I_SYC5,
-		I_SYC6,
-		I_SYC7,
-		I_SYC8,
-		I_SYC9,
-		
-		I_SYCX,
-		I_SYCY,
-		I_SYCA,
-		I_SYCU,
-		I_SYCO,
-		I_SYCQ,
-		I_SYCC,
-		I_SYCN,
-		I_SYCM,
-		
-		I_SYCZ,
-		I_SYCS,
-		I_SYCT,
+		I_SYW0,
+		I_SYW1,
+		I_SYW2,
+		I_SYW3,
+		I_SYW4,
+		I_SYW5,
+		I_SYW6,
+		I_SYW7,
+		I_SYW8,
+		I_SYW9,
+		I_SBLW,
+		I_SBRW,
+		I_SYD0,
+		I_SYD1,
+		I_SYD2,
+		I_SYD3,
+		I_SYD4,
+		I_SYD5,
+		I_SYD6,
+		I_SYD7,
+		I_SYD8,
+		I_SYD9,
+		I_SBLD,
+		I_SBRD,
+		I_SYQ0,
+		I_SYQ1,
+		I_SYQ2,
+		I_SYQ3,
+		I_SYQ4,
+		I_SYQ5,
+		I_SYQ6,
+		I_SYQ7,
+		I_SYQ8,
+		I_SYQ9,
+		I_SBLQ,
+		I_SBRQ,
+		I_SCBW,
+		I_SCWD,
+		I_SCZD,
+		I_SCDQ,
+		I_SCZQ,
+		I_SCQD,
+		I_SCDW,
+		I_SCWB,
+		I_SCDB,
+		I_SCQB,
 		
 		// the following should not be encontered by the instruction optimizer
+		
 		I_NSNB,
-		I_NSCB,
-		I_NSNW,
-		I_NSCW,
 		I_ZNXB,
-		I_ZNXW,
-
 		I_BYTE,
 		I_WORD,
 		I_DWRD,
-
 		I_SYDB,
 		I_SYDW,
 		I_SYDD,
+		I_SYDQ,
 		I_SYDE,
 		
 		I_DEPL, // I_DEPL is used for when a depth limit is reached for peephole optimization templates, it is not an instruction
@@ -132,41 +157,36 @@ typedef struct InstructionSingle{
 		
 		I_STPI, // for placing initializer offsets. Is converted to I_STPA after the variable's local offset is calculated.
 		
-		I_LOFF, // used temporarily by static initializers to indicate an offset of the data that comes next
+		I_LOFF, // used temporarily by listed initializers to indicate an offset of the data that comes next
 		
-		I_INSR // this is the insert placeholder for core entries, it is not an instruction. It uses the 'B' struct in the 'arg' union
+		I_INSR // this is the insert placeholder for core entries, it is not an instruction. It uses the 'B1' struct in the 'arg' union
 	} id;
 	union {
 		struct {
 			uint8_t a_0;
-		} B;
+		} B1;
 		struct {
 			uint8_t a_0;
 			uint8_t a_1;
-		} BB;
+		} B2;
 		struct {
 			uint8_t a_0;
 			uint8_t a_1;
 			uint8_t a_2;
-		} BBB;
+		} B3;
 		struct {
-			uint8_t a_0;
 			uint16_t a_1;
+			uint8_t a_0;
 		} BW;
 		struct {
-			uint8_t a_0;
-			uint8_t a_1;
-			uint16_t a_2;
-		} BBW;
-		struct {
-			uint8_t a_0;
-			uint8_t a_1;
 			uint32_t a_2;
+			uint8_t a_0;
+			uint8_t a_1;
 		} BBD;
 		struct {
-			uint8_t a_0;
-			uint16_t a_1;
 			uint32_t a_2;
+			uint16_t a_1;
+			uint8_t a_0;
 		} BWD;
 		struct {
 			uint16_t a_0;
@@ -175,20 +195,41 @@ typedef struct InstructionSingle{
 			uint32_t a_0;
 			bool mark; // [for use on LABL only] may be used in the optimizer to avoid infinite loops (as of writing this it is unused)
 		} D;
+		struct {
+			uint8_t a_0;
+			uint8_t a_1;
+			uint8_t a_2;
+			uint8_t a_3;
+		} B4;
+		struct {
+			uint8_t a_0;
+			uint8_t a_1;
+			uint8_t a_2;
+			uint8_t a_3;
+			uint8_t a_4;
+		} B5;
+		struct {
+			uint8_t a_0;
+			uint8_t a_1;
+			uint8_t a_2;
+			uint8_t a_3;
+			uint8_t a_4;
+			uint8_t a_5;
+		} B6;
+		struct {
+			uint8_t a_0;
+			uint8_t a_1;
+			uint8_t a_2;
+			uint8_t a_3;
+			uint8_t a_4;
+			uint8_t a_5;
+			uint8_t a_6;
+			uint8_t a_7;
+		} B8;
 	} arg;
 } InstructionSingle;
 
-
-/*
-I_PHIS - phi start
-I_PHIE - phi end
-
-phi nodes are used to access register values across jumps and labels.
-the I_PHIS 'instruction', according to the optimizer, contains one register of  input that is not renamable and not reorderable
-the I_PHIE 'instruction', according to the optimizer, contains one register of output that is not renamable and not reorderable
-*/
-
-
+void printSingleInstructionOptCode(const InstructionSingle instructionSingle);
 
 typedef struct CompressedInstructionBuffer{
 	uint8_t* byteCode;
@@ -203,49 +244,11 @@ typedef struct InstructionBuffer{
 	uint32_t numberOfSlotsTaken;
 } InstructionBuffer;
 
+#define INCLUDE_BACKEND // temp
+
 #ifdef INCLUDE_BACKEND
 uint32_t backendInstructionSize(const InstructionSingle IS){
 	switch (IS.id){
-		case I_NOP_:
-		case I_JEND:
-		case I_SYRE:
-		case I_SYDE:
-		case I_SYC0:
-		case I_SYC1:
-		case I_SYC2:
-		case I_SYC3:
-		case I_SYC4:
-		case I_SYC5:
-		case I_SYC6:
-		case I_SYC7:
-		case I_SYC8:
-		case I_SYC9:
-		case I_SYCZ:
-		case I_SYCS:
-		case I_SYCT:
-		case I_SYCX:
-		case I_SYCY:
-		case I_SYCA:
-		case I_SYCU:
-		case I_SYCO:
-		case I_SYCQ:
-		case I_SYCC:
-		case I_SYCN:
-		case I_SYCM:
-		case I_PHIS:
-		case I_PHIE:
-		case I_FCST:
-		case I_FCEN:
-		case I_NSNB:
-		case I_NSCB:
-		case I_NSNW:
-		case I_NSCW:
-		case I_LABL:
-		case I_SYCD:
-		case I_SYCW:
-		case I_SYCB:
-		case I_SYCL:
-		return 0;
 		case I_SYDB:
 		case I_BYTE:
 		return 1;
@@ -267,7 +270,6 @@ uint32_t backendInstructionSize(const InstructionSingle IS){
 		case I_OR__:
 		case I_XOR_:
 		case I_ADDN:
-		case I_ADDC:
 		case I_SSUB:
 		case I_SUBN:
 		case I_SUBC:
@@ -297,83 +299,130 @@ uint32_t backendInstructionSize(const InstructionSingle IS){
 		case I_JTEN:
 		case I_SYDD:
 		case I_DWRD:
+		case I_LAD1:
+		case I_LAD2:
 		return 4;
 		case I_STPA:
 		case I_ALOC:
+		case I_LAD0:
+		case I_LSU0:
 		return 6;
 		case I_RL2_:
 		case I_SYRD:
+		case I_SYDQ:
 		return 8;
 		case I_D32U:
 		case I_R32U:
 		case I_D32S:
 		case I_R32S:
+		case I_D64U:
+		case I_D64S:
+		case I_R64U:
+		case I_R64S:
+		case I_LAD4:
+		case I_LAD5:
+		case I_LSU4:
+		case I_LSU5:
+		case I_LMU4:
+		case I_LMU5:
+		case I_LDI4:
+		case I_LDI5:
+		case I_LLS6:
+		case I_LLS7:
+		case I_LRS6:
+		case I_LRS7:
 		return 14;
-		case I_ALCR:return 4u+(((unsigned)IS.arg. BW.a_1&0xFF00u)!=0u)*2u;
-		case I_STOF:return 8u+(((unsigned)IS.arg.BBW.a_2&0xFF00u)!=0u)*2u;
+		case I_SYRQ:
+		return 16;
+		case I_ALCR:return 4u+(((unsigned)IS.arg.BW.a_1&0xFF00u)!=0u)*2u;
+		case I_STOF:return 8u+(((unsigned)IS.arg.BW.a_1&0xFF00u)!=0u)*2u;
 		case I_ZNXB:return IS.arg.D.a_0;
-		case I_ZNXW:return IS.arg.D.a_0*2u;
+		
+		case I_LAD3:
+		case I_LSU3:
+		case I_LMU3:
+		assert(false);// backend not ready for those instructions yet
 		default:;
 	}
-	assert(false); // invalid operator id
-	exit(1);
+	return 0;
 }
 
 
-// symVal includes JTEN
-// symVal includes location of related label for D32U,D32S,R32U,R32S
+// symVal includes symbolic calculations,JTEN, and location of related label for things like D32U
 void backendInstructionWrite(uint8_t** byte,uint32_t symVal,uint16_t func_stack_size,uint8_t func_stack_initial,const InstructionSingle IS){
-	uint8_t b0=((unsigned)IS.arg.BB.a_0&0xFu)|(((unsigned)IS.arg.BB.a_1&0xFu)<<4);
-	uint8_t b1=((unsigned)IS.arg.BBB.a_0&0xFu)|(((unsigned)IS.arg.BBB.a_1&0xFu)<<4);
-	uint8_t b2=(unsigned)IS.arg.BBB.a_2&0xFu;
+	uint8_t b0=((unsigned)IS.arg.B2.a_0&0xFu)|(((unsigned)IS.arg.B2.a_1&0xFu)<<4);
+	uint8_t b1=((unsigned)IS.arg.B3.a_0&0xFu)|(((unsigned)IS.arg.B3.a_1&0xFu)<<4);
+	uint8_t b2=(unsigned)IS.arg.B3.a_2&0xFu;
 	uint16_t w;
+	InstructionSingle bh;// backend helper (to compose instructions from here)
 	switch (IS.id){
 		case I_NOP_:
 		case I_JEND:
 		case I_SYRE:
 		case I_SYDE:
-		case I_SYC0:
-		case I_SYC1:
-		case I_SYC2:
-		case I_SYC3:
-		case I_SYC4:
-		case I_SYC5:
-		case I_SYC6:
-		case I_SYC7:
-		case I_SYC8:
-		case I_SYC9:
-		case I_SYCZ:
-		case I_SYCS:
-		case I_SYCT:
-		case I_SYCX:
-		case I_SYCY:
-		case I_SYCA:
-		case I_SYCU:
-		case I_SYCO:
-		case I_SYCQ:
-		case I_SYCC:
-		case I_SYCN:
-		case I_SYCM:
+		case I_SYCB:
+		case I_SYCW:
+		case I_SYCD:
+		case I_SYCL:
+		case I_SYW0:
+		case I_SYW1:
+		case I_SYW2:
+		case I_SYW3:
+		case I_SYW4:
+		case I_SYW5:
+		case I_SYW6:
+		case I_SYW7:
+		case I_SYW8:
+		case I_SYW9:
+		case I_SBLW:
+		case I_SBRW:
+		case I_SYD0:
+		case I_SYD1:
+		case I_SYD2:
+		case I_SYD3:
+		case I_SYD4:
+		case I_SYD5:
+		case I_SYD6:
+		case I_SYD7:
+		case I_SYD8:
+		case I_SYD9:
+		case I_SBLD:
+		case I_SBRD:
+		case I_SYQ0:
+		case I_SYQ1:
+		case I_SYQ2:
+		case I_SYQ3:
+		case I_SYQ4:
+		case I_SYQ5:
+		case I_SYQ6:
+		case I_SYQ7:
+		case I_SYQ8:
+		case I_SYQ9:
+		case I_SBLQ:
+		case I_SBRQ:
+		case I_SCBW:
+		case I_SCWD:
+		case I_SCZD:
+		case I_SCDQ:
+		case I_SCZQ:
+		case I_SCQD:
+		case I_SCDW:
+		case I_SCWB:
+		case I_SCDB:
+		case I_SCQB:
 		case I_PHIS:
 		case I_PHIE:
 		case I_FCST:
 		case I_FCEN:
 		case I_NSNB:
-		case I_NSCB:
-		case I_NSNW:
-		case I_NSCW:
 		case I_LABL:
-		case I_SYCD:
-		case I_SYCW:
-		case I_SYCB:
-		case I_SYCL:
 		return;
 		
 		case I_SYDB:*((*byte)++)=symVal;return;
-		case I_BYTE:*((*byte)++)=IS.arg.B.a_0;return;
+		case I_BYTE:*((*byte)++)=IS.arg.B1.a_0;return;
 		
-		case I_PU1_:case I_PUA1:*((*byte)++)=(unsigned)IS.arg.B.a_0&0xFu;*((*byte)++)=0xF0;return;
-		case I_POP1:*((*byte)++)=IS.arg.B.a_0&0xFu;*((*byte)++)=0xF2;return;
+		case I_PU1_:case I_PUA1:*((*byte)++)=(unsigned)IS.arg.B1.a_0&0xFu;*((*byte)++)=0xF0;return;
+		case I_POP1:*((*byte)++)=IS.arg.B1.a_0&0xFu;*((*byte)++)=0xF2;return;
 		case I_PU2_:case I_PUA2:*((*byte)++)=b0;*((*byte)++)=0xF1;return;
 		case I_POP2:*((*byte)++)=b0;*((*byte)++)=0xF3;return;
 		case I_MOV_:*((*byte)++)=b0;*((*byte)++)=0xF4;return;
@@ -394,22 +443,21 @@ void backendInstructionWrite(uint8_t** byte,uint32_t symVal,uint16_t func_stack_
 		case I_MRWN:case I_MRWV:*((*byte)++)=b1;*((*byte)++)=0x80|b2;return;
 		case I_MWWN:case I_MWWV:*((*byte)++)=b1;*((*byte)++)=0x90|b2;return;
 		case I_ADDN:*((*byte)++)=b1;*((*byte)++)=0xA0|b2;return;
-		case I_ADDC:*((*byte)++)=b1;*((*byte)++)=0xB0|b2;return;
 		case I_SUBN:*((*byte)++)=b1;*((*byte)++)=0xC0|b2;return;
 		case I_SUBC:*((*byte)++)=b1;*((*byte)++)=0xD0|b2;return;
 		case I_CJMP:*((*byte)++)=b1;*((*byte)++)=0xE0|b2;return;
 		
-		case I_SYRB:*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|((unsigned)IS.arg.B.a_0&0xFu);*((*byte)++)=(((unsigned)symVal>>4)&0xFu);return;
-		case I_BL1_:*((*byte)++)=(((unsigned)IS.arg.BB.a_1&0xFu)<<4)|((unsigned)IS.arg.BB.a_0&0xFu);*((*byte)++)=(((unsigned)IS.arg.BB.a_1>>4)&0xFu);return;
-		case I_STRN:case I_STRV:*((*byte)++)=(((unsigned)IS.arg.BB.a_1&0xFu)<<4)|((unsigned)IS.arg.BB.a_0&0xFu);*((*byte)++)=0x20u|(((unsigned)IS.arg.BB.a_1>>4)&0xFu);return;
-		case I_STWN:case I_STWV:*((*byte)++)=(((unsigned)IS.arg.BB.a_1&0xFu)<<4)|((unsigned)IS.arg.BB.a_0&0xFu);*((*byte)++)=0x30u|(((unsigned)IS.arg.BB.a_1>>4)&0xFu);return;
+		case I_SYRB:*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|((unsigned)IS.arg.B1.a_0&0xFu);*((*byte)++)=(((unsigned)symVal>>4)&0xFu);return;
+		case I_BL1_:*((*byte)++)=(((unsigned)IS.arg.B2.a_1&0xFu)<<4)|((unsigned)IS.arg.B2.a_0&0xFu);*((*byte)++)=(((unsigned)IS.arg.B2.a_1>>4)&0xFu);return;
+		case I_STRN:case I_STRV:*((*byte)++)=(((unsigned)IS.arg.B2.a_1&0xFu)<<4)|((unsigned)IS.arg.B2.a_0&0xFu);*((*byte)++)=0x20u|(((unsigned)IS.arg.B2.a_1>>4)&0xFu);return;
+		case I_STWN:case I_STWV:*((*byte)++)=(((unsigned)IS.arg.B2.a_1&0xFu)<<4)|((unsigned)IS.arg.B2.a_0&0xFu);*((*byte)++)=0x30u|(((unsigned)IS.arg.B2.a_1>>4)&0xFu);return;
 		
 		case I_SYDW:*((*byte)++)=symVal;*((*byte)++)=(unsigned)symVal>>8;return;
 		case I_WORD:*((*byte)++)=IS.arg.W.a_0;*((*byte)++)=(unsigned)IS.arg.W.a_0>>8;return;
 		
 		case I_SYRW:
-		*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|((unsigned)IS.arg.B.a_0&0xFu);*((*byte)++)=(((unsigned)symVal>>4)&0xFu);
-		*((*byte)++)=(((unsigned)symVal>>4)&0xF0u)|((unsigned)IS.arg.B.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)symVal>>12)&0xFu);
+		*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|((unsigned)IS.arg.B1.a_0&0xFu);*((*byte)++)=(((unsigned)symVal>>4)&0xFu);
+		*((*byte)++)=(((unsigned)symVal>>4)&0xF0u)|((unsigned)IS.arg.B1.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)symVal>>12)&0xFu);
 		return;
 		case I_RL1_:
 		*((*byte)++)=(((unsigned)IS.arg.BW.a_1&0xFu)<<4)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xFu);
@@ -444,11 +492,11 @@ void backendInstructionWrite(uint8_t** byte,uint32_t symVal,uint16_t func_stack_
 		*((*byte)++)=(((unsigned)w>>4)&0xF0u)|((unsigned)IS.arg.BBD.a_1&0xFu);*((*byte)++)=0x10u|(((unsigned)w>>12)&0xFu);
 		return;
 		case I_SYRD:
-		*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|((unsigned)IS.arg.BB.a_0&0xFu);*((*byte)++)=(((unsigned)symVal>>4)&0xFu);
-		*((*byte)++)=(((unsigned)symVal>>4)&0xF0u)|((unsigned)IS.arg.BB.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)symVal>>12)&0xFu);
+		*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|((unsigned)IS.arg.B2.a_0&0xFu);*((*byte)++)=(((unsigned)symVal>>4)&0xFu);
+		*((*byte)++)=(((unsigned)symVal>>4)&0xF0u)|((unsigned)IS.arg.B2.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)symVal>>12)&0xFu);
 		w=symVal>>16;
-		*((*byte)++)=(((unsigned)w&0xFu)<<4)|((unsigned)IS.arg.BB.a_1&0xFu);*((*byte)++)=(((unsigned)w>>4)&0xFu);
-		*((*byte)++)=(((unsigned)w>>4)&0xF0u)|((unsigned)IS.arg.BB.a_1&0xFu);*((*byte)++)=0x10u|(((unsigned)w>>12)&0xFu);
+		*((*byte)++)=(((unsigned)w&0xFu)<<4)|((unsigned)IS.arg.B2.a_1&0xFu);*((*byte)++)=(((unsigned)w>>4)&0xFu);
+		*((*byte)++)=(((unsigned)w>>4)&0xF0u)|((unsigned)IS.arg.B2.a_1&0xFu);*((*byte)++)=0x10u|(((unsigned)w>>12)&0xFu);
 		return;
 		case I_D32U:
 		case I_R32U:
@@ -464,6 +512,32 @@ void backendInstructionWrite(uint8_t** byte,uint32_t symVal,uint16_t func_stack_
 		
 		*((*byte)++)=0xBA;*((*byte)++)=0xFA;
 		return;
+		case I_D64U:
+		case I_R64U:
+		case I_D64S:
+		case I_R64S:
+		case I_LAD4:
+		case I_LAD5:
+		case I_LSU4:
+		case I_LSU5:
+		case I_LMU4:
+		case I_LMU5:
+		case I_LDI4:
+		case I_LDI5:
+		case I_LLS6:
+		case I_LLS7:
+		case I_LRS6:
+		case I_LRS7:
+		*((*byte)++)=0x2;*((*byte)++)=0;*((*byte)++)=0x2;*((*byte)++)=0xF0;
+		
+		*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|0x2u;*((*byte)++)=(((unsigned)symVal>>4)&0xFu);
+		*((*byte)++)=(((unsigned)symVal>>4)&0xF0u)|0x2u;*((*byte)++)=0x10u|(((unsigned)symVal>>12)&0xFu);
+		w=symVal>>16;
+		*((*byte)++)=(((unsigned)w&0xFu)<<4)|0x3u;*((*byte)++)=(((unsigned)w>>4)&0xFu);
+		*((*byte)++)=(((unsigned)w>>4)&0xF0u)|0x3u;*((*byte)++)=0x10u|(((unsigned)w>>12)&0xFu);
+		
+		*((*byte)++)=0x32;*((*byte)++)=0xFA;
+		return;
 		case I_ALCR:
 		*((*byte)++)=(((unsigned)IS.arg.BW.a_1&0xFu)<<4)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xFu);
 		if ((((unsigned)IS.arg. BW.a_1&0xFF00u)!=0u)){
@@ -472,35 +546,78 @@ void backendInstructionWrite(uint8_t** byte,uint32_t symVal,uint16_t func_stack_
 		*((*byte)++)=(unsigned)IS.arg.BW.a_0&0xFu;*((*byte)++)=0xFF;
 		return;
 		case I_STOF:
-		*((*byte)++)=(unsigned)IS.arg.BBW.a_1&0xFu;*((*byte)++)=0;
-		*((*byte)++)=(unsigned)IS.arg.BBW.a_1&0xFu;*((*byte)++)=0xFF;
-		w=(unsigned)IS.arg.BBW.a_0&0xFu;
-		*((*byte)++)=(((unsigned)IS.arg.BBW.a_2&0xFu)<<4)|((unsigned)w);*((*byte)++)=(((unsigned)IS.arg.BBW.a_2>>4)&0xFu);
-		if (((unsigned)IS.arg.BBW.a_2&0xFF00u)!=0u){
-			*((*byte)++)=(((unsigned)IS.arg.BBW.a_2>>4)&0xF0u)|((unsigned)w);*((*byte)++)=0x10u|(((unsigned)IS.arg.BBW.a_2>>12)&0xFu);
+		*((*byte)++)=0xFu;*((*byte)++)=0;
+		*((*byte)++)=0xFu;*((*byte)++)=0xFF;
+		w=(unsigned)IS.arg.BW.a_0&0xFu;
+		*((*byte)++)=(((unsigned)IS.arg.BW.a_1&0xFu)<<4)|((unsigned)w);*((*byte)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xFu);
+		if (((unsigned)IS.arg.BW.a_1&0xFF00u)!=0u){
+			*((*byte)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xF0u)|((unsigned)w);*((*byte)++)=0x10u|(((unsigned)IS.arg.BW.a_1>>12)&0xFu);
 		}
-		*((*byte)++)=(unsigned)w|((unsigned)w<<4);*((*byte)++)=0xA0|((unsigned)IS.arg.BBW.a_1&0xFu);
+		*((*byte)++)=(unsigned)w|((unsigned)w<<4);*((*byte)++)=0xAFu;
 		return;
 		case I_ZNXB:
 		for (uint32_t i=0;i<IS.arg.D.a_0;i++){
 			*((*byte)++)=0;
 		}
 		return;
-		case I_ZNXW:
-		for (uint32_t i=0;i<IS.arg.D.a_0;i++){
-			*((*byte)++)=0;*((*byte)++)=0;
-		}
+		case I_LAD0:
+		*((*byte)++)=(((unsigned)IS.arg.B6.a_2&0xFu)<<4)|((unsigned)IS.arg.B6.a_0&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B6.a_4&0xFu);
+		bh.id=I_ADDN;
+		bh.arg.B3.a_0=IS.arg.B6.a_1;
+		bh.arg.B3.a_1=IS.arg.B6.a_3;
+		bh.arg.B3.a_2=IS.arg.B6.a_5;
+		backendInstructionWrite(byte,0,0,0,bh);
+		bh.id=I_ADDN;
+		bh.arg.B3.a_0=IS.arg.B6.a_1;
+		bh.arg.B3.a_1=IS.arg.B6.a_1;
+		bh.arg.B3.a_2=15;
+		backendInstructionWrite(byte,0,0,0,bh);
+		return;
+		case I_LAD1:
+		*((*byte)++)=(((unsigned)IS.arg.B5.a_2&0xFu)<<4)|((unsigned)IS.arg.B5.a_0&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B5.a_4&0xFu);
+		bh.id=I_ADDN;
+		bh.arg.B3.a_0=IS.arg.B5.a_1;
+		bh.arg.B3.a_1=IS.arg.B5.a_3;
+		bh.arg.B3.a_2=15;
+		backendInstructionWrite(byte,0,0,0,bh);
+		return;
+		case I_LAD2:
+		*((*byte)++)=(((unsigned)IS.arg.B4.a_2&0xFu)<<4)|((unsigned)IS.arg.B4.a_0&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B4.a_3&0xFu);
+		bh.id=I_MOV_;
+		bh.arg.B2.a_0=IS.arg.B4.a_1;
+		bh.arg.B2.a_1=15;
+		backendInstructionWrite(byte,0,0,0,bh);
+		return;
+		case I_LSU0:
+		bh.id=I_BL1_;
+		bh.arg.B2.a_0=15;
+		bh.arg.B2.a_1=1;
+		backendInstructionWrite(byte,0,0,0,bh);
+		bh.id=I_SSUB;
+		bh.arg.B3.a_0=15;
+		bh.arg.B3.a_1=IS.arg.B4.a_0;
+		bh.arg.B3.a_2=IS.arg.B4.a_2;
+		backendInstructionWrite(byte,0,0,0,bh);
+		bh.id=I_SSUB;
+		bh.arg.B3.a_0=15;
+		bh.arg.B3.a_1=IS.arg.B4.a_1;
+		bh.arg.B3.a_2=IS.arg.B4.a_3;
+		backendInstructionWrite(byte,0,0,0,bh);
 		return;
 		default:;
 	}
+	printSingleInstructionOptCode(IS);printf("\n");fflush(stdout);
 	assert(false); // invalid operator id
 	exit(1);
 }
 #endif //ifdef INCLUDE_BACKEND
 
+
+// for compressed instruction buffers
 uint8_t instructionContentCatagory(enum InstructionTypeID id){
 	switch (id){
 		case I_NOP_:
+		return 0;
 		case I_FCEN:
 		case I_RET_:
 		case I_ALOC:
@@ -508,35 +625,76 @@ uint8_t instructionContentCatagory(enum InstructionTypeID id){
 		case I_R32U:
 		case I_D32S:
 		case I_R32S:
+		case I_D64U:
+		case I_R64U:
+		case I_D64S:
+		case I_R64S:
+		case I_LAD4:
+		case I_LAD5:
+		case I_LSU4:
+		case I_LSU5:
+		case I_LMU4:
+		case I_LMU5:
+		case I_LDI4:
+		case I_LDI5:
+		case I_LLS6:
+		case I_LLS7:
+		case I_LRS6:
+		case I_LRS7:
 		case I_JEND:
 		case I_SYRE:
 		case I_SYDB:
 		case I_SYDW:
 		case I_SYDD:
+		case I_SYDQ:
 		case I_SYDE:
-		case I_SYC0:
-		case I_SYC1:
-		case I_SYC2:
-		case I_SYC3:
-		case I_SYC4:
-		case I_SYC5:
-		case I_SYC6:
-		case I_SYC7:
-		case I_SYC8:
-		case I_SYC9:
-		case I_SYCZ:
-		case I_SYCS:
-		case I_SYCT:
-		case I_SYCX:
-		case I_SYCY:
-		case I_SYCA:
-		case I_SYCU:
-		case I_SYCO:
-		case I_SYCQ:
-		case I_SYCC:
-		case I_SYCN:
-		case I_SYCM:
-		return 0;
+		case I_SYW0:
+		case I_SYW1:
+		case I_SYW2:
+		case I_SYW3:
+		case I_SYW4:
+		case I_SYW5:
+		case I_SYW6:
+		case I_SYW7:
+		case I_SYW8:
+		case I_SYW9:
+		case I_SBLW:
+		case I_SBRW:
+		case I_SYD0:
+		case I_SYD1:
+		case I_SYD2:
+		case I_SYD3:
+		case I_SYD4:
+		case I_SYD5:
+		case I_SYD6:
+		case I_SYD7:
+		case I_SYD8:
+		case I_SYD9:
+		case I_SBLD:
+		case I_SBRD:
+		case I_SYQ0:
+		case I_SYQ1:
+		case I_SYQ2:
+		case I_SYQ3:
+		case I_SYQ4:
+		case I_SYQ5:
+		case I_SYQ6:
+		case I_SYQ7:
+		case I_SYQ8:
+		case I_SYQ9:
+		case I_SBLQ:
+		case I_SBRQ:
+		case I_SCBW:
+		case I_SCWD:
+		case I_SCZD:
+		case I_SCDQ:
+		case I_SCZQ:
+		case I_SCQD:
+		case I_SCDW:
+		case I_SCWB:
+		case I_SCDB:
+		case I_SCQB:
+		return 1;
 		case I_PU1_:
 		case I_PUA1:
 		case I_POP1:
@@ -544,10 +702,10 @@ uint8_t instructionContentCatagory(enum InstructionTypeID id){
 		case I_SYRW:
 		case I_PHIS:
 		case I_PHIE:
-		return 1;
+		return 2;
 		case I_BYTE:
 		case I_SYCB:
-		return 2;
+		return 3;
 		case I_PU2_:
 		case I_PUA2:
 		case I_POP2:
@@ -564,13 +722,12 @@ uint8_t instructionContentCatagory(enum InstructionTypeID id){
 		case I_MRBV:
 		case I_MOV_:
 		case I_SYRD:
-		return 3;
+		return 4;
 		case I_AND_:
 		case I_OR__:
 		case I_XOR_:
 		case I_SSUB:
 		case I_ADDN:
-		case I_ADDC:
 		case I_SUBN:
 		case I_SUBC:
 		case I_MWWN:
@@ -578,21 +735,20 @@ uint8_t instructionContentCatagory(enum InstructionTypeID id){
 		case I_MWWV:
 		case I_MRWV:
 		case I_CJMP:
-		return 4;
+		return 5;
 		case I_BL1_:
 		case I_STWN:
 		case I_STRN:
 		case I_STWV:
 		case I_STRV:
-		return 5;
+		return 6;
 		case I_WORD:
 		case I_SYCW:
-		return 6;
+		return 7;
 		case I_RL1_:
 		case I_ALCR:
 		case I_STPA:
 		case I_STPS:
-		return 7;
 		case I_STOF:
 		return 8;
 		case I_LABL:
@@ -601,17 +757,25 @@ uint8_t instructionContentCatagory(enum InstructionTypeID id){
 		case I_SYCL:
 		case I_DWRD:
 		case I_NSNB:
-		case I_NSCB:
-		case I_NSNW:
-		case I_NSCW:
 		case I_ZNXB:
-		case I_ZNXW:
 		return 9;
 		case I_RL2_:
 		case I_JJMP:
 		return 10;
 		case I_FCST:
 		return 11;
+		case I_LAD2:
+		case I_SYRQ:
+		case I_LSU0:
+		return 12;
+		case I_LAD1:
+		return 13;
+		case I_LAD0:
+		return 14;
+		case I_LAD3:
+		case I_LSU3:
+		case I_LMU3:
+		return 15;
 		default:;
 	}
 	assert(false); // invalid operator id
@@ -624,42 +788,42 @@ uint8_t decompressInstruction(const uint8_t* byteCode,InstructionSingle* IS_pare
 	InstructionSingle IS;
 	switch(instructionContentCatagory(IS.id=byteCode[0])){
 		case 0:
-		delta=1;
+		delta=0;
 		break;
 		case 1:
+		delta=1;
+		break;
 		case 2:
-		IS.arg.B.a_0=byteCode[1];
+		IS.arg.B1.a_0=byteCode[1]&15;
 		delta=2;
 		break;
 		case 3:
-		IS.arg.BB.a_0=(unsigned)byteCode[1]&15u;
-		IS.arg.BB.a_1=(unsigned)byteCode[1]/16u;
+		IS.arg.B1.a_0=byteCode[1];
 		delta=2;
 		break;
 		case 4:
-		IS.arg.BBB.a_0=(unsigned)byteCode[1]&15u;
-		IS.arg.BBB.a_1=(unsigned)byteCode[1]/16u;
-		IS.arg.BBB.a_2=(unsigned)byteCode[2]&15u;
-		delta=3;
+		IS.arg.B2.a_0=(unsigned)byteCode[1]&15u;
+		IS.arg.B2.a_1=(unsigned)byteCode[1]/16u;
+		delta=2;
 		break;
 		case 5:
-		IS.arg.BB.a_0=(unsigned)byteCode[1]&15u;
-		IS.arg.BB.a_1=byteCode[2];
+		IS.arg.B3.a_0=(unsigned)byteCode[1]&15u;
+		IS.arg.B3.a_1=(unsigned)byteCode[1]/16u;
+		IS.arg.B3.a_2=(unsigned)byteCode[2]&15u;
 		delta=3;
 		break;
 		case 6:
-		IS.arg.W.a_0=(unsigned)byteCode[1]|(unsigned)byteCode[2]*256u;
+		IS.arg.B2.a_0=(unsigned)byteCode[1]&15u;
+		IS.arg.B2.a_1=byteCode[2];
 		delta=3;
 		break;
 		case 7:
-		IS.arg.BW.a_0=(unsigned)byteCode[1]&15u;
-		IS.arg.BW.a_1=(unsigned)byteCode[2]|(unsigned)byteCode[3]*256u;
-		delta=4;
+		IS.arg.W.a_0=(unsigned)byteCode[1]|(unsigned)byteCode[2]*256u;
+		delta=3;
 		break;
 		case 8:
-		IS.arg.BBW.a_0=(unsigned)byteCode[1]&15u;
-		IS.arg.BBW.a_1=(unsigned)byteCode[1]/16u;
-		IS.arg.BBW.a_2=(unsigned)byteCode[2]|(unsigned)byteCode[3]*256u;
+		IS.arg.BW.a_0=(unsigned)byteCode[1]&15u;
+		IS.arg.BW.a_1=(unsigned)byteCode[2]|(unsigned)byteCode[3]*256u;
 		delta=4;
 		break;
 		case 9:
@@ -683,6 +847,41 @@ uint8_t decompressInstruction(const uint8_t* byteCode,InstructionSingle* IS_pare
 		(uint32_t)((unsigned)byteCode[4]|(unsigned)byteCode[5]*256u)|
 		(uint32_t)((unsigned)byteCode[6]|(unsigned)byteCode[7]*256u)*65536lu;
 		delta=8;
+		break;
+		case 12:
+		IS.arg.B4.a_0=(unsigned)byteCode[1]&15u;
+		IS.arg.B4.a_1=(unsigned)byteCode[1]/16u;
+		IS.arg.B4.a_2=(unsigned)byteCode[2]&15u;
+		IS.arg.B4.a_3=(unsigned)byteCode[2]/16u;
+		delta=3;
+		break;
+		case 13:
+		IS.arg.B5.a_0=(unsigned)byteCode[1]&15u;
+		IS.arg.B5.a_1=(unsigned)byteCode[1]/16u;
+		IS.arg.B5.a_2=(unsigned)byteCode[2]&15u;
+		IS.arg.B5.a_3=(unsigned)byteCode[2]/16u;
+		IS.arg.B5.a_4=(unsigned)byteCode[3]&15u;
+		delta=4;
+		break;
+		case 14:
+		IS.arg.B6.a_0=(unsigned)byteCode[1]&15u;
+		IS.arg.B6.a_1=(unsigned)byteCode[1]/16u;
+		IS.arg.B6.a_2=(unsigned)byteCode[2]&15u;
+		IS.arg.B6.a_3=(unsigned)byteCode[2]/16u;
+		IS.arg.B6.a_4=(unsigned)byteCode[3]&15u;
+		IS.arg.B6.a_5=(unsigned)byteCode[3]/16u;
+		delta=4;
+		break;
+		case 15:
+		IS.arg.B8.a_0=(unsigned)byteCode[1]&15u;
+		IS.arg.B8.a_1=(unsigned)byteCode[1]/16u;
+		IS.arg.B8.a_2=(unsigned)byteCode[2]&15u;
+		IS.arg.B8.a_3=(unsigned)byteCode[2]/16u;
+		IS.arg.B8.a_4=(unsigned)byteCode[3]&15u;
+		IS.arg.B8.a_5=(unsigned)byteCode[3]/16u;
+		IS.arg.B8.a_6=(unsigned)byteCode[4]&15u;
+		IS.arg.B8.a_7=(unsigned)byteCode[4]/16u;
+		delta=5;
 		break;
 	}
 	*IS_parent=IS;
@@ -771,58 +970,75 @@ void destroyInstructionBuffer(InstructionBuffer* ib){
 uint8_t compressInstruction(uint8_t* byteCode,const InstructionSingle IS){
 	switch (instructionContentCatagory(byteCode[0]=IS.id)){
 		case 0:
-		return 1;
+		return 0;
 		case 1:
+		return 1;
 		case 2:
-		byteCode[1]=IS.arg.B.a_0;
-		return 2;
 		case 3:
-		byteCode[1]=IS.arg.BB.a_0|(IS.arg.BB.a_1*16);
+		byteCode[1]=IS.arg.B1.a_0;
 		return 2;
 		case 4:
-		byteCode[1]=IS.arg.BBB.a_0|(IS.arg.BBB.a_1*16);
-		byteCode[2]=IS.arg.BBB.a_2;
-		return 3;
+		byteCode[1]=IS.arg.B2.a_0|(IS.arg.B2.a_1*16);
+		return 2;
 		case 5:
-		byteCode[1]=IS.arg.BB.a_0;
-		byteCode[2]=IS.arg.BB.a_1;
+		byteCode[1]=IS.arg.B3.a_0|(IS.arg.B3.a_1*16);
+		byteCode[2]=IS.arg.B3.a_2;
 		return 3;
 		case 6:
-		byteCode[1]=IS.arg.W.a_0&255U;
-		byteCode[2]=(IS.arg.W.a_0&(255U*256U))/256U;
+		byteCode[1]=IS.arg.B2.a_0;
+		byteCode[2]=IS.arg.B2.a_1;
 		return 3;
 		case 7:
-		byteCode[1]=IS.arg.BW.a_0;
-		byteCode[2]=IS.arg.BW.a_1&255U;
-		byteCode[3]=(IS.arg.BW.a_1&(255U*256U))/256U;
-		return 4;
+		byteCode[1]=IS.arg.W.a_0&255;
+		byteCode[2]=((unsigned)IS.arg.W.a_0&(255U*256U))/256U;
+		return 3;
 		case 8:
-		byteCode[1]=IS.arg.BBW.a_0|(IS.arg.BBW.a_1*16);
-		byteCode[2]=IS.arg.BBW.a_2&255U;
-		byteCode[3]=(IS.arg.BBW.a_2&(255U*256U))/256U;
+		byteCode[1]=IS.arg.BW.a_0;
+		byteCode[2]=IS.arg.BW.a_1&255;
+		byteCode[3]=((unsigned)IS.arg.BW.a_1&(255U*256U))/256U;
 		return 4;
 		case 9:
-		byteCode[1]=(uint16_t)IS.arg.D.a_0&255U;
-		byteCode[2]=((uint16_t)IS.arg.D.a_0&(255U*256U))/256U;
+		byteCode[1]=IS.arg.D.a_0&255;
+		byteCode[2]=((unsigned)IS.arg.D.a_0&(255U*256U))/256U;
 		byteCode[3]=*((uint16_t*)&IS.arg.D.a_0+1)&255U;
 		byteCode[4]=(*((uint16_t*)&IS.arg.D.a_0+1)&(255U*256U))/256U;
 		return 5;
 		case 10:
 		byteCode[1]=IS.arg.BBD.a_0|(IS.arg.BBD.a_1*16);
-		byteCode[2]=(uint16_t)IS.arg.BBD.a_2&255U;
-		byteCode[3]=((uint16_t)IS.arg.BBD.a_2&(255U*256U))/256U;
+		byteCode[2]=(unsigned)IS.arg.BBD.a_2&255U;
+		byteCode[3]=((unsigned)IS.arg.BBD.a_2&(255U*256U))/256U;
 		byteCode[4]=*((uint16_t*)&IS.arg.BBD.a_2+1)&255U;
 		byteCode[5]=(*((uint16_t*)&IS.arg.BBD.a_2+1)&(255U*256U))/256U;
 		return 6;
 		case 11:
 		byteCode[1]=IS.arg.BWD.a_0;
-		byteCode[2]=IS.arg.BWD.a_1&255U;
-		byteCode[3]=(IS.arg.BWD.a_1&(255U*256U))/256U;
-		byteCode[4]=(uint16_t)IS.arg.BWD.a_2&255U;
-		byteCode[5]=((uint16_t)IS.arg.BWD.a_2&(255U*256U))/256U;
+		byteCode[2]=IS.arg.BWD.a_1&255;
+		byteCode[3]=((unsigned)IS.arg.BWD.a_1&(255U*256U))/256U;
+		byteCode[4]=IS.arg.BWD.a_2&255;
+		byteCode[5]=((unsigned)IS.arg.BWD.a_2&(255U*256U))/256U;
 		byteCode[6]=*((uint16_t*)&IS.arg.BWD.a_2+1)&255U;
 		byteCode[7]=(*((uint16_t*)&IS.arg.BWD.a_2+1)&(255U*256U))/256U;
 		return 8;
+		case 12:
+		byteCode[1]=IS.arg.B4.a_0|(IS.arg.B4.a_1*16);
+		byteCode[2]=IS.arg.B4.a_2|(IS.arg.B4.a_3*16);
+		return 3;
+		case 13:
+		byteCode[1]=IS.arg.B5.a_0|(IS.arg.B5.a_1*16);
+		byteCode[2]=IS.arg.B5.a_2|(IS.arg.B5.a_3*16);
+		byteCode[3]=IS.arg.B5.a_4;
+		return 4;
+		case 14:
+		byteCode[1]=IS.arg.B6.a_0|(IS.arg.B6.a_1*16);
+		byteCode[2]=IS.arg.B6.a_2|(IS.arg.B6.a_3*16);
+		byteCode[3]=IS.arg.B6.a_4|(IS.arg.B6.a_5*16);
+		return 4;
+		case 15:
+		byteCode[1]=IS.arg.B8.a_0|(IS.arg.B8.a_1*16);
+		byteCode[2]=IS.arg.B8.a_2|(IS.arg.B8.a_3*16);
+		byteCode[3]=IS.arg.B8.a_4|(IS.arg.B8.a_5*16);
+		byteCode[4]=IS.arg.B8.a_6|(IS.arg.B8.a_7*16);
+		return 5;
 	}
 	assert(false);
 	exit(1);
@@ -831,7 +1047,7 @@ uint8_t compressInstruction(uint8_t* byteCode,const InstructionSingle IS){
 uint8_t getStorageDeltaForInstruction(enum InstructionTypeID id){
 	// if something changes, do not just change this, there are other places
 	const uint8_t deltas[]={ // could be static
-		[ 0]=1,[ 1]=2,[ 2]=2,[ 3]=2,[ 4]=3,[ 5]=3,[ 6]=3,[ 7]=4,[ 8]=4,[ 9]=5,[10]=6,[11]=8
+		[ 0]=0,[ 1]=1,[ 2]=2,[ 3]=2,[ 4]=2,[ 5]=3,[ 6]=3,[ 7]=3,[ 8]=4,[ 9]=5,[10]=6,[11]=8,[12]=3,[13]=4,[14]=4,[15]=5
 	};
 	return deltas[instructionContentCatagory(id)];
 }
@@ -981,7 +1197,7 @@ void doLabelMarkoffInInstructionBuffer(const InstructionBuffer* ib,uint32_t* lab
 void add_ALCR(InstructionBuffer* ib, uint16_t size){
 	InstructionSingle IS;
 	IS.id=I_ALCR;
-	IS.arg.BW.a_0=13;
+	IS.arg.BW.a_0=11;
 	IS.arg.BW.a_1=size;
 	addInstruction(ib,IS);
 }
@@ -989,7 +1205,7 @@ void add_ALCR(InstructionBuffer* ib, uint16_t size){
 void addVoidPop(InstructionBuffer* ib){
 	InstructionSingle IS;
 	IS.id=I_POP1;
-	IS.arg.B.a_0=3;
+	IS.arg.B1.a_0=3;
 	addInstruction(ib,IS);
 }
 
@@ -1003,22 +1219,22 @@ void addQuadVoidPop(InstructionBuffer* ib){
 void addPopArgPush1(InstructionBuffer* ib){
 	InstructionSingle IS;
 	IS.id=I_POP1;
-	IS.arg.B.a_0=3;
+	IS.arg.B1.a_0=3;
 	addInstruction(ib,IS);
 	IS.id=I_PUA1;
-	IS.arg.B.a_0=3;
+	IS.arg.B1.a_0=3;
 	addInstruction(ib,IS);
 }
 
 void addPopArgPush2(InstructionBuffer* ib){
 	InstructionSingle IS;
 	IS.id=I_POP2;
-	IS.arg.BB.a_0=3;
-	IS.arg.BB.a_1=4;
+	IS.arg.B2.a_0=3;
+	IS.arg.B2.a_1=4;
 	addInstruction(ib,IS);
 	IS.id=I_PUA2;
-	IS.arg.BB.a_0=4;
-	IS.arg.BB.a_1=3;
+	IS.arg.B2.a_0=4;
+	IS.arg.B2.a_1=3;
 	addInstruction(ib,IS);
 }
 
@@ -1032,32 +1248,29 @@ if isActuallyAddressBecauseUnionOrStruct==false, then this should not be called
 void addStructArgPush(InstructionBuffer* ib, uint16_t size, bool isVolatile){
 	InstructionSingle IS;
 	IS.id=I_POP2;
-	IS.arg.BB.a_0=3;
-	IS.arg.BB.a_1=4;
+	IS.arg.B2.a_0=3;
+	IS.arg.B2.a_1=4;
 	addInstruction(ib,IS);
 	IS.id=I_BL1_;
-	IS.arg.BB.a_0=6;
-	IS.arg.BB.a_1=2;
+	IS.arg.B2.a_0=6;
+	IS.arg.B2.a_1=2;
 	addInstruction(ib,IS);
 	while (size){
 		if (isVolatile) IS.id=I_MRWV;
 		else IS.id=I_MRWN;
-		IS.arg.BBB.a_0=5;
-		IS.arg.BBB.a_1=3;
-		IS.arg.BBB.a_2=4;
+		IS.arg.B3.a_0=5;
+		IS.arg.B3.a_1=3;
+		IS.arg.B3.a_2=4;
 		addInstruction(ib,IS);
-		IS.id=I_ADDC;
-		IS.arg.BBB.a_0=3;
-		IS.arg.BBB.a_1=3;
-		IS.arg.BBB.a_2=6;
-		addInstruction(ib,IS);
-		IS.id=I_ADDN;
-		IS.arg.BBB.a_0=4;
-		IS.arg.BBB.a_1=4;
-		IS.arg.BBB.a_2=15;
+		IS.id=I_LAD1;
+		IS.arg.B5.a_0=3;
+		IS.arg.B5.a_1=4;
+		IS.arg.B5.a_2=3;
+		IS.arg.B5.a_3=4;
+		IS.arg.B5.a_4=6;
 		addInstruction(ib,IS);
 		IS.id=I_PUA1;
-		IS.arg.B.a_0=5;
+		IS.arg.B1.a_0=5;
 		addInstruction(ib,IS);
 		size-=2;
 	}
@@ -1070,38 +1283,35 @@ void addStructArgPush(InstructionBuffer* ib, uint16_t size, bool isVolatile){
 void addStructStackAssign(InstructionBuffer* ib, uint16_t size, bool isVolatile){
 	InstructionSingle IS;
 	IS.id=I_POP2;
-	IS.arg.BB.a_0=3;
-	IS.arg.BB.a_1=4;
+	IS.arg.B2.a_0=3;
+	IS.arg.B2.a_1=4;
 	addInstruction(ib,IS);
 	while (size){
 		size-=2;
 		IS.id=I_POP1;
-		IS.arg.B.a_0=5;
+		IS.arg.B1.a_0=5;
 		addInstruction(ib,IS);
 		IS.id=I_RL1_;
 		IS.arg.BW.a_0=6;
 		IS.arg.BW.a_1=size;
 		addInstruction(ib,IS);
-		IS.id=I_ADDC;
-		IS.arg.BBB.a_0=7;
-		IS.arg.BBB.a_1=3;
-		IS.arg.BBB.a_2=6;
-		addInstruction(ib,IS);
-		IS.id=I_ADDN;
-		IS.arg.BBB.a_0=8;
-		IS.arg.BBB.a_1=4;
-		IS.arg.BBB.a_2=15;
+		IS.id=I_LAD1;
+		IS.arg.B5.a_0=7;
+		IS.arg.B5.a_1=8;
+		IS.arg.B5.a_2=3;
+		IS.arg.B5.a_3=4;
+		IS.arg.B5.a_4=6;
 		addInstruction(ib,IS);
 		if (isVolatile) IS.id=I_MWWV;
 		else IS.id=I_MWWN;
-		IS.arg.BBB.a_0=5;
-		IS.arg.BBB.a_1=7;
-		IS.arg.BBB.a_2=8;
+		IS.arg.B3.a_0=5;
+		IS.arg.B3.a_1=7;
+		IS.arg.B3.a_2=8;
 		addInstruction(ib,IS);
 	}
 	IS.id=I_PU2_;
-	IS.arg.BB.a_0=4;
-	IS.arg.BB.a_1=3;
+	IS.arg.B2.a_0=4;
+	IS.arg.B2.a_1=3;
 	addInstruction(ib,IS);
 }
 
@@ -1111,7 +1321,7 @@ void convertSTPI_STPA(InstructionBuffer* ib, uint16_t offsetToAdd){
 	for (uint32_t i=0;i<ib->numberOfSlotsTaken;i++){
 		if (ib->buffer[i].id==I_STPI){
 			ib->buffer[i].id=I_STPA;
-			uint16_t* vp=&ib->buffer[i].arg.BBW.a_2;
+			uint16_t* vp=&ib->buffer[i].arg.BW.a_1;
 			*vp=offsetToAdd-*vp;
 		}
 	}

@@ -19,6 +19,37 @@
 #include <string.h>
 
 
+// this is for valgrind testing. if defined it will null out the entire exp buffer when clearing previous expressions
+//#define FORCE_EXP_BUFFER_NULL
+
+
+#define ERR_MSG_LEN 60 // controls the length of error messages
+
+
+//#define STATEMENT_DEBUG
+//#define EXP_TO_ASSEMBLY_DEBUG
+//#define COMPILE_EXP_DEBUG_PRINTOUT
+
+//#define COMPILE_ONLY_EXP_DEBUG // this includes a main
+
+
+//#define OPT_DEBUG_SANITY
+//#define OPT_DEBUG_GENERAL_ACTIVE
+//#define OPT_DEBUG_PUSH_POP_MOV
+//#define OPT_DEBUG_CONST
+//#define OPT_PEEPHOLE_PRINT_TREE
+
+//#define PRINT_EACH_FUNCTION // this prints the optimized instruction buffer for each function
+
+/*
+STATEMENT_DEBUG tells the statement walker to print every statement it reaches prior to processing it
+EXP_TO_ASSEMBLY_DEBUG tells ExpressionToInstructions to print some information about what it is currently processing
+COMPILE_EXP_DEBUG_PRINTOUT tells ExpressionParser to explain how the expression tree got built
+*/
+
+
+
+
 #define USE_ALT_ALLOC
 
 void* cosmic_malloc(size_t size);
@@ -85,39 +116,6 @@ void err_1111_(const char* message,int32_t s,int32_t e){printInformativeMessageA
 
 
 
-
-// this is for valgrind testing. if defined it will null out the entire exp buffer when clearing previous expressions
-//#define FORCE_EXP_BUFFER_NULL
-
-
-#define ERR_MSG_LEN 60 // controls the length of error messages
-
-
-//#define STATEMENT_DEBUG
-//#define EXP_TO_ASSEMBLY_DEBUG
-//#define COMPILE_EXP_DEBUG_PRINTOUT
-
-//#define COMPILE_ONLY_EXP_DEBUG // this includes a main
-
-
-//#define OPT_DEBUG_SANITY
-//#define OPT_DEBUG_GENERAL_ACTIVE
-//#define OPT_DEBUG_PUSH_POP_MOV
-//#define OPT_DEBUG_CONST
-//#define OPT_PEEPHOLE_PRINT_TREE
-
-//#define PRINT_EACH_FUNCTION // this prints the optimized instruction buffer for each function
-
-/*
-STATEMENT_DEBUG tells the statement walker to print every statement it reaches prior to processing it
-EXP_TO_ASSEMBLY_DEBUG tells ExpressionToInstructions to print some information about what it is currently processing
-COMPILE_EXP_DEBUG_PRINTOUT tells ExpressionParser to explain how the expression tree got built
-*/
-
-
-
-
-
 struct CompileSettings{
 	uint8_t optLevel; // range is 0->4 inclusive. The value is one higher then the argument supplied
 	bool noColor; // used to disable color printing if desired
@@ -130,12 +128,6 @@ struct CompileSettings{
 } compileSettings = {
 	.optLevel=1
 };
-
-
-#include "TargetInstructions/IncludeInstructions.c"
-#include "Alloc.c"
-
-
 
 
 
@@ -162,6 +154,12 @@ void resetColor(){
 	if (compileSettings.noColor) return;
 	printf("\033[0m");
 }
+
+
+#include "TargetInstructions/IncludeInstructions.c"
+#include "Alloc.c"
+
+
 
 void memZero(void* ptr, uint32_t numberOfBytes){
 	for (uint32_t i=0;i<numberOfBytes;i++){
