@@ -2192,19 +2192,18 @@ bool processIfLikeDirectiveToBool(int32_t indexOfSpaceAfterDirective){
 	int32_t endIndex=indexOfSpaceAfterDirective;
 	while (sourceContainer.sourceChar[endIndex++].c!='\n'){
 	}
-	sourceContainer.string=copySegmentOfSourceContainerToHeapString(indexOfSpaceAfterDirective,endIndex);
-	sourceContainer.stringOffset=indexOfSpaceAfterDirective;
 	sourceContainer.isStringForPreprocesser=true;
-	int16_t expRoot=buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(sourceContainer.string,1,endIndex-indexOfSpaceAfterDirective,true);
+	sourceContainer.stringOffset=indexOfSpaceAfterDirective;
+	sourceContainer.string=copySegmentOfSourceContainerToHeapString(indexOfSpaceAfterDirective,endIndex);
+	int16_t expRoot=buildExpressionTreeToGlobalBufferAndReturnRootIndex(1,endIndex-indexOfSpaceAfterDirective,true);
 	bool result=false;
 	if (expRoot==-1){
-		sourceContainer.isStringForPreprocesser=false;
 		printInformativeMessageAtSourceContainerIndex(false,"No constant expression was found here for this directive\n    Preprocessing will continue as if it was false",indexOfSpaceAfterDirective,0);
 	} else {
 		result=expressionToConstantValue("unsigned long",expRoot)!=0;
 	}
-	sourceContainer.isStringForPreprocesser=false;
 	cosmic_free(sourceContainer.string);
+	sourceContainer.isStringForPreprocesser=false;
 	sourceContainer.string=NULL;
 	sourceContainer.stringOffset=0;
 	return result;

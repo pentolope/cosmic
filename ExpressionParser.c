@@ -1,139 +1,71 @@
 
 #include "Common.c"
 
-
-// doesn't check much. returns -1 if there was an obvious failure. returns the index directly after the token ends
-int32_t getEndOfToken(char* string,int32_t startIndex){
-	char startingChar = string[startIndex];
-	if (startingChar=='\"'){
-		for (int32_t i=startIndex+1;string[i];i++){
-			char c = string[i];
-			if (c=='\\'){
-				i++;
-			} else if (c=='\"'){
-				return i+1;
-			} else if (c=='\n'){
-				printf("newlines are not allowed in string literals\n");
-				exit(1);
-			}
+// doesn't check much. returns the index directly after the token ends
+int32_t getEndOfToken(int32_t startIndex){
+	char* string=sourceContainer.string;
+	char c0;
+	char c1 = 0;
+	char c2 = 0;
+	if ((c0=string[startIndex])!=0){
+		if ((c1=string[startIndex+1])!=0){
+			c2=string[startIndex+2];
 		}
-		printf("token splitter failing by string termination while string literal parsing on startIndex %d\n",startIndex);
-		return -1;
-	} else if ((startingChar=='L') && 
-				isStringLengthLargerThan(string,startIndex,2) &&
-				(string[startIndex+1]=='\"')){
-		
-		for (int32_t i=startIndex+2;string[i];i++){
-			char c = string[i];
-			if (c=='\\'){
-				i++;
-			} else if (c=='\"'){
-				return i+1;
-			} else if (c=='\n'){
-				printf("newlines are not allowed in string literals\n");
-				exit(1);
-			}
-		}
-		printf("token splitter failing by string termination while wide literal parsing on startIndex %d\n",startIndex);
-		return -1;
-	} else if (startingChar=='\''){
-		for (int32_t i=startIndex+1;string[i];i++){
-			char c = string[i];
-			if (c=='\\'){
-				i++;
-			} else if (c=='\''){
-				return i+1;
-			} else if (c=='\n'){
-				printf("newlines are not allowed in character literals\n");
-				exit(1);
-			}
-		}
-		printf("token splitter failing by string termination while character literal parsing on startIndex %d\n",startIndex);
-		return -1;
-		
-	} else if (isLetter(startingChar) | isDigit(startingChar) |
-		(startingChar=='.' & isDigit(string[startIndex+1]))){
-		
-		if (startingChar=='.' | isDigit(startingChar)){ // this is to seperate between if the '.' will stop the token, as well as handling the floating point "e+" and "e-" part
-			for (int32_t i=startIndex;string[i];i++){
-				char c = string[i];
-				if ((c=='e' | c=='E') & (string[i+1]=='+' | string[i+1]=='-')){
-					i+=2; // advance past the e and the + or -
-				} else if (!(isLetter(c) | isDigit(c) | c=='.')){
-					return i;
+	}
+	if (c0=='\"' | c0=='\'' | isLetter(c0) | isDigit(c0) | (c0=='.' & isDigit(c1))){
+		int32_t i=startIndex;
+		char c;
+		if (c0=='\'' | c0=='\"' | (c0=='L' & c1=='\"')){
+			char end=c0=='L'?'\"':c0;
+			while ((c=string[++i])){
+				if (c=='\\' | c==end | c=='\n'){
+					++i;
+					if (c!='\\' & c==end) return i;
+					if (c=='\n'){
+						err_1101_("string and character literals must not span multiple lines (use \\n instead)",startIndex);
+					}
 				}
 			}
 		} else {
-			for (int32_t i=startIndex;string[i];i++){
-				char c = string[i];
-				if (!(isLetter(c) | isDigit(c))){
-					return i;
+			--i;
+			if (c0=='.' | isDigit(c0)){ // this is to seperate between if the '.' will stop the token, as well as handling the floating point "e+" and "e-" part
+				while ((c=string[++i])){
+					char cn=string[i+1];
+					if ((c=='e' | c=='E') & (cn=='+' | cn=='-')) i+=2; // advance past the e and the + or -
+					else if (!(isLetter(c) | isDigit(c) | c=='.')) return i;
+				}
+			} else {
+				while ((c=string[++i])){
+					if (!(isLetter(c) | isDigit(c))) return i;
 				}
 			}
 		}
-		printf("token splitter failing by string termination on startIndex %d\n",startIndex);
-		return -1;
+		err_1101_("Unexpected EOF while finding end of token that starts here",startIndex);
+		return 0; // this return is unreachable
 	}
-	if (isStringLengthLargerThan(string,startIndex,3)){
-		char c0=string[startIndex  ];
-		char c1=string[startIndex+1];
-		char c2=string[startIndex+2];
-		if ((c0=='>' & c1=='>' & c2=='=') |
-			(c0=='<' & c1=='<' & c2=='=')){
-			
-			return startIndex+3;
-		}
+	if ((c0=='>' & c1=='>' & c2=='=') | (c0=='<' & c1=='<' & c2=='=')
+		){
+		return startIndex+3;
 	}
-	if (isStringLengthLargerThan(string,startIndex,2)){
-		
-		char c0=string[startIndex  ];
-		char c1=string[startIndex+1];
-		if ((c1=='=' & (c0=='!' | c0=='=' | c0=='*' | c0=='/' | c0=='%' | c0=='&' | c0=='^' | c0=='|' | c0=='+' | c0=='-' | c0=='<' | c0=='>')) |
-			(c0=='-' & (c1=='-' | c1=='>')) |
-			(c0=='+' & c1=='+') |
-			(c0=='&' & c1=='&') |
-			(c0=='|' & c1=='|') |
-			(c0=='<' & c1=='<') |
-			(c0=='>' & c1=='>')
-			){
-			
-			return startIndex+2;
-		}
+	if ((c1=='=' & (c0=='!' | c0=='=' | c0=='*' | c0=='/' | c0=='%' | c0=='&' | c0=='^' | c0=='|' | c0=='+' | c0=='-' | c0=='<' | c0=='>')) |
+		(c0=='-' & (c1=='-' | c1=='>')) | (c0=='+' & c1=='+') | (c0=='&' & c1=='&') |
+		(c0=='|' & c1=='|') | (c0=='<' & c1=='<') | (c0=='>' & c1=='>')
+		){
+		return startIndex+2;
 	}
-	if (isStringLengthLargerThan(string,startIndex,1)){
-		if (startingChar=='(' |
-			startingChar==')' |
-			startingChar=='[' |
-			startingChar==']' |
-			startingChar=='{' |
-			startingChar=='}' |
-			startingChar=='.' |
-			startingChar=='+' |
-			startingChar=='-' |
-			startingChar=='*' |
-			startingChar=='/' |
-			startingChar=='%' |
-			startingChar=='&' |
-			startingChar=='^' |
-			startingChar=='|' |
-			startingChar=='?' |
-			startingChar==':' |
-			startingChar=='=' |
-			startingChar==',' |
-			startingChar=='<' |
-			startingChar=='>' |
-			startingChar=='!' |
-			startingChar=='~' |
-			startingChar==' ' |
-			startingChar==';' |
-			startingChar=='\n'){
-			
-			return startIndex+1;
-		}
+	if (c0=='(' | c0==')' | c0=='[' | c0==']' | c0=='{' | c0=='}' | c0=='.' |
+		c0=='+' | c0=='-' | c0=='*' | c0=='/' | c0=='%' | c0=='&' | c0=='^' |
+		c0=='|' | c0=='?' | c0==':' | c0=='=' | c0==',' | c0=='<' | c0=='>' |
+		c0=='!' | c0=='~' | c0==' ' | c0==';' | c0=='\n'
+		){
+		return startIndex+1;
 	}
-	printf("token splitter failing on startIndex %d\n",startIndex);
-	return -1;
+	err_1101_("Unexpected character while attempting to find end of token",startIndex);
+	return 0; // this return is unreachable
 }
+
+
+
 
 
 bool isSubstringANameForAValidType(char *string, int32_t startIndex, int32_t endIndex){
@@ -193,7 +125,6 @@ typedef struct ExpressionToken{
 } ExpressionToken;
 
 typedef struct ExpressionTokenArray{
-	char* string;
 	ExpressionToken* expressionTokens;
 	int32_t length;
 } ExpressionTokenArray;
@@ -278,7 +209,7 @@ bool isOperatorForExpressionTree(uint8_t oID);
 void internalDebugForExpressionParser(ExpressionTokenArray expressionTokenArray){
 	printf("In progress results follow:\n");
 	for (int32_t i=0;i<expressionTokenArray.length;i++){
-		char *tokenStringContents = copyStringSegmentToHeap(expressionTokenArray.string,expressionTokenArray.expressionTokens[i].tokenStart,expressionTokenArray.expressionTokens[i].tokenEnd);
+		char *tokenStringContents = copyStringSegmentToHeap(sourceContainer.string,expressionTokenArray.expressionTokens[i].tokenStart,expressionTokenArray.expressionTokens[i].tokenEnd);
 		ExpressionToken token = expressionTokenArray.expressionTokens[i];
 		printf("token number %3d has precedenceTotal   :%2d:%2d, catagory %2d, isOperator %1d , and contents \"%s\"\n",
 			i,
@@ -296,10 +227,10 @@ void internalDebugForExpressionParser(ExpressionTokenArray expressionTokenArray)
 bool isExpressionTokenName(ExpressionTokenArray expressionTokenArray, int32_t index){ // this detection is a little more complicated then normal, so it is in a function
 	ExpressionToken expressionToken = expressionTokenArray.expressionTokens[index];
 	
-	char firstCharacter = expressionTokenArray.string[expressionToken.tokenStart];
+	char firstCharacter = sourceContainer.string[expressionToken.tokenStart];
 	if (isLetter(firstCharacter)){
 		if (firstCharacter=='L'){
-			return expressionTokenArray.string[expressionToken.tokenStart+1]!='\"'; // this should not cause an out of bounds error
+			return sourceContainer.string[expressionToken.tokenStart+1]!='\"'; // this should not cause an out of bounds error
 		} else {
 			return true; // normally, we would also check for if it was not sizeof, however that check is done elsewhere
 		}
@@ -377,13 +308,12 @@ does not handle declarations.
 void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 	int32_t i;
 	int32_t length = expressionTokenArray.length;
-	int32_t ifcct; // indexOfFirstCharacterInCurrentToken
 	int32_t lengthOfStringInCurrentToken;
 	int32_t leftIndexForPairing;
 	int32_t rightIndexForPairing;
 	ExpressionToken *expressionTokens = expressionTokenArray.expressionTokens;
 	ExpressionToken *currentTokenPtr;
-	char *string = expressionTokenArray.string;
+	char *string = sourceContainer.string;
 	char firstCharacterOfCurrentToken;
 	uint8_t operatorIDofCurrentToken;
 	bool doPairing = false;
@@ -402,6 +332,7 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 	}
 	for (i=0;i<length;i++){ // initialize part 2: catagorize
 		currentTokenPtr = &(expressionTokens[i]);
+		int32_t ifcct; // indexOfFirstCharacterInCurrentToken
 		ifcct = currentTokenPtr->tokenStart;
 		lengthOfStringInCurrentToken = currentTokenPtr->tokenEnd - ifcct;
 		firstCharacterOfCurrentToken = string[ifcct];
@@ -841,7 +772,7 @@ void checkForZeroPrecedenceInPrecedenceTotal(ExpressionTokenArray expressionToke
 }
 
 int32_t matchSpecificEnclosementOnExpressionTokenArray(ExpressionTokenArray expressionTokenArray, int32_t tokenIndexToMatch){
-	char startTarget = expressionTokenArray.string[expressionTokenArray.expressionTokens[tokenIndexToMatch].tokenStart];
+	char startTarget = sourceContainer.string[expressionTokenArray.expressionTokens[tokenIndexToMatch].tokenStart];
 	char endTarget;
 	if (startTarget=='('){
 		endTarget=')';
@@ -856,7 +787,7 @@ int32_t matchSpecificEnclosementOnExpressionTokenArray(ExpressionTokenArray expr
 	for (int32_t i=tokenIndexToMatch+1;i<expressionTokenArray.length;i++){
 		if (expressionTokenArray.expressionTokens[i].isOpenEnclosement){
 			i = matchSpecificEnclosementOnExpressionTokenArray(expressionTokenArray,i);
-		} else if (expressionTokenArray.string[expressionTokenArray.expressionTokens[i].tokenStart]==endTarget){ // if the first character of token[i] matches the endTarget
+		} else if (sourceContainer.string[expressionTokenArray.expressionTokens[i].tokenStart]==endTarget){ // if the first character of token[i] matches the endTarget
 			expressionTokenArray.expressionTokens[tokenIndexToMatch].matchingIndex = i;
 			expressionTokenArray.expressionTokens[i].matchingIndex = tokenIndexToMatch;
 			return i;
@@ -871,7 +802,7 @@ int32_t matchSpecificEnclosementOnExpressionTokenArray(ExpressionTokenArray expr
 
 void matchEnclosementsOnExpressionTokenArray(ExpressionTokenArray expressionTokenArray){
 	for (int32_t i=0;i<expressionTokenArray.length;i++){
-		char c = expressionTokenArray.string[expressionTokenArray.expressionTokens[i].tokenStart];
+		char c = sourceContainer.string[expressionTokenArray.expressionTokens[i].tokenStart];
 		expressionTokenArray.expressionTokens[i].isOpenEnclosement  = c=='(' | c=='[' | c=='{';
 		expressionTokenArray.expressionTokens[i].isCloseEnclosement = c==')' | c==']' | c=='}';
 	}
@@ -887,7 +818,7 @@ void matchEnclosementsOnExpressionTokenArray(ExpressionTokenArray expressionToke
 
 
 /*
-when the expression is terminated with a semicolon, then the following should be true:  string[endIndex]==';'
+when the expression is terminated with a semicolon, then the following should be true:  sourceContainer.string[endIndex]==';'
 the array is allocated on heap, don't forget to cosmic_free() it
 also removes spaces and newlines (but notates if a newline existed)
 does not call the enclosement matcher or the expression parsing functions
@@ -896,17 +827,12 @@ ExpressionTokenArray generateTokenArrayForExpression(char* string, int32_t start
 	bool terminatedAtCorrectIndex = false;
 	int32_t lengthCount = 0;
 	for (int32_t i=startIndex;i<endIndex;){
-		if (!(string[i]==' ' | string[i]=='\n')){
+		char c=sourceContainer.string[i];
+		if (!(c==' ' | c=='\n')){
 			lengthCount++;
 		}
-		i = getEndOfToken(string,i);
-		if (i==-1){
-			printf("token splitter error.\n");
-			exit(1); // general error from the token splitter. probably didn't find the token because the string terminated early or there were invalid characters
-		}
-		if (i==endIndex){
-			terminatedAtCorrectIndex = true;
-		}
+		i = getEndOfToken(i);
+		terminatedAtCorrectIndex=i==endIndex;
 	}
 	if (!terminatedAtCorrectIndex){
 		printf("Internal Error: generateTokenArrayForExpression() was told to end at a character that is inside a token.\n");
@@ -915,12 +841,11 @@ ExpressionTokenArray generateTokenArrayForExpression(char* string, int32_t start
 	ExpressionTokenArray expressionTokenArray;
 	expressionTokenArray.expressionTokens = cosmic_calloc(lengthCount,sizeof(ExpressionToken));
 	expressionTokenArray.length = lengthCount;
-	expressionTokenArray.string = string;
 	int32_t walkingIndex = 0;
 	for (int32_t i=startIndex;i<endIndex;){
 		int32_t tokenStart = i;
-		i = getEndOfToken(string,i);
-		char c=string[tokenStart];
+		i = getEndOfToken(i);
+		char c=sourceContainer.string[tokenStart];
 		if (!(c==' ' | c=='\n')){
 			expressionTokenArray.expressionTokens[walkingIndex].tokenStart = tokenStart;
 			expressionTokenArray.expressionTokens[walkingIndex].tokenEnd = i;
@@ -932,49 +857,8 @@ ExpressionTokenArray generateTokenArrayForExpression(char* string, int32_t start
 	return expressionTokenArray;
 }
 
-
-// this is to make walking the expression tree a little easier
-typedef struct ExpTreePreWalkData{
-	int16_t leftNode;
-	int16_t rightNode;
-	int16_t chainNode;
-	bool hasLeftNode;
-	bool hasRightNode;
-	bool hasChainNode;
-} ExpTreePreWalkData;
-/*
-when generating assembly, then this is a description of the indexes in ExpressionTreeNode:
-
-the indexes : startIndexInString,endIndexInString
- - most important for error locations, and is important for function calls with a name, because the name is effectively stored here
-
-the indexes : argumentIndexStart,argumentIndexEnd
- - used for types (for type cast and sizeof), are indexes into the source string
-
-*/
-
-typedef struct ExpTreePostWalkData{
-	char* typeStringNQ; // no identifer, volatile, or const. comes from the same allocation as typeString, and should NOT be cosmic_freed
-	char* typeString; // no identifier, may have volatile and const. is heap allocated
-	// next two refer to the typeString. it makes type detection easier
-	bool isRValueConst;
-	bool isRValueVolatile;
-	// next five refer to the object of the value
-	bool isLValue;
-	bool isLValueConst;
-	bool isLValueVolatile;
-	bool isLValueStructResultOfAssignment; // this indicates that it cannot be assigned, but it also is not nessassarily a const lvalue (the data this lvalue points to is not nessassarily const)
-	uint16_t sizeOnStack; // this is the number of bytes that were pushed to the stack for function parameter chains
-	uint16_t operatorTypeID; // this is a value set by applyAutoTypeConversion() that indicates the kind of operation to be performed. It is used in conjunction with the operatorID by applyOperator()
-	uint32_t constVal; // for constant expressions
-	// these next two members are values set by applyAutoTypeConversion() that indicates various things, it may be used by applyOperator()
-	uint32_t extraVal;
-	void* extraPtr;
-} ExpTreePostWalkData;
-
-
-typedef struct ExpressionTreeNode{
-	int32_t startIndexInString; // this and the next indexes are copied from the token
+typedef struct {
+	int32_t startIndexInString; // this and the next indexes are copied from the token. most important for error locations, and is important for function calls with a name, because the name is effectively stored here
 	int32_t endIndexInString;
 	int32_t argumentIndexStart; // this and the next component are used for types (for type cast and sizeof), and are an index into the source string
 	int32_t argumentIndexEnd;
@@ -986,18 +870,43 @@ typedef struct ExpressionTreeNode{
 	bool isEndNode;
 	bool isArgumentTypeForSizeof; // if this node is a sizeof operator, this is true if the argument is a type rather then an expression
 	uint8_t operatorID; // copied from the token
+/*
+the following are newer pieces. They are typically initialized and handled by expressionToInstructions()
+.pre , however, is initialized by buildExpressionTreeToGlobalBufferAndReturnRootIndex()
+*/
+	struct ExpTreePreWalkData{
+		int16_t leftNode;
+		int16_t rightNode;
+		int16_t chainNode;
+		bool hasLeftNode;
+		bool hasRightNode;
+		bool hasChainNode;
+	} pre;
 	
-	//int32_t tokenNum; // this is for debug only
+	struct ExpTreePostWalkData{
+		char* typeStringNQ; // no identifer, volatile, or const. comes from the same allocation as typeString, and should NOT have cosmic_free() called on it
+		char* typeString; // no identifier, may have volatile and const. is heap allocated
+		// next two refer to the typeString. it makes type detection easier
+		bool isRValueConst;
+		bool isRValueVolatile;
+		// next five refer to the object of the value
+		bool isLValue;
+		bool isLValueConst;
+		bool isLValueVolatile;
+		bool isLValueStructResultOfAssignment; // this indicates that it cannot be assigned, but it also is not nessassarily a const lvalue (the data this lvalue points to is not nessassarily const)
+		uint16_t sizeOnStack; // this is the number of bytes that were pushed to the stack for function parameter chains
+		uint16_t operatorTypeID; // this is a value set by applyAutoTypeConversion() that indicates the kind of operation to be performed. It is used in conjunction with the operatorID by applyOperator()
+		uint32_t constVal; // for constant expressions
+		// these next two members are values set by applyAutoTypeConversion() that indicates various things, it may be used by applyOperator()
+		uint32_t extraVal;
+		void* extraPtr;
+	} post;
 	
-	// the following are newer pieces. They are typically initialized and handled by expressionToInstructions()
-	// .pre , however, is initialized by buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex()
-	ExpTreePreWalkData pre;
-	ExpTreePostWalkData post;
 	InstructionBuffer ib;
+	
 } ExpressionTreeNode;
 
-
-typedef struct ExpressionTreeGlobalBuffer{
+typedef struct {
 	ExpressionTreeNode* expressionTreeNodes;
 	int16_t numberOfNodesAllocatedToArray;
 	int16_t walkingIndexForNextOpenSlot;
@@ -1015,10 +924,8 @@ void unpackExpressionTreeGlobalBuffer(ExpressionTreeGlobalBuffer* pack){
 	expressionTreeGlobalBuffer=*pack;
 }
 
-
 void genSinglePreWalkData(int16_t nodeIndex){
 	ExpressionTreeNode* etn = &(expressionTreeGlobalBuffer.expressionTreeNodes[nodeIndex]);
-	ExpTreePreWalkData* expTreeWalkDataToPopulate = &etn->pre;
 	uint8_t oID = etn->operatorID;
 	etn->pre.chainNode = etn->nextInChain;
 	etn->pre.hasChainNode = etn->hasNextChainElement;
@@ -1074,7 +981,7 @@ void genSinglePreWalkData(int16_t nodeIndex){
 }
 
 
-// called in buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex()
+// called in buildExpressionTreeToGlobalBufferAndReturnRootIndex()
 void genAllPreWalkData(int16_t nodeIndex){
 	genSinglePreWalkData(nodeIndex);
 	ExpressionTreeNode* expTreeNode = expressionTreeGlobalBuffer.expressionTreeNodes+nodeIndex;
@@ -1128,7 +1035,6 @@ int16_t generateSpecificNodeForExpressionTree(ExpressionTokenArray expressionTok
 	thisExpressionTreeNode->operatorID = thisOperatorID;
 	thisExpressionTreeNode->startIndexInString = targetExpressionToken->tokenStart;
 	thisExpressionTreeNode->endIndexInString = targetExpressionToken->tokenEnd;
-	//thisExpressionTreeNode->tokenNum = targetIndex; // this is debug only
 	uint8_t countOfNonEnclosementAttached = 0;
 	int16_t tempStorageForRecursiveReturnValue;
 	
@@ -1423,9 +1329,8 @@ when started, it should be started with startIndex==0 , previousOperatorIndex==-
 */
 void generateOperatorTargetRoot(ExpressionTokenArray expressionTokenArray, int32_t startIndex, int32_t previousOperatorIndex, int16_t precedenceLevel){
 	int32_t thisOperatorIndex = -3;
-	int32_t i;
 	int32_t modifiedStartIndex = startIndex;
-	i=startIndex;
+	int32_t i = startIndex;
 	while (i<expressionTokenArray.length && expressionTokenArray.expressionTokens[i].precedenceTotal!=precedenceLevel){
 		modifiedStartIndex = ++i;
 	}
@@ -1540,7 +1445,7 @@ void printLinesForDebugType2(int16_t numberOfSpaces){
 }
 
 // this function was made before the abstractions to make walking the tree easier
-void debugPrintOfExpressionTreeFromTargetType2(char *string, int16_t targetIndex, int16_t currentNumberOfPrependSpaces){
+void debugPrintOfExpressionTreeFromTarget(char *string, int16_t targetIndex, int16_t currentNumberOfPrependSpaces){
 	ExpressionTreeNode *exTreeNode = &(expressionTreeGlobalBuffer.expressionTreeNodes[targetIndex]);
 	uint8_t thisOperatorID = exTreeNode->operatorID;
 	char *tempString = copyStringSegmentToHeap(string,exTreeNode->startIndexInString,exTreeNode->endIndexInString);
@@ -1560,7 +1465,7 @@ void debugPrintOfExpressionTreeFromTargetType2(char *string, int16_t targetIndex
 			printf("\"%s\"",tempString2);
 			cosmic_free(tempString2);
 		} else {
-			debugPrintOfExpressionTreeFromTargetType2(string,exTreeNode->indexOfComponent1,currentNumberOfPrependSpaces+2);
+			debugPrintOfExpressionTreeFromTarget(string,exTreeNode->indexOfComponent1,currentNumberOfPrependSpaces+2);
 		}
 	} else if (thisOperatorID==14){ // type cast
 		char *tempString2 = copyStringSegmentToHeap(string,exTreeNode->argumentIndexStart,exTreeNode->argumentIndexEnd);
@@ -1568,7 +1473,7 @@ void debugPrintOfExpressionTreeFromTargetType2(char *string, int16_t targetIndex
 		printf("(%s)\n",tempString2);
 		printLinesForDebugType2(currentNumberOfPrependSpaces);
 		printf(" \\\n");
-		debugPrintOfExpressionTreeFromTargetType2(string,exTreeNode->indexOfComponent1,currentNumberOfPrependSpaces+2);
+		debugPrintOfExpressionTreeFromTarget(string,exTreeNode->indexOfComponent1,currentNumberOfPrependSpaces+2);
 		cosmic_free(tempString2);
 		
 	} else if (thisOperatorID==65){ // function call (with name)
@@ -1581,10 +1486,10 @@ void debugPrintOfExpressionTreeFromTargetType2(char *string, int16_t targetIndex
 			printf("\n");
 			printLinesForDebugType2(currentNumberOfPrependSpaces);
 			printf("\\\\\n");
-			debugPrintOfExpressionTreeFromTargetType2(string,exTreeNode->indexOfComponent1,currentNumberOfPrependSpaces+2);
+			debugPrintOfExpressionTreeFromTarget(string,exTreeNode->indexOfComponent1,currentNumberOfPrependSpaces+2);
 		}
 	} else if (thisOperatorID==66){ // function call (no name)
-		debugPrintOfExpressionTreeFromTargetType2(string,exTreeNode->indexOfComponent2,currentNumberOfPrependSpaces+2); // for complex function call, the left side is in component2, which is different from usual
+		debugPrintOfExpressionTreeFromTarget(string,exTreeNode->indexOfComponent2,currentNumberOfPrependSpaces+2); // for complex function call, the left side is in component2, which is different from usual
 		printLinesForDebugType2(currentNumberOfPrependSpaces);
 		printf(" /\n");
 		printLinesForDebugType2(currentNumberOfPrependSpaces);
@@ -1593,23 +1498,23 @@ void debugPrintOfExpressionTreeFromTargetType2(char *string, int16_t targetIndex
 			// then this function call has arguments
 			printLinesForDebugType2(currentNumberOfPrependSpaces);
 			printf("\\\\\n");
-			debugPrintOfExpressionTreeFromTargetType2(string,exTreeNode->indexOfComponent1,currentNumberOfPrependSpaces+2);
+			debugPrintOfExpressionTreeFromTarget(string,exTreeNode->indexOfComponent1,currentNumberOfPrependSpaces+2);
 		}
 	} else if (isOneOperandOperatorForExpressionTree(thisOperatorID)){
 		printLinesForDebugType2(currentNumberOfPrependSpaces);
 		printf("%s\n",tempString);
 		printLinesForDebugType2(currentNumberOfPrependSpaces);
 		printf(" \\\n");
-		debugPrintOfExpressionTreeFromTargetType2(string,exTreeNode->indexOfComponent1,currentNumberOfPrependSpaces+2);
+		debugPrintOfExpressionTreeFromTarget(string,exTreeNode->indexOfComponent1,currentNumberOfPrependSpaces+2);
 	} else if (isTwoOperandOperatorForExpressionTree(thisOperatorID)){
-		debugPrintOfExpressionTreeFromTargetType2(string,exTreeNode->indexOfComponent1,currentNumberOfPrependSpaces+2);
+		debugPrintOfExpressionTreeFromTarget(string,exTreeNode->indexOfComponent1,currentNumberOfPrependSpaces+2);
 		printLinesForDebugType2(currentNumberOfPrependSpaces);
 		printf(" /\n");
 		printLinesForDebugType2(currentNumberOfPrependSpaces);
 		printf("%s\n",tempString);
 		printLinesForDebugType2(currentNumberOfPrependSpaces);
 		printf(" \\\n");
-		debugPrintOfExpressionTreeFromTargetType2(string,exTreeNode->indexOfComponent2,currentNumberOfPrependSpaces+2);
+		debugPrintOfExpressionTreeFromTarget(string,exTreeNode->indexOfComponent2,currentNumberOfPrependSpaces+2);
 	} else {
 		printLinesForDebugType2(currentNumberOfPrependSpaces);
 		printf("%s\n",tempString);
@@ -1617,7 +1522,7 @@ void debugPrintOfExpressionTreeFromTargetType2(char *string, int16_t targetIndex
 	if (exTreeNode->hasNextChainElement){
 		printLinesForDebugType2(currentNumberOfPrependSpaces-1);
 		printf("!\n");
-		debugPrintOfExpressionTreeFromTargetType2(string,exTreeNode->nextInChain,currentNumberOfPrependSpaces);
+		debugPrintOfExpressionTreeFromTarget(string,exTreeNode->nextInChain,currentNumberOfPrependSpaces);
 	}
 	cosmic_free(tempString);
 }
@@ -1646,24 +1551,22 @@ void clearPreviousExpressions(){
 this will be the public function that gets used most
 returns -1 if there is no expression to be processed there
 */
-int16_t buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(char *string, int32_t startIndexInString, int32_t endIndexInString, bool doClearPreviousExpressions){
-	assert(string==sourceContainer.string);
-	
+int16_t buildExpressionTreeToGlobalBufferAndReturnRootIndex(int32_t startIndexInString, int32_t endIndexInString, bool doClearPreviousExpressions){
 	if (startIndexInString>=endIndexInString ||
-		(string[startIndexInString]==' ' & startIndexInString+1>=endIndexInString)){
+		(sourceContainer.string[startIndexInString]==' ' & startIndexInString+1>=endIndexInString)){
 #ifdef COMPILE_EXP_DEBUG_PRINTOUT
 		printf("Expression parser debug ::\n  no expression to parse, so no further information is given.\n");
 #endif
 		return -1;
 	}
 	ExpressionTokenArray expressionTokenArray;
-	expressionTokenArray = generateTokenArrayForExpression(string,startIndexInString,endIndexInString); // this is contained in this function (cosmic_free() is called it's array)
+	expressionTokenArray = generateTokenArrayForExpression(sourceContainer.string,startIndexInString,endIndexInString); // this is contained in this function (cosmic_free() is called it's array)
 	matchEnclosementsOnExpressionTokenArray(expressionTokenArray);
 	if (expressionTokenArray.expressionTokens[0].isOpenEnclosement==true && expressionTokenArray.expressionTokens[0].matchingIndex==expressionTokenArray.length-1){
 		// then the entire expression is in parentheses. This messes with some of the other algorithms used below, so lets try again without those unneeded parentheses.
 #ifdef COMPILE_EXP_DEBUG_PRINTOUT
 		{
-		char *tempString = copyStringSegmentToHeap(string,startIndexInString,endIndexInString);
+		char *tempString = copyStringSegmentToHeap(sourceContainer.string,startIndexInString,endIndexInString);
 		printf("Expression parser debug on \"%s\" ::\n  expression was surrounded in parentheses, so a reparse is required.\n",tempString);
 		cosmic_free(tempString);
 		}
@@ -1671,7 +1574,7 @@ int16_t buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(char *s
 		int32_t newStartIndex = expressionTokenArray.expressionTokens[0].tokenEnd;
 		int32_t newEndIndex = expressionTokenArray.expressionTokens[expressionTokenArray.length-1].tokenStart;
 		cosmic_free(expressionTokenArray.expressionTokens);
-		return buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(string,newStartIndex,newEndIndex,doClearPreviousExpressions);
+		return buildExpressionTreeToGlobalBufferAndReturnRootIndex(newStartIndex,newEndIndex,doClearPreviousExpressions);
 	}
 	generatePrecedenceTotal(expressionTokenArray);
 	if (expressionTokenArray.length==1 & expressionTokenArray.expressionTokens[0].operatorID>=59 & expressionTokenArray.expressionTokens[0].operatorID<=62){
@@ -1682,7 +1585,7 @@ int16_t buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(char *s
 		*/
 #ifdef COMPILE_EXP_DEBUG_PRINTOUT
 		{
-		char *tempString = copyStringSegmentToHeap(string,startIndexInString,endIndexInString);
+		char *tempString = copyStringSegmentToHeap(sourceContainer.string,startIndexInString,endIndexInString);
 		printf("Expression parser debug on \"%s\" ::\n  expression was a single node, so no further information is given.\n",tempString);
 		cosmic_free(tempString);
 		}
@@ -1703,14 +1606,14 @@ int16_t buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(char *s
 	
 #ifdef COMPILE_EXP_DEBUG_PRINTOUT
 	{
-	char *tempString = copyStringSegmentToHeap(string,startIndexInString,endIndexInString);
+	char *tempString = copyStringSegmentToHeap(sourceContainer.string,startIndexInString,endIndexInString);
 	printf("Expression parser debug on \"%s\" ::\n",tempString);
 	cosmic_free(tempString);
 	}
 	printf("  Operation on tokens partially completed (1/3). Partial results follow:\n");
 	for (int32_t i=0;i<expressionTokenArray.length;i++){
 		char *tokenStringContents = copyStringSegmentToHeap(
-			expressionTokenArray.string,
+			sourceContainer.string,
 			expressionTokenArray.expressionTokens[i].tokenStart,
 			expressionTokenArray.expressionTokens[i].tokenEnd);
 		ExpressionToken token = expressionTokenArray.expressionTokens[i];
@@ -1735,7 +1638,7 @@ int16_t buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(char *s
 	printf("  Operation on tokens partially completed (2/3). Partial results follow:\n");
 	for (int32_t i=0;i<expressionTokenArray.length;i++){
 		char *tokenStringContents = copyStringSegmentToHeap(
-			expressionTokenArray.string,
+			sourceContainer.string,
 			expressionTokenArray.expressionTokens[i].tokenStart,
 			expressionTokenArray.expressionTokens[i].tokenEnd);
 		ExpressionToken token = expressionTokenArray.expressionTokens[i];
@@ -1766,7 +1669,7 @@ int16_t buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(char *s
 	printf("  Operation on tokens completed (3/3). Full results follow:\n");
 	for (int32_t i=0;i<expressionTokenArray.length;i++){
 		char *tokenStringContents = copyStringSegmentToHeap(
-		expressionTokenArray.string,
+		sourceContainer.string,
 		expressionTokenArray.expressionTokens[i].tokenStart,
 		expressionTokenArray.expressionTokens[i].tokenEnd);
 		ExpressionToken token = expressionTokenArray.expressionTokens[i];
@@ -1783,7 +1686,7 @@ int16_t buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(char *s
 		cosmic_free(tokenStringContents);
 	}
 	printf("\n  Expression tree printout:\n");
-	debugPrintOfExpressionTreeFromTargetType2(string,rootIndex,0);
+	debugPrintOfExpressionTreeFromTarget(sourceContainer.string,rootIndex,0);
 	printf("\n  End of printout for this expression.\n\n");
 #endif
 
@@ -1797,7 +1700,8 @@ int16_t buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(char *s
 #ifdef COMPILE_ONLY_EXP_DEBUG
 
 void runTestOnString(char *testString){
-	int16_t rootIndex = buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(testString,0,strlen(testString)-1,true);
+	sourceContainer.string=testString;
+	int16_t rootIndex = buildExpressionTreeToGlobalBufferAndReturnRootIndex(0,strlen(testString)-1,true);
 	//printf("rootIndex was %d\n\n",rootIndex);
 }
 

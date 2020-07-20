@@ -420,7 +420,7 @@ char* resolveConstantExpressionInTypeString(char* string,int32_t sourceStart,int
 						printInformativeMessageAtSourceContainerIndex(true,"Type parser failed to figure out the original position of the contents of an array bracket pair",sourceStart,sourceEnd);
 						exit(1);
 					}
-					int16_t root=buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(sourceContainer.string,internalSourceStart,internalSourceEnd,true);
+					int16_t root=buildExpressionTreeToGlobalBufferAndReturnRootIndex(internalSourceStart,internalSourceEnd,true);
 					assert(root!=-1); // empty brackets should have already been check for
 					uint32_t arrSize=expressionToConstantValue("unsigned long",root);
 					char numberBuffer[14] = {0};

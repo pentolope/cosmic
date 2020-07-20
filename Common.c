@@ -58,7 +58,7 @@ void  cosmic_free(void* ptr);
 void* cosmic_realloc(void* ptr,size_t size);
 
 void printInformativeMessageAtSourceContainerIndex(bool,const char*,int32_t,int32_t);
-int16_t buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(char*,int32_t,int32_t,bool);
+int16_t buildExpressionTreeToGlobalBufferAndReturnRootIndex(int32_t,int32_t,bool);
 uint32_t expressionToConstantValue(const char*,int16_t);
 
 /*
@@ -295,19 +295,13 @@ bool specificStringEqualCheck(const char* stringLarge,const int32_t startInStrin
 	return true;
 }
 
-bool isUpperLetter(const char c){
-	return c>64 & c<91;
+static inline bool isLetter(const char c){
+	// lower letters are c>96 & c<123
+	// upper letters are c>64 & c<91
+	return (c>96 & c<123) | (c>64 & c<91) | c=='_';
 }
 
-bool isLowerLetter(const char c){
-	return c>96 & c<123;
-}
-
-bool isLetter(const char c){
-	return isLowerLetter(c) || (isUpperLetter(c) | c=='_');
-}
-
-bool isDigit(const char c){
+static inline bool isDigit(const char c){
 	return c>47 & c<58;
 }
 
@@ -590,26 +584,26 @@ int32_t getIndexOfMatchingEnclosement(const char* string,const int32_t index){
 }
 
 int32_t emptyIndexRecede(int32_t strStart){
-	int32_t strWalk=strStart+1;
-	while (true){
-		char c=sourceContainer.string[--strWalk];
-		assert(strWalk!=0); // hit string start
-		if (!(c==' ' | c=='\n')){
-			return strWalk;
-		}
+	int32_t i=strStart+1;
+	while (i!=0){
+		char c=sourceContainer.string[--i];
+		if (!(c==' ' | c=='\n')) return i;
 	}
+	err_1101_("Expected something before this point",strStart);
+	return 0; // unreachable
 }
 
-int32_t emptyIndexAdvance(int32_t strStart){
-	int32_t strWalk=strStart-1;
-	while (true){
-		char c=sourceContainer.string[++strWalk];
-		assert(c!=0);
-		if (!(c==' ' | c=='\n')){
-			return strWalk;
-		}
+int32_t emptyIndexAdvance(int32_t index){
+	char c;
+	int32_t i=index;
+	while ((c=sourceContainer.string[i])){
+		if (c==' ' | c=='\n') i++;
+		else return i;
 	}
+	err_1101_("Unexpected EOF after this point",index-1);
+	return 0; // unreachable
 }
+
 
 
 #include "NumberParser.c"

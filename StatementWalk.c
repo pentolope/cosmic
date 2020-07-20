@@ -23,16 +23,12 @@ int32_t findIndexOfTypicalStatementEnd(int32_t indexToStartAt){
 			enclosementLevel--;
 		} else if (c=='\'' | c=='\"'){
 			int32_t backup=i;
-			i = getEndOfToken(sourceContainer.string,i);
-			if (i==-1){
-				err_11000("Unable to find the end of this string",backup);
-				goto UnableToFindEnd;
-			}
+			i = getEndOfToken(i);
 			i--;
 		}
 		i++;
 	}
-	err_11000("Unexpected source termination",i-1);
+	err_11000("Unexpected EOF",i-1);
 	UnableToFindEnd:
 	err_1101_("Unable to find the end of this statement",indexToStartAt);
 	return 0; // unreachable
@@ -41,34 +37,20 @@ int32_t findIndexOfTypicalStatementEnd(int32_t indexToStartAt){
 
 
 
-
-int32_t advanceToNonNewlineSpace(int32_t index){
-	char c;
-	int32_t i=index;
-	while ((c=sourceContainer.string[i])){
-		if (c==' ' | c=='\n'){
-			i++;
-		} else {
-			return i;
-		}
-	}
-	err_1101_("Unexpected source termination after here",index-1);
-	return 0; // unreachable
-}
-
 // if called with hasRecursed==false, then the value -1 will never be returned
 int32_t parenEndWithLiteralSkip(int32_t indexAfterOpenParen,bool hasRecursed){
 	int32_t i=indexAfterOpenParen;
 	char c;
+	int32_t b;
 	while ((c=sourceContainer.string[i])){
 		if (c==')'){
 			return i;
 		} else if (c=='('){
-			int32_t b=parenEndWithLiteralSkip(i+1,1);
+			b=parenEndWithLiteralSkip(i+1,1);
 			i=b+1;
 			if (b==-1) break;
-		} else if ((c=='\"') | (c=='\'')){
-			i=getEndOfToken(sourceContainer.string,i);
+		} else if (c=='\"' | c=='\''){
+			i=getEndOfToken(i);
 		} else {
 			i++;
 		}
@@ -211,8 +193,7 @@ int32_t functionStatementsWalk(
 						false,"function scope walk starting here:",walkingIndex,0);
 		#endif
 		
-		int32_t endOfToken = getEndOfToken(sourceContainer.string,walkingIndex);
-		if (endOfToken==-1) err_1101_("Couldn\'t find end of this token",walkingIndex);
+		int32_t endOfToken = getEndOfToken(walkingIndex);
 		if (firstCharacter=='}'){
 			
 			if (stopAfterSingleExpression){
@@ -234,7 +215,7 @@ int32_t functionStatementsWalk(
 			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"if")){
 			
-			walkingIndex = advanceToNonNewlineSpace(walkingIndex+2);
+			walkingIndex = emptyIndexAdvance(walkingIndex+2);
 			if (sourceContainer.string[walkingIndex]!='('){
 				err_1101_("expected \'(\'",walkingIndex);
 			}
@@ -251,8 +232,8 @@ int32_t functionStatementsWalk(
 				labelNumberForContinue,
 				labelNumberForInlinedReturn,
 				true);
-			int32_t startOfNextStatement_1 = advanceToNonNewlineSpace(endOfIfStatement_1+1);
-			int32_t endOfNextToken = getEndOfToken(sourceContainer.string,startOfNextStatement_1);
+			int32_t startOfNextStatement_1 = emptyIndexAdvance(endOfIfStatement_1+1);
+			int32_t endOfNextToken = getEndOfToken(startOfNextStatement_1);
 			if (specificStringEqualCheck(sourceContainer.string,startOfNextStatement_1,endOfNextToken,"else")){
 				initInstructionBuffer(&instructionBufferLocalTemp_2);
 				int32_t endOfIfStatement_2 = functionStatementsWalk(
@@ -282,20 +263,20 @@ int32_t functionStatementsWalk(
 			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"for")){
 			
-			walkingIndex = advanceToNonNewlineSpace(walkingIndex+3);
+			walkingIndex = emptyIndexAdvance(walkingIndex+3);
 			if (sourceContainer.string[walkingIndex]!='('){
 				err_1101_("expected \'(\'",walkingIndex);
 			}
 			walkingIndex++;
 			int32_t otherParenIndex = parenEndWithLiteralSkip(walkingIndex,0);
-			walkingIndex=advanceToNonNewlineSpace(walkingIndex);
+			walkingIndex=emptyIndexAdvance(walkingIndex);
 			initInstructionBuffer(&instructionBufferLocalTemp_0);
 			initInstructionBuffer(&instructionBufferLocalTemp_1);
 			initInstructionBuffer(&instructionBufferLocalTemp_2);
 			initInstructionBuffer(&instructionBufferLocalTemp_3);
 			addBlockFrame();
 			if (sourceContainer.string[walkingIndex]!=';'){
-				endOfToken = getEndOfToken(sourceContainer.string,walkingIndex);
+				endOfToken = getEndOfToken(walkingIndex);
 				if (isSegmentOfStringTypeLike(sourceContainer.string,walkingIndex,endOfToken)){
 					// then the first statement is a declaration
 					int32_t indexOfEndOfDeclaration = findEndIndexForConvertType(sourceContainer.string,walkingIndex);
@@ -319,7 +300,7 @@ int32_t functionStatementsWalk(
 						err_1101_("Cannot use 'register' and 'static' at the same time",walkingIndex);
 					}
 					if (sourceContainer.string[indexOfEndOfDeclaration]=='='){
-						int32_t indexOfStartOfInitializer = advanceToNonNewlineSpace(indexOfEndOfDeclaration+1);
+						int32_t indexOfStartOfInitializer = emptyIndexAdvance(indexOfEndOfDeclaration+1);
 						int32_t indexOfEndOfInitializer = findIndexOfTypicalStatementEnd(indexOfStartOfInitializer);
 						expressionToAssemblyWithInitializer(&instructionBufferLocalTemp_0,indexOfStartOfInitializer,indexOfEndOfInitializer,walkingIndex,indexOfEndOfDeclaration,usedRegister,usedStatic);
 						walkingIndex=indexOfEndOfInitializer;
@@ -342,7 +323,7 @@ int32_t functionStatementsWalk(
 			} else {
 				walkingIndex++;
 			}
-			walkingIndex=advanceToNonNewlineSpace(walkingIndex);
+			walkingIndex=emptyIndexAdvance(walkingIndex);
 			if (sourceContainer.string[walkingIndex]!=';'){
 				int32_t endingSemicolon = findIndexOfTypicalStatementEnd(walkingIndex);
 				expressionToAssemblyWithCast(&instructionBufferLocalTemp_1,"_Bool",walkingIndex,endingSemicolon);
@@ -352,7 +333,7 @@ int32_t functionStatementsWalk(
 			} else {
 				err_1101_("An expression is required here",walkingIndex);
 			}
-			walkingIndex=advanceToNonNewlineSpace(walkingIndex);
+			walkingIndex=emptyIndexAdvance(walkingIndex);
 			if (sourceContainer.string[walkingIndex]!=')'){
 				expressionToAssemblyWithCast(&instructionBufferLocalTemp_2,"void",walkingIndex,otherParenIndex);
 				walkingIndex=otherParenIndex+1;
@@ -392,7 +373,7 @@ int32_t functionStatementsWalk(
 			if (labelNumberForBreak==0){
 				err_1101_("\'break\' keyword has nothing to break to",walkingIndex);
 			}
-			walkingIndex = advanceToNonNewlineSpace(walkingIndex+5);
+			walkingIndex = emptyIndexAdvance(walkingIndex+5);
 			if (sourceContainer.string[walkingIndex]!=';'){
 				err_1101_("expected \';\'",walkingIndex);
 			}
@@ -404,7 +385,7 @@ int32_t functionStatementsWalk(
 			if (labelNumberForContinue==0){
 				err_1101_("\'continue\' keyword has nothing to continue to",walkingIndex);
 			}
-			walkingIndex = advanceToNonNewlineSpace(walkingIndex+8);
+			walkingIndex = emptyIndexAdvance(walkingIndex+8);
 			if (sourceContainer.string[walkingIndex]!=';'){
 				err_1101_("expected \';\'",walkingIndex);
 			}
@@ -413,7 +394,7 @@ int32_t functionStatementsWalk(
 			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"while")){
 			
-			walkingIndex = advanceToNonNewlineSpace(walkingIndex+5);
+			walkingIndex = emptyIndexAdvance(walkingIndex+5);
 			if (sourceContainer.string[walkingIndex]!='('){
 				err_1101_("expected \'(\'",walkingIndex);
 			}
@@ -422,7 +403,7 @@ int32_t functionStatementsWalk(
 			initInstructionBuffer(&instructionBufferLocalTemp_0);
 			initInstructionBuffer(&instructionBufferLocalTemp_1);
 			expressionToAssemblyWithCast(&instructionBufferLocalTemp_0,"_Bool",walkingIndex,otherParenIndex);
-			walkingIndex = advanceToNonNewlineSpace(otherParenIndex+1);
+			walkingIndex = emptyIndexAdvance(otherParenIndex+1);
 			uint32_t newBreakLabel=++globalLabelID;
 			uint32_t newContinueLabel=++globalLabelID;
 			walkingIndex = functionStatementsWalk(
@@ -440,7 +421,7 @@ int32_t functionStatementsWalk(
 			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"do")){
 			
-			walkingIndex = advanceToNonNewlineSpace(walkingIndex+2);
+			walkingIndex = emptyIndexAdvance(walkingIndex+2);
 			initInstructionBuffer(&instructionBufferLocalTemp_1);
 			uint32_t internalLabel=++globalLabelID;
 			uint32_t newBreakLabel=++globalLabelID;
@@ -453,12 +434,12 @@ int32_t functionStatementsWalk(
 					newContinueLabel,
 					labelNumberForInlinedReturn,
 					true);
-			walkingIndex = advanceToNonNewlineSpace(walkingIndex+1);
-			int32_t endOfNextToken = getEndOfToken(sourceContainer.string,walkingIndex);
+			walkingIndex = emptyIndexAdvance(walkingIndex+1);
+			int32_t endOfNextToken = getEndOfToken(walkingIndex);
 			if (!specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfNextToken,"while")){
 				err_1101_("expected \'while\'",walkingIndex);
 			}
-			walkingIndex = advanceToNonNewlineSpace(walkingIndex+5);
+			walkingIndex = emptyIndexAdvance(walkingIndex+5);
 			if (sourceContainer.string[walkingIndex]!='('){
 				err_1101_("expected \'(\'",walkingIndex);
 			}
@@ -466,7 +447,7 @@ int32_t functionStatementsWalk(
 			int32_t otherParenIndex = parenEndWithLiteralSkip(walkingIndex,0);
 			initInstructionBuffer(&instructionBufferLocalTemp_0);
 			expressionToAssemblyWithCast(&instructionBufferLocalTemp_0,"_Bool",walkingIndex,otherParenIndex);
-			walkingIndex = advanceToNonNewlineSpace(otherParenIndex+1);
+			walkingIndex = emptyIndexAdvance(otherParenIndex+1);
 			if (sourceContainer.string[walkingIndex]!=';'){
 				err_1101_("expected \';\'",walkingIndex);
 			}
@@ -476,7 +457,7 @@ int32_t functionStatementsWalk(
 			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"return")){
 			
-			walkingIndex = advanceToNonNewlineSpace(walkingIndex+6);
+			walkingIndex = emptyIndexAdvance(walkingIndex+6);
 			if (doStringsMatch(returnTypeString,"void")){
 				if (sourceContainer.string[walkingIndex]!=';'){
 					err_1101_("expected \';\'",walkingIndex);
@@ -517,13 +498,13 @@ int32_t functionStatementsWalk(
 			
 			struct SwitchManagment packedSwitchManagment = packCurrentSwitchManagment();
 			currentSwitchManagment.inSwitch=true;
-			walkingIndex = advanceToNonNewlineSpace(walkingIndex+6);
+			walkingIndex = emptyIndexAdvance(walkingIndex+6);
 			if (sourceContainer.string[walkingIndex]!='('){
 				err_1101_("expected \'(\'",walkingIndex);
 			}
 			walkingIndex++;
 			int32_t otherParenIndex = parenEndWithLiteralSkip(walkingIndex,0);
-			int32_t startBracketIndex = advanceToNonNewlineSpace(otherParenIndex+1);
+			int32_t startBracketIndex = emptyIndexAdvance(otherParenIndex+1);
 			if (sourceContainer.string[startBracketIndex]!='{'){
 				err_1101_("expected \'{\'",walkingIndex);
 			}
@@ -558,7 +539,7 @@ int32_t functionStatementsWalk(
 			if (!currentSwitchManagment.inSwitch){
 				err_1101_("keyword \'case\' must be inside a switch",walkingIndex);
 			}
-			int32_t tempWalkingIndex0=advanceToNonNewlineSpace(walkingIndex+4);
+			int32_t tempWalkingIndex0=emptyIndexAdvance(walkingIndex+4);
 			int32_t tempWalkingIndex1=tempWalkingIndex0;
 			{
 				char c;
@@ -570,7 +551,7 @@ while (true){
 	c=sourceContainer.string[++tempWalkingIndex1];
 	if (c=='\'') break;
 	// this next if statement depends on short circuiting || and &&
-	if (c==0 || (c=='\\' && sourceContainer.string[++tempWalkingIndex1]==0)) err_1101_("Unexpected source termination",tempWalkingIndex1-1);
+	if (c==0 || (c=='\\' && sourceContainer.string[++tempWalkingIndex1]==0)) err_1101_("Unexpected EOF",tempWalkingIndex1-1);
 }
 					}
 					tempWalkingIndex1++;
@@ -579,7 +560,7 @@ while (true){
 			if (sourceContainer.string[tempWalkingIndex1]!=':'){
 				err_1101_("expected \':\' after keyword \'case\'",tempWalkingIndex0);
 			}
-			int16_t expRoot=buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(sourceContainer.string,tempWalkingIndex0,tempWalkingIndex1,true);
+			int16_t expRoot=buildExpressionTreeToGlobalBufferAndReturnRootIndex(tempWalkingIndex0,tempWalkingIndex1,true);
 			if (expRoot==-1){
 				err_1101_("expected const-expression after keyword \'case\'",tempWalkingIndex0);
 			}
@@ -600,7 +581,7 @@ while (true){
 			if (!currentSwitchManagment.inSwitch){
 				err_1101_("keyword \'default\' must be inside a switch",walkingIndex);
 			}
-			int32_t tempWalkingIndex=advanceToNonNewlineSpace(walkingIndex+7);
+			int32_t tempWalkingIndex=emptyIndexAdvance(walkingIndex+7);
 			if (sourceContainer.string[tempWalkingIndex]!=':'){
 				err_1101_("expected \':\' after keyword \'default\'",tempWalkingIndex);
 			}
@@ -620,9 +601,9 @@ while (true){
 			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"goto")){
 			
-			int32_t labelStart=advanceToNonNewlineSpace(endOfToken);
-			int32_t labelEnd=getEndOfToken(sourceContainer.string,labelStart);
-			int32_t semiColon=advanceToNonNewlineSpace(labelEnd);
+			int32_t labelStart=emptyIndexAdvance(endOfToken);
+			int32_t labelEnd=getEndOfToken(labelStart);
+			int32_t semiColon=emptyIndexAdvance(labelEnd);
 			if (sourceContainer.string[semiColon]!=';'){
 				err_1101_("Expected \';\' after goto statement",semiColon);
 			}
@@ -634,7 +615,7 @@ while (true){
 			
 			int32_t labelStart=walkingIndex;
 			int32_t labelEnd=endOfToken;
-			int32_t colon=advanceToNonNewlineSpace(endOfToken);
+			int32_t colon=emptyIndexAdvance(endOfToken);
 			walkingIndex=labelEnd;
 			insert_IB_raw_label(parentInstructionBufferToInsertTo,addGotoOrLabel(copyStringSegmentToHeap(sourceContainer.string,labelStart,labelEnd),false));
 			
@@ -663,7 +644,7 @@ while (true){
 					err_1101_("Cannot use 'register' and 'static' at the same time",walkingIndex);
 				}
 				if (sourceContainer.string[indexOfEndOfDeclaration]=='='){
-					int32_t indexOfStartOfInitializer = advanceToNonNewlineSpace(indexOfEndOfDeclaration+1);
+					int32_t indexOfStartOfInitializer = emptyIndexAdvance(indexOfEndOfDeclaration+1);
 					int32_t indexOfEndOfInitializer = findIndexOfTypicalStatementEnd(indexOfStartOfInitializer);
 					expressionToAssemblyWithInitializer(parentInstructionBufferToInsertTo,indexOfStartOfInitializer,indexOfEndOfInitializer,walkingIndex,indexOfEndOfDeclaration,usedRegister,usedStatic);
 					walkingIndex=indexOfEndOfInitializer;
@@ -688,7 +669,7 @@ while (true){
 		}
 		walkingIndex++;
 	}
-	err_1101_("Unexpected source termination which parsing function at this segment",indexOfStart);
+	err_1101_("Unexpected EOF while parsing function at this segment",indexOfStart);
 	return 0; // unreachable
 }
 
@@ -717,10 +698,7 @@ void fileScopeStatementsWalk(){
 		printInformativeMessageAtSourceContainerIndex(
 						false,"file scope walk starting here:",walkingIndex,0);
 		#endif
-		int32_t endOfToken = getEndOfToken(sourceContainer.string,walkingIndex);
-		if (endOfToken==-1){
-			err_1101_("Couldn\'t find end of this token",walkingIndex);
-		}
+		int32_t endOfToken = getEndOfToken(walkingIndex);
 		if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"typedef")){
 			// then this is a typedef entry
 			int32_t startIndexForDeclaration = walkingIndex+8;
@@ -761,10 +739,7 @@ void fileScopeStatementsWalk(){
 					}
 					if (checkForStorageClassSpecifier){
 						startIndexForDeclaration+=7;
-						endOfToken=getEndOfToken(sourceContainer.string,startIndexForDeclaration);
-						if (endOfToken==-1){
-							err_1101_("Couldn\'t find end of this token",startIndexForDeclaration);
-						}
+						endOfToken=getEndOfToken(startIndexForDeclaration);
 						continue;
 					} else {
 						break;

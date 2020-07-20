@@ -893,18 +893,22 @@ int32_t partitionEntryInInitializerMap(){
 	return initializerMap.numberOfEntriesTaken++;
 }
 
-int32_t findLocatorEndForInitializerMap(int32_t strStart){
+int32_t findDesignatorEndForInitializerMap(int32_t strStart){
 	char strStartChar=sourceContainer.string[strStart];
 	int32_t strWalk=strStart;
 	while (true){
 		char c=sourceContainer.string[++strWalk];
-		assert(c!=';' & c!=0);
-		if (strStartChar=='.'){
+		if (c==';' | c==0){
+			goto Fail;
+		} else if (strStartChar=='.'){
 			if (!(c==' ' | c=='\n')){
 				return strWalk;
 			}
 		} else if (strStartChar=='['){
-			assert(c!='['); // hit nested brackets
+			if (c=='['){
+				err_1101_("Designators should not contain nested brackets",strWalk);
+				return 0; // unreachable
+			}
 			if (c==']'){
 				return strWalk+1;
 			}
@@ -912,8 +916,10 @@ int32_t findLocatorEndForInitializerMap(int32_t strStart){
 			return strStart;
 		} else if (c==' ' | c=='\n' | c=='.' | c=='[' | c=='='){
 			return strWalk;
-		} else {
-			assert(c!='\'' & c!='\"' & c!='{' & c!='}'); // should not hit string or character literals or brackets
+		} else if (c=='\'' | c=='\"' | c=='{' | c=='}'){
+			Fail:
+			err_1101_("Could not agree on end point of this designator",strStart);
+			return 0; // unreachable
 		}
 	}
 }
@@ -923,8 +929,10 @@ int32_t parenSkipForInitializerMap(int32_t strStart){
 	int32_t strWalk=strStart;
 	while (true){
 		char c=sourceContainer.string[++strWalk];
-		assert(c!=0);
-		if (inLiteral){
+		if (c==0){
+			err_1101_("Unexpected EOF while finding pair to this parenthese",strStart);
+			return 0; // unreachable
+		} else if (inLiteral){
 			if (c=='\\') ++strWalk;
 			else if (c=='\"' | c=='\'') inLiteral=false;
 		} else {
@@ -940,7 +948,10 @@ int32_t findTypicalEndForInitializerMap(int32_t strStart){
 	int32_t strWalk=strStart-1;
 	while (true){
 		char c=sourceContainer.string[++strWalk];
-		assert(c!=0);
+		if (c==0){
+			err_1101_("Unexpected EOF while finding end of this initializer element",strStart);
+			return 0; // unreachable
+		}
 		if (c=='\'' | c=='\"'){
 			inLiteral^=true;
 			continue;
@@ -966,7 +977,7 @@ int32_t findTypicalEndForInitializerMap(int32_t strStart){
 	}
 }
 
-uint8_t catagorizeInitializerMapLocator(int32_t strStart){
+uint8_t catagorizeInitializerMapDesignator(int32_t strStart){
 	char strStartChar0=sourceContainer.string[strStart];
 	assert(strStartChar0!=' ' & strStartChar0!='\n'); // bad starting place
 	if (strStartChar0=='.'){
@@ -978,28 +989,28 @@ uint8_t catagorizeInitializerMapLocator(int32_t strStart){
 	}
 }
 
-int32_t initializerMapLocator(int32_t strStart){
+int32_t initializerMapDesignator(int32_t strStart){
 	struct InitializerMapEntry ime={-1,-1,-1,strStart,strStart,
-		findLocatorEndForInitializerMap(strStart),catagorizeInitializerMapLocator(strStart),-1};
+		findDesignatorEndForInitializerMap(strStart),catagorizeInitializerMapDesignator(strStart),-1};
 	if (ime.typeOfEntry==7){
-		return initializerMapLocator(ime.strEnd);
+		return initializerMapDesignator(ime.strEnd);
 	} else if (strStart==ime.strEnd){
 		return -1;
 	}
 	int32_t thisEntry=partitionEntryInInitializerMap();
-	ime.chainEntry=initializerMapLocator(emptyIndexAdvance(ime.strEnd));
+	ime.chainEntry=initializerMapDesignator(emptyIndexAdvance(ime.strEnd));
 	initializerMap.entries[thisEntry]=ime;
 	return thisEntry;
 }
 
-uint8_t catagorizeInitializerMapTypical(char* string,int32_t index){
-	const char c0=string[index  ];
-	const char c1=string[index+1];
+uint8_t catagorizeInitializerMapTypical(int32_t index){
+	const char c0=sourceContainer.string[index  ];
+	const char c1=sourceContainer.string[index+1];
 	if (c0=='{'){
 		return 1;
 	} else if (c0=='\"' | (c0=='L' & c1=='\"')){
 		if (initializerMap.typeOfInit==0){
-			if (string[emptyIndexAdvance(getEndOfToken(string,index))]==';') return 2;
+			if (sourceContainer.string[emptyIndexAdvance(getEndOfToken(index))]==';') return 2;
 			return 4;
 		} else if (initializerMap.typeOfInit==4) return 4;
 		return 2;
@@ -1010,38 +1021,54 @@ uint8_t catagorizeInitializerMapTypical(char* string,int32_t index){
 }
 
 int32_t initializerMapTypical(int32_t strStart){
+	strStart=emptyIndexAdvance(strStart);
 	struct InitializerMapEntry ime={-1,-1,-1,strStart,strStart,findTypicalEndForInitializerMap(strStart),0,-1};
 	{
 	char strStartChar0=sourceContainer.string[strStart];
 	assert(!(strStartChar0==' ' | strStartChar0=='\n')); // bad starting place
 	if (strStartChar0=='.' | strStartChar0=='['){
-		while (true){
-			char c=sourceContainer.string[++ime.strMid];
-			if (c=='='){
-				ime.strMid=emptyIndexAdvance(ime.strMid+1);
-				assert(ime.strMid<ime.strEnd); // overran strEnd while looking for locator end
-				ime.descriptionBranchEntry=initializerMapLocator(strStart);
-				break;
-			} else {
-				assert(c!=';' & c!='{' & c!='}' & c!=0); // should not hit these while looking for locator
-			}
+		char c;
+		do {
+			c=sourceContainer.string[++ime.strMid];
+		} while (!(c=='=' | c==';' | c=='{' | c=='}' | c==0));
+		if (c=='=') ime.strMid=emptyIndexAdvance(ime.strMid+1);
+		if (c!='=' | ime.strMid>=ime.strEnd){
+			err_11000("Could not agree on end point of this designator",strStart);
+			return -1;
 		}
+		ime.descriptionBranchEntry=initializerMapDesignator(strStart);
 	}
-	ime.typeOfEntry=catagorizeInitializerMapTypical(sourceContainer.string,ime.strMid);
+	ime.typeOfEntry=catagorizeInitializerMapTypical(ime.strMid);
 	}
 	int32_t thisEntry=partitionEntryInInitializerMap();
-	int32_t strEndNextIndex=emptyIndexAdvance(ime.strEnd+1);
 	char strEndChar=sourceContainer.string[ime.strEnd];
 	if (ime.typeOfEntry==1){
-		assert(strEndChar=='}'); // bad end
-		ime.subEntry=initializerMapTypical(emptyIndexAdvance(ime.strMid+1));
+		if (strEndChar!='}'){
+			err_11000("Expected \'}\'",ime.strEnd);
+			err_11100("After parsing this bracket pair",ime.strMid,ime.strEnd);
+			return -1;
+		}
+		ime.subEntry=initializerMapTypical(ime.strMid+1);
+		if (ime.subEntry==-1){
+			err_11100("While parsing this bracket pair",ime.strMid,ime.strEnd);
+			return -1;
+		}
+		int32_t strEndNextIndex=emptyIndexAdvance(ime.strEnd+1);
 		if (sourceContainer.string[strEndNextIndex]==','){
-			ime.chainEntry=initializerMapTypical(emptyIndexAdvance(strEndNextIndex+1));
+			ime.chainEntry=initializerMapTypical(strEndNextIndex+1);
+			if (ime.chainEntry==-1){
+				err_11100("While parsing this bracket pair",ime.strMid,ime.strEnd);
+				return -1;
+			}
 		}
 	} else {
-		assert(strEndChar=='}' | strEndChar==';' | strEndChar==','); // bad end
 		if (strEndChar==','){
-			ime.chainEntry=initializerMapTypical(strEndNextIndex);
+			ime.chainEntry=initializerMapTypical(ime.strEnd+1);
+			if (ime.chainEntry==-1) return -1;
+		} else if ((initializerMap.typeOfInit==1 & strEndChar!='}') | (initializerMap.typeOfInit!=1 & strEndChar!=';')){
+			err_11000("Expected \'}\' or \';\'",ime.strEnd);
+			err_11100("After parsing this expression",ime.strMid,ime.strEnd);
+			return -1;
 		}
 	}
 	initializerMap.entries[thisEntry]=ime;
@@ -1054,7 +1081,9 @@ bool endCheckInitializerMap(int32_t entryIndex,int32_t strStart,int32_t strEnd){
 	struct InitializerMapEntry* ime=initializerMap.entries+entryIndex;
 	int32_t thisStrEnd=ime->strEnd;
 	bool foundEnd=thisStrEnd==strEnd;
-	assert(thisStrEnd<=strEnd); // check if initializerMapRoot() overstepped strEnd
+	if (thisStrEnd>strEnd){
+		err_1111_("Could not agree on end point of this initializer",strStart,strEnd);
+	}
 	foundEnd|=endCheckInitializerMap(ime->subEntry              ,strStart,strEnd);
 	foundEnd|=endCheckInitializerMap(ime->chainEntry            ,strStart,strEnd);
 	foundEnd|=endCheckInitializerMap(ime->descriptionBranchEntry,strStart,strEnd);
@@ -1099,14 +1128,13 @@ void genExpressionsForInitializerMap(int32_t entryIndex){
 		const bool isTypeOfEntry5=typeOfEntry==5;
 		const int32_t start=emptyIndexAdvance(ime->strMid+isTypeOfEntry5);
 		const int32_t end=emptyIndexRecede((ime->strEnd-1)-isTypeOfEntry5)+1;
-		const int16_t expNode=buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(sourceContainer.string,start,end,false);
+		const int16_t expNode=buildExpressionTreeToGlobalBufferAndReturnRootIndex(start,end,false);
 		ime->expNode=expNode;
 		if (expNode!=-1){
 			if (isTypeOfEntry5) ime->arrayConstVal=expressionToConstantValue("unsigned long",expNode);
 			else expressionPrecheckForInitializer(expNode);
 		} else {
-			printInformativeMessageAtSourceContainerIndex(true,"Expression expected here",start,end);
-			exit(1);
+			err_1111_("Expression expected here",start,end);
 		}
 	}
 	genExpressionsForInitializerMap(ime->subEntry);
@@ -1115,19 +1143,31 @@ void genExpressionsForInitializerMap(int32_t entryIndex){
 }
 
 
-// returns root. clears any previous initializer mappings, and clear previous expressions. if strEnd==-1 then it doesn't check for overstepping strEnd
+// returns root. clears any previous initializer mappings, and clear previous expressions. if strEnd==-1 then it doesn't check for mismatched strEnd
 int32_t initializerMapRoot(int32_t strStart,int32_t strEnd){
 	clearPreviousExpressions();
+	strStart=emptyIndexAdvance(strStart);
 	initializerMap.numberOfEntriesTaken=0;
 	initializerMap.typeOfInit=0;//this set is needed for catagorizeInitializerMapTypical() in case a string is first and it needs to know if it is running to find the typeOfInit or typeOfEntry
-	initializerMap.typeOfInit=catagorizeInitializerMapTypical(sourceContainer.string,strStart);
+	initializerMap.typeOfInit=catagorizeInitializerMapTypical(strStart);
 	int32_t root = initializerMapTypical(strStart);
-	if (initializerMap.typeOfInit==1){
-		strEnd=emptyIndexRecede(strEnd-1);
-		assert(strStart<strEnd); // bracket location calc failure
+	if (root==-1){
+		if (strEnd!=-1) err_1111_("Could not parse this initializer",strStart,strEnd);
+		else err_1101_("Could not parse this initializer",strStart);
 	}
-	assert(initializerMap.entries[root].typeOfEntry==initializerMap.typeOfInit); // failed to agree on catagory
-	assert(!(strEnd!=-1 && !endCheckInitializerMap(root,strStart,strEnd))); // understepped the end of the initializer
+	if (strEnd!=-1){
+		bool doesEndNotAgree=false;
+		if (initializerMap.typeOfInit==1){
+			strEnd=emptyIndexRecede(strEnd-1);
+			doesEndNotAgree=strStart>=strEnd;
+		}
+		if (doesEndNotAgree || !endCheckInitializerMap(root,strStart,strEnd)){
+			err_1111_("Could not agree on end point of this initializer",strStart,strEnd);
+		}
+	}
+	if (initializerMap.entries[root].typeOfEntry!=initializerMap.typeOfInit){
+		err_1111_("Could not agree on catagory of this initializer",strStart,strEnd);
+	}
 	if (initializerMap.typeOfInit!=2){
 		genExpressionsForInitializerMap(root);
 	}

@@ -1,9 +1,6 @@
 
 
 
-
-
-
 // this prototype will be needed when function inlining becomes a thing
 int32_t functionStatementsWalk(
 	char* returnTypeString,
@@ -19,14 +16,10 @@ int32_t functionStatementsWalk(
 bool doSymbolicConstantGenForExp = false; // InitializerMapping controls this
 
 
-
 void ensureExpNodeInit(ExpressionTreeNode* thisNode){
-	const ExpTreePostWalkData n0 = {0};
-	const InstructionBuffer n1 = {0};
-	thisNode->post=n0;
-	thisNode->ib=n1;
+	{const struct ExpTreePostWalkData n0 = {0};thisNode->post=n0;}
+	{const InstructionBuffer n1 = {0};thisNode->ib=n1;}
 }
-
 
 
 void findErrorRangeForExpressionNode(ExpressionTreeNode* thisNode, int32_t* start, int32_t* end){
@@ -677,7 +670,7 @@ const char* getTypeStringForCommonRank(uint16_t r0,uint16_t r1){
 struct AdvancedTypeInfo{
 	bool isPtr;
 	bool isSU; // isStructOrUnion
-	ExpTreePostWalkData* post;
+	struct ExpTreePostWalkData* post;
 	ExpressionTreeNode* node;
 	const char* tsDerefNQ;
 	struct IntegralTypePromoteResult itpr;
@@ -815,7 +808,7 @@ void applyAutoTypeConversion_Sizeof(ExpressionTreeNode* thisNode){
 
 void applyAutoTypeConversion_Identifier(ExpressionTreeNode* thisNode){
 	if (sourceContainer.isStringForPreprocesser){
-		thisNode->post.operatorTypeID=2;
+		thisNode->post.operatorTypeID=3; // this operatorTypeID is just because enum values are acceptable in constant expressions
 		thisNode->post.extraVal=0;
 		thisNode->post.typeString=copyStringToHeapString("unsigned long");
 		return;
@@ -997,7 +990,7 @@ void applyAutoTypeConversion_Typical(ExpressionTreeNode* tn){
 			if (!(oID==49 | oID==16)) r=genAdvancedTypeInfo(rn);
 		}
 	}
-	ExpTreePostWalkData* tp=&tn->post;
+	struct ExpTreePostWalkData* tp=&tn->post;
 	char** thisTSP=&tp->typeString;
 	
 	switch (oID){
@@ -2456,7 +2449,7 @@ void expressionToAssemblyWithCast(
 		int32_t startIndexForExpression,
 		int32_t endIndexForExpression)
 {
-	int16_t indexOfRoot = buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(sourceContainer.string,startIndexForExpression,endIndexForExpression,true);
+	int16_t indexOfRoot = buildExpressionTreeToGlobalBufferAndReturnRootIndex(startIndexForExpression,endIndexForExpression,true);
 	bool isVoidCast=doStringsMatch("void",castTypeString);
 	if (indexOfRoot==-1){
 		if (isVoidCast){
@@ -2482,7 +2475,7 @@ void expressionToAssemblyWithReturn(
 		int32_t endIndexForExpression,
 		const char* returnTypeString)
 {
-	int16_t indexOfRoot = buildExpressionTreeFromSubstringToGlobalBufferAndReturnRootIndex(sourceContainer.string,startIndexForExpression,endIndexForExpression,true);
+	int16_t indexOfRoot = buildExpressionTreeToGlobalBufferAndReturnRootIndex(startIndexForExpression,endIndexForExpression,true);
 	if (indexOfRoot==-1){
 		printInformativeMessageAtSourceContainerIndex(true,"Expression is required here",startIndexForExpression,endIndexForExpression);
 		exit(1);

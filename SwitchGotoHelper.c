@@ -294,7 +294,7 @@ void resolveGoto(int32_t failIndex){
 
 // assumes that almost all other options have been checked
 bool isSectionLabel(int32_t start,int32_t end){
-	int32_t end2 = advanceToNonNewlineSpace(end);
+	int32_t end2 = emptyIndexAdvance(end);
 	return sourceContainer.string[end2]==':' && !isSegmentOfStringTypeLike(sourceContainer.string,start,end);
 }
 
