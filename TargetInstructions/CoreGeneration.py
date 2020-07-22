@@ -107,7 +107,7 @@ instructionListWithPrefix = [
 'MRBN % %',
 'MWBV % %',
 'MRBV % %',
-'LABL :',# the label is symbolic and is used to discern between multiple labels
+'LABL :',# the label is symbolic and is used to discern between multiple labels, unless it is a intrinsic_back entry
 'PHIS %',
 'PHIE %',
 'FCST $ # :',
@@ -157,7 +157,7 @@ instructionListWithPrefix = [
 'SYCB $',
 'SYCW #',
 'SYCD !',
-'SYCL @',# the label is symbolic and is used to discern between multiple labels
+'SYCL @',# the label is symbolic and is used to discern between multiple labels, unless it is a intrinsic_back entry
 'SYW0',
 'SYW1',
 'SYW2',
@@ -422,7 +422,7 @@ PU1_ %2
 
 
 
-"IB_i_32div_u_u":"""
+"IB_intrinsic_front_i_32div_u_u":"""
 
 POP2 %2 %3
 POP2 %4 %5
@@ -432,7 +432,7 @@ PU2_ %9 %8
 """,
 
 
-"IB_i_32mod_u_u":"""
+"IB_intrinsic_front_i_32mod_u_u":"""
 
 POP2 %2 %3
 POP2 %4 %5
@@ -442,7 +442,7 @@ PU2_ %7 %6
 """,
 
 
-"IB_i_32div_s_s":"""
+"IB_intrinsic_front_i_32div_s_s":"""
 
 POP2 %2 %3
 POP2 %4 %5
@@ -452,7 +452,7 @@ PU2_ %9 %8
 """,
 
 
-"IB_i_32mod_s_s":"""
+"IB_intrinsic_front_i_32mod_s_s":"""
 
 POP2 %2 %3
 POP2 %4 %5
@@ -1439,7 +1439,6 @@ BL1_ %C $00
 BL1_ %2 $00
 
 SUBC %A %C %7
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1448,7 +1447,6 @@ MULS %8 %6
 BL1_ %A $01
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1457,7 +1455,6 @@ MULS %8 %6
 BL1_ %A $02
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1466,7 +1463,6 @@ MULS %8 %6
 BL1_ %A $03
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1475,7 +1471,6 @@ MULS %8 %6
 BL1_ %A $04
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1484,7 +1479,6 @@ MULS %8 %6
 BL1_ %A $05
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1493,7 +1487,6 @@ MULS %8 %6
 BL1_ %A $06
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1502,7 +1495,6 @@ MULS %8 %6
 BL1_ %A $07
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1511,7 +1503,6 @@ MULS %8 %6
 BL1_ %A $08
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1520,7 +1511,6 @@ MULS %8 %6
 BL1_ %A $09
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1529,7 +1519,6 @@ MULS %8 %6
 BL1_ %A $0A
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1538,7 +1527,6 @@ MULS %8 %6
 BL1_ %A $0B
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1547,7 +1535,6 @@ MULS %8 %6
 BL1_ %A $0C
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1556,7 +1543,6 @@ MULS %8 %6
 BL1_ %A $0D
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1565,7 +1551,6 @@ MULS %8 %6
 BL1_ %A $0E
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1574,7 +1559,6 @@ MULS %8 %6
 BL1_ %A $0F
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1592,7 +1576,6 @@ BL1_ %C $00
 BL1_ %2 $00
 
 SUBC %A %C %7
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1601,7 +1584,6 @@ SHFT %8 %8
 BL1_ %A $01
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1610,7 +1592,6 @@ SHFT %8 %8
 BL1_ %A $02
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1619,7 +1600,6 @@ SHFT %8 %8
 BL1_ %A $03
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1628,7 +1608,6 @@ SHFT %8 %8
 BL1_ %A $04
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1637,7 +1616,6 @@ SHFT %8 %8
 BL1_ %A $05
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1646,7 +1624,6 @@ SHFT %8 %8
 BL1_ %A $06
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1655,7 +1632,6 @@ SHFT %8 %8
 BL1_ %A $07
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1664,7 +1640,6 @@ SHFT %8 %8
 BL1_ %A $08
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1673,7 +1648,6 @@ SHFT %8 %8
 BL1_ %A $09
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1682,7 +1656,6 @@ SHFT %8 %8
 BL1_ %A $0A
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1691,7 +1664,6 @@ SHFT %8 %8
 BL1_ %A $0B
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1700,7 +1672,6 @@ SHFT %8 %8
 BL1_ %A $0C
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1709,7 +1680,6 @@ SHFT %8 %8
 BL1_ %A $0D
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1718,7 +1688,6 @@ SHFT %8 %8
 BL1_ %A $0E
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1727,7 +1696,6 @@ SHFT %8 %8
 BL1_ %A $0F
 XOR_ %A %A %7
 SUBC %A %C %A
-XOR_ %A %A %B
 MULS %A %D
 AND_ %A %A %8
 OR__ %2 %2 %A
@@ -1736,7 +1704,7 @@ PU1_ %2
 
 """,
 
-"IB_Lshift32":"""
+"IB_intrinsic_front_Lshift32":"""
 
 POP1 %A
 POP2 %6 %7
@@ -1745,7 +1713,7 @@ PU2_ %3 %2
 
 """,
 
-"IB_Rshift32":"""
+"IB_intrinsic_front_Rshift32":"""
 
 POP1 %A
 POP2 %6 %7
@@ -1754,7 +1722,72 @@ PU2_ %3 %2
 
 """,
 
-"IB_internal_div32_u_u":"""
+
+
+
+
+
+"IB_intrinsic_back_Lshift32":"""
+
+FCST $0A #000A :00000011
+MOV_ %2 %6
+MOV_ %3 %7
+SYRD %6 %7
+SYCL @00000021
+SYDE
+CJMP %6 %7 %A
+BL1_ %E $00
+BL1_ %B $01
+RL1_ %C #8000
+SYRD %6 %7
+SYCL @00000020
+SYDE
+LABL :00000020
+AND_ %D %2 %C
+SUBC %D %D %C
+ADDN %2 %2 %2
+ADDN %3 %3 %3
+OR__ %2 %2 %D
+ADDN %E %E %B
+SUBC %D %E %A
+CJMP %6 %7 %D
+LABL :00000021
+RET_
+FCEN
+
+""",
+
+"IB_intrinsic_back_Rshift32":"""
+
+FCST $0A #000A :00000013
+MOV_ %2 %6
+MOV_ %3 %7
+SYRD %6 %7
+SYCL @00000023
+SYDE
+CJMP %6 %7 %A
+BL1_ %E $00
+BL1_ %B $01
+RL1_ %C #8000
+SYRD %6 %7
+SYCL @00000022
+SYDE
+LABL :00000022
+AND_ %D %3 %B
+MULS %D %C
+SHFT %2 %2
+SHFT %3 %3
+OR__ %2 %2 %D
+ADDN %E %E %B
+SUBC %D %E %A
+CJMP %6 %7 %D
+LABL :00000023
+RET_
+FCEN
+
+""",
+
+"IB_intrinsic_back_div32_u_u":"""
 
 FCST $0A #000A :00000001
 
@@ -1763,7 +1796,7 @@ FCEN
 
 """,
 
-"IB_internal_mod32_u_u":"""
+"IB_intrinsic_back_mod32_u_u":"""
 
 FCST $0A #000A :00000002
 
@@ -1772,7 +1805,7 @@ FCEN
 
 """,
 
-"IB_internal_div32_s_s":"""
+"IB_intrinsic_back_div32_s_s":"""
 
 FCST $0A #000A :00000003
 
@@ -1781,7 +1814,7 @@ FCEN
 
 """,
 
-"IB_internal_mod32_s_s":"""
+"IB_intrinsic_back_mod32_s_s":"""
 
 FCST $0A #000A :00000004
 
@@ -1822,12 +1855,7 @@ for k in dictionaryOfInitializationContents.keys():
 
 namesToUse = filter(lambda e:e not in namesToSkipBecauseZero,dictionaryOfInitializationContents.keys())
 namesToUse = sorted(namesToUse)
-namesInRunSection=[
-'IB_internal_div32_s_s',
-'IB_internal_div32_u_u',
-'IB_internal_mod32_s_s',
-'IB_internal_mod32_u_u',
-]
+namesInRunSection=filter(lambda e:e.split('_')[:3]==['IB','intrinsic','back'],namesToUse)
 namesUnused=[
 'IB_stack_swp_12',
 ]
@@ -1898,46 +1926,47 @@ f=open('GeneratedInstructionInsertion.c','w')
 
 
 for k in namesToUse:
-    altName1 = 'ib_'+k[3:]
-    splitInstructions = splitInstructionString(dictionaryOfInitializationContents[k])
-    insertNumbers=[]
-    labelNumbers=[]
-    for intr in splitInstructions:
-        opCode = intr.split(' ')[0]
-        if opCode=='INSR':
-            numberOn = int(intr.split(' ')[1][1:],base=16)
-            if not (numberOn in insertNumbers):
-                insertNumbers.append(numberOn)
-        elif opCode=='LABL' or opCode=='SYCL':
-            numberOn = int(intr.split(' ')[1][1:],base=16)
-            if not (numberOn in labelNumbers):
-                labelNumbers.append(numberOn)
-    if len(insertNumbers)!=0 or len(labelNumbers)!=0:
-        f.write('void insert_'+k+'(InstructionBuffer* ib_ToAppendTo')
-        for i in sorted(insertNumbers):
-            f.write(',const InstructionBuffer* ib_ToInsertFor'+str(i))
-        for i in sorted(labelNumbers):
-            f.write(',uint32_t labelNumFor'+str(i))
-        if k=='IB_CJMP_list_item':f.write(',uint16_t valueFor0')
-        f.write('){\n')
-        if k=='IB_CJMP_list_item':
-            for i,intr in enumerate(splitInstructions):
-                opCode = intr.split(' ')[0]
-                f.write('\taddInstruction(ib_ToAppendTo,'+altName1+'.buffer['+str(i)+']);\n')
-                if opCode=='RL1_':
-                    f.write('\tib_ToAppendTo->buffer[ib_ToAppendTo->numberOfSlotsTaken-1].arg.BW.a_1=valueFor0;\n')
-                if opCode=='SYCL':
-                    f.write('\tib_ToAppendTo->buffer[ib_ToAppendTo->numberOfSlotsTaken-1].arg.D.a_0=labelNumFor0;\n')
-        else:
-            for i,intr in enumerate(splitInstructions):
-                opCode = intr.split(' ')[0]
-                if opCode=='INSR':
-                    f.write('\tsingleMergeIB(ib_ToAppendTo,ib_ToInsertFor'+str(int(intr.split(' ')[1][1:],base=16))+');\n')
-                else:
+    if not (k in namesInRunSection):
+        altName1 = 'ib_'+k[3:]
+        splitInstructions = splitInstructionString(dictionaryOfInitializationContents[k])
+        insertNumbers=[]
+        labelNumbers=[]
+        for intr in splitInstructions:
+            opCode = intr.split(' ')[0]
+            if opCode=='INSR':
+                numberOn = int(intr.split(' ')[1][1:],base=16)
+                if not (numberOn in insertNumbers):
+                    insertNumbers.append(numberOn)
+            elif opCode=='LABL' or opCode=='SYCL':
+                numberOn = int(intr.split(' ')[1][1:],base=16)
+                if not (numberOn in labelNumbers):
+                    labelNumbers.append(numberOn)
+        if len(insertNumbers)!=0 or len(labelNumbers)!=0:
+            f.write('void insert_'+k+'(InstructionBuffer* ib_ToAppendTo')
+            for i in sorted(insertNumbers):
+                f.write(',const InstructionBuffer* ib_ToInsertFor'+str(i))
+            for i in sorted(labelNumbers):
+                f.write(',uint32_t labelNumFor'+str(i))
+            if k=='IB_CJMP_list_item':f.write(',uint16_t valueFor0')
+            f.write('){\n')
+            if k=='IB_CJMP_list_item':
+                for i,intr in enumerate(splitInstructions):
+                    opCode = intr.split(' ')[0]
                     f.write('\taddInstruction(ib_ToAppendTo,'+altName1+'.buffer['+str(i)+']);\n')
-                if opCode=='LABL' or opCode=='SYCL':
-                    f.write('\tib_ToAppendTo->buffer[ib_ToAppendTo->numberOfSlotsTaken-1].arg.D.a_0=labelNumFor'+str(int(intr.split(' ')[1][1:],base=16))+';\n')
-        f.write('}\n')
+                    if opCode=='RL1_':
+                        f.write('\tib_ToAppendTo->buffer[ib_ToAppendTo->numberOfSlotsTaken-1].arg.BW.a_1=valueFor0;\n')
+                    if opCode=='SYCL':
+                        f.write('\tib_ToAppendTo->buffer[ib_ToAppendTo->numberOfSlotsTaken-1].arg.D.a_0=labelNumFor0;\n')
+            else:
+                for i,intr in enumerate(splitInstructions):
+                    opCode = intr.split(' ')[0]
+                    if opCode=='INSR':
+                        f.write('\tsingleMergeIB(ib_ToAppendTo,ib_ToInsertFor'+str(int(intr.split(' ')[1][1:],base=16))+');\n')
+                    else:
+                        f.write('\taddInstruction(ib_ToAppendTo,'+altName1+'.buffer['+str(i)+']);\n')
+                    if opCode=='LABL' or opCode=='SYCL':
+                        f.write('\tib_ToAppendTo->buffer[ib_ToAppendTo->numberOfSlotsTaken-1].arg.D.a_0=labelNumFor'+str(int(intr.split(' ')[1][1:],base=16))+';\n')
+            f.write('}\n')
 
 
 if 2!=len(splitInstructionString(dictionaryOfInitializationContents['IB_load_byte'])):
@@ -1974,7 +2003,7 @@ def genPrintoutCode():
             if pref=='#':
                 acc+='#%04X'
             if pref in '!@:':
-                acc+=pref+'%08X'
+                acc+=pref+'%04X%04X'
         acc+='"'
         structName=''
         for pref in p[1:]:
@@ -1995,17 +2024,12 @@ def genPrintoutCode():
         if structName=='B'*len(structName):structName='B'+str(len(structName))
         for i,pref in enumerate(p[1:]):
             acc+=','
-            if pref=='&':
-                acc+='instructionSingle.arg.'+structName+'.a_'+str(i)
-            if pref=='%':
-                acc+='instructionSingle.arg.'+structName+'.a_'+str(i)
-            if pref=='$':
-                acc+='instructionSingle.arg.'+structName+'.a_'+str(i)
-            if pref=='#':
-                acc+='instructionSingle.arg.'+structName+'.a_'+str(i)
+            accessor='instructionSingle.arg.'+structName+'.a_'+str(i)
+            if pref in '&%$#':
+                acc+='(uint16_t)'+accessor
             if pref in '!@:':
-                acc+='instructionSingle.arg.'+structName+'.a_'+str(i)
-        acc+=');break;\n'
+                acc+='(uint16_t)('+accessor+'>>16),(uint16_t)'+accessor
+        acc+=');return;\n'
         finalString+=acc
     finalString+='}\n}\n'
     f=open('PrintSingleInstruction.c','w')

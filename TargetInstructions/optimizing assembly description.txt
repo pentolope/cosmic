@@ -563,12 +563,12 @@ LDI4 - divides two floats                             destroys register values, 
 LDI5 - divides two doubles                            destroys register values, uses label 00000010
 		[%2,%3,%4,%5]=[%6,%7,%8,%9]/[%A,%B,%C,%D]
 
-LLS6 - left shift 32bit number                        destroys register values, uses label 00000011
+LLS6 - left shift 32bit number                        destroys register values, uses label 00000011 [internal label usage:00000020,00000021]
 		[%2,%3]=[%6,%7]<<[%A]
 LLS7 - left shift 64bit number                        destroys register values, uses label 00000012
 		[%2,%3,%4,%5]=[%6,%7,%8,%9]<<[%A]
 
-LRS6 - right shift 32bit number                       destroys register values, uses label 00000013
+LRS6 - right shift 32bit number                       destroys register values, uses label 00000013 [internal label usage:00000022,00000023]
 		[%2,%3]=[%6,%7]>>[%A]
 LRS7 - right shift 64bit number                       destroys register values, uses label 00000014
 		[%2,%3,%4,%5]=[%6,%7,%8,%9]>>[%A]

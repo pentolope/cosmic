@@ -109,8 +109,8 @@ bool isSubstringANameForAValidType(char *string, int32_t startIndex, int32_t end
 typedef struct ExpressionToken{
 	int32_t tokenStart;
 	int32_t tokenEnd;
-	int32_t operatorTargetRoot; // initialized and used when building expression tree. See those functions for explanation
-	int32_t matchingIndex;      // this is valid for enclosements ()[]{}   initialized by the enclosement matcher
+	int16_t operatorTargetRoot; // initialized and used when building expression tree. See those functions for explanation
+	int16_t matchingIndex;      // this is valid for enclosements ()[]{}   initialized by the enclosement matcher
 	bool isOpenEnclosement;  // this is true even for things like function calls or type casts. initialized by the enclosement matcher
 	bool isCloseEnclosement; // this is true even for things like function calls or type casts. initialized by the enclosement matcher
 	bool containedNewlineAfterThisToken; // currently, this is initialized, but not used
@@ -121,13 +121,16 @@ typedef struct ExpressionToken{
 	int16_t precedenceToAddImmediatelyBeforeToken;
 	int16_t precedenceToRemoveImmediatelyAfterToken;
 	int16_t precedenceTotal; // calculated after operator order is mapped using the other 2 precedence numbers in this struct. Does not include ternaryPrecedenceTotal
-	int32_t nextTokenIndexWithMatchingPrecedence; // initialized right before building expression tree. If it equals -1, there is no next token
+	int16_t nextTokenIndexWithMatchingPrecedence; // initialized right before building expression tree. If it equals -1, there is no next token
 } ExpressionToken;
 
-typedef struct ExpressionTokenArray{
-	ExpressionToken* expressionTokens;
-	int32_t length;
-} ExpressionTokenArray;
+struct {
+	ExpressionToken* tokens;
+	int16_t len;
+	int16_t allocLen;
+} expressionTokenArray;
+// expressionTokenArray is a temporary storage for when an expression tree is being built
+
 
 /*
 operatorID list
@@ -206,11 +209,11 @@ ID = token = details
 
 #ifdef COMPILE_EXP_DEBUG_PRINTOUT
 bool isOperatorForExpressionTree(uint8_t oID);
-void internalDebugForExpressionParser(ExpressionTokenArray expressionTokenArray){
+void internalDebugForExpressionParser(){
 	printf("In progress results follow:\n");
-	for (int32_t i=0;i<expressionTokenArray.length;i++){
-		char *tokenStringContents = copyStringSegmentToHeap(sourceContainer.string,expressionTokenArray.expressionTokens[i].tokenStart,expressionTokenArray.expressionTokens[i].tokenEnd);
-		ExpressionToken token = expressionTokenArray.expressionTokens[i];
+	for (int32_t i=0;i<expressionTokenArray.len;i++){
+		char *tokenStringContents = copyStringSegmentToHeap(sourceContainer.string,expressionTokenArray.tokens[i].tokenStart,expressionTokenArray.tokens[i].tokenEnd);
+		ExpressionToken token = expressionTokenArray.tokens[i];
 		printf("token number %3d has precedenceTotal   :%2d:%2d, catagory %2d, isOperator %1d , and contents \"%s\"\n",
 			i,
 			token.precedenceToAddImmediatelyBeforeToken,
@@ -224,8 +227,8 @@ void internalDebugForExpressionParser(ExpressionTokenArray expressionTokenArray)
 #endif
 
 
-bool isExpressionTokenName(ExpressionTokenArray expressionTokenArray, int32_t index){ // this detection is a little more complicated then normal, so it is in a function
-	ExpressionToken expressionToken = expressionTokenArray.expressionTokens[index];
+bool isExpressionTokenName(int16_t index){ // this detection is a little more complicated then normal, so it is in a function
+	ExpressionToken expressionToken = expressionTokenArray.tokens[index];
 	
 	char firstCharacter = sourceContainer.string[expressionToken.tokenStart];
 	if (isLetter(firstCharacter)){
@@ -239,7 +242,7 @@ bool isExpressionTokenName(ExpressionTokenArray expressionTokenArray, int32_t in
 }
 
 
-int32_t findIndexForAppropriatePrecedenceToLeft(ExpressionToken *expressionTokens, bool includeThisPrecedence, int32_t operatorIndex){
+int16_t findIndexForAppropriatePrecedenceToLeft(bool includeThisPrecedence, int16_t operatorIndex){
 	if (operatorIndex==0){
 		printf("an expression operator requiring a left argument was encountered as the first token in an expression\n");
 		exit(1);
@@ -247,49 +250,50 @@ int32_t findIndexForAppropriatePrecedenceToLeft(ExpressionToken *expressionToken
 	// in this one, we are going backwards, so we add instead of subtract and subtract instead of add (when dealing with the relativePrecedence)
 	int16_t relativePrecedence = 0;
 	if (includeThisPrecedence){
-		relativePrecedence = -expressionTokens[operatorIndex].precedenceToAddImmediatelyBeforeToken;
+		relativePrecedence = -expressionTokenArray.tokens[operatorIndex].precedenceToAddImmediatelyBeforeToken;
 	}
-	int32_t operatorIndexStart=operatorIndex-1;
-	if (relativePrecedence+expressionTokens[operatorIndexStart].precedenceToRemoveImmediatelyAfterToken<=0){
+	int16_t operatorIndexStart=operatorIndex-1;
+	if (relativePrecedence+expressionTokenArray.tokens[operatorIndexStart].precedenceToRemoveImmediatelyAfterToken<=0){
 		return operatorIndexStart;
 	}
-	for (int32_t i=operatorIndexStart;i>-1;i--){
-		relativePrecedence += expressionTokens[i].precedenceToRemoveImmediatelyAfterToken;
+	for (int16_t i=operatorIndexStart;i>-1;i--){
+		relativePrecedence += expressionTokenArray.tokens[i].precedenceToRemoveImmediatelyAfterToken;
 		// `relativePrecedence>0` is always true at this point
-		relativePrecedence -= expressionTokens[i].precedenceToAddImmediatelyBeforeToken;
+		relativePrecedence -= expressionTokenArray.tokens[i].precedenceToAddImmediatelyBeforeToken;
 		if (relativePrecedence<=0 & i!=operatorIndex-1) return i;
 	}
 	return 0;
 }
 
-int32_t findIndexForAppropriatePrecedenceToRight(ExpressionToken *expressionTokens, bool includeThisPrecedence, int32_t operatorIndex, int32_t lengthOfExpressionTokens){
+int16_t findIndexForAppropriatePrecedenceToRight(bool includeThisPrecedence, int16_t operatorIndex){
+	int16_t lengthOfExpressionTokens=expressionTokenArray.len;
 	if (operatorIndex==lengthOfExpressionTokens-1){
 		printf("an expression operator requiring a right argument was encountered as the last token in an expression\n");
 		exit(1);
 	}
 	int16_t relativePrecedence = 0;
 	if (includeThisPrecedence){
-		relativePrecedence = -expressionTokens[operatorIndex].precedenceToRemoveImmediatelyAfterToken;
+		relativePrecedence = -expressionTokenArray.tokens[operatorIndex].precedenceToRemoveImmediatelyAfterToken;
 	}
-	int32_t operatorIndexStart=operatorIndex+1;
-	if (relativePrecedence+expressionTokens[operatorIndexStart].precedenceToAddImmediatelyBeforeToken<=0){
+	int16_t operatorIndexStart=operatorIndex+1;
+	if (relativePrecedence+expressionTokenArray.tokens[operatorIndexStart].precedenceToAddImmediatelyBeforeToken<=0){
 		return operatorIndexStart;
 	}
-	for (int32_t i=operatorIndexStart;i<lengthOfExpressionTokens;i++){
-		relativePrecedence += expressionTokens[i].precedenceToAddImmediatelyBeforeToken;
+	for (int16_t i=operatorIndexStart;i<lengthOfExpressionTokens;i++){
+		relativePrecedence += expressionTokenArray.tokens[i].precedenceToAddImmediatelyBeforeToken;
 		// `relativePrecedence>0` is always true at this point
-		relativePrecedence -= expressionTokens[i].precedenceToRemoveImmediatelyAfterToken;
+		relativePrecedence -= expressionTokenArray.tokens[i].precedenceToRemoveImmediatelyAfterToken;
 		if (relativePrecedence<=0 & i!=operatorIndex-1) return i;
 	}
 	return lengthOfExpressionTokens-1;
 }
 
-void markValidCommasAsSeperatorsForFunction(ExpressionToken *expressionTokens, int32_t start){
-	assert(expressionTokens[start].isOpenEnclosement); // called wrong
-	int32_t end = expressionTokens[start].matchingIndex;
+void markValidCommasAsSeperatorsForFunction(int16_t start){
+	assert(expressionTokenArray.tokens[start].isOpenEnclosement); // called wrong
+	int16_t end = expressionTokenArray.tokens[start].matchingIndex;
 	ExpressionToken *currentTokenPtr;
-	for (int32_t i=start+1;i<end;i++){
-		currentTokenPtr = &(expressionTokens[i]);
+	for (int16_t i=start+1;i<end;i++){
+		currentTokenPtr = &(expressionTokenArray.tokens[i]);
 		
 		if (currentTokenPtr->isOpenEnclosement){ // skip enclosed areas
 			i = currentTokenPtr->matchingIndex - 1; // -1 is for the fact that i is incremented
@@ -305,16 +309,15 @@ parses expressions into the precedence total data structure.
 expects that matchEnclosementsOnExpressionTokenArray() has matched the enclosements.
 does not handle declarations.
 */
-void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
-	int32_t i;
-	int32_t length = expressionTokenArray.length;
+void generatePrecedenceTotal(){
+	int16_t i;
+	int16_t tokenLen = expressionTokenArray.len;
 	int32_t lengthOfStringInCurrentToken;
-	int32_t leftIndexForPairing;
-	int32_t rightIndexForPairing;
-	ExpressionToken *expressionTokens = expressionTokenArray.expressionTokens;
+	int16_t leftIndexForPairing;
+	int16_t rightIndexForPairing;
+	ExpressionToken *tokens = expressionTokenArray.tokens;
 	ExpressionToken *currentTokenPtr;
-	char *string = sourceContainer.string;
-	char firstCharacterOfCurrentToken;
+	char fcct; // first character of current token
 	uint8_t operatorIDofCurrentToken;
 	bool doPairing = false;
 	/* 
@@ -322,31 +325,31 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 	sometimes the variable is set for a loop, sometimes it is not. check the beginning of the loop to see which ones are set for that loop
 	*/
 	
-	for (i=0;i<length;i++){ // initialize part 1: ensure zero
-		currentTokenPtr = &(expressionTokens[i]);
+	for (i=0;i<tokenLen;i++){ // initialize part 1: ensure zero
+		currentTokenPtr = tokens+i;
 		
 		currentTokenPtr->precedenceToAddImmediatelyBeforeToken = 0;
 		currentTokenPtr->precedenceToRemoveImmediatelyAfterToken = 0;
 		currentTokenPtr->operatorID = 0;
 		currentTokenPtr->isThisPieceOfTernaryBonded = false;
 	}
-	for (i=0;i<length;i++){ // initialize part 2: catagorize
-		currentTokenPtr = &(expressionTokens[i]);
+	for (i=0;i<tokenLen;i++){ // initialize part 2: catagorize
+		currentTokenPtr = tokens+i;
 		int32_t ifcct; // indexOfFirstCharacterInCurrentToken
 		ifcct = currentTokenPtr->tokenStart;
 		lengthOfStringInCurrentToken = currentTokenPtr->tokenEnd - ifcct;
-		firstCharacterOfCurrentToken = string[ifcct];
+		fcct = sourceContainer.string[ifcct];
 		
 		uint8_t n_oID = 0;
 		if (lengthOfStringInCurrentToken==6){
-			if (isSectionOfStringEquivalent(string,ifcct,"sizeof"))   n_oID = 17;
+			if (isSectionOfStringEquivalent(sourceContainer.string,ifcct,"sizeof"))   n_oID = 17;
 		} else if (lengthOfStringInCurrentToken==3){
-			if (firstCharacterOfCurrentToken=='<' | firstCharacterOfCurrentToken=='>'){
-				if (isSectionOfStringEquivalent(string,ifcct,"<<="))      n_oID = 44;
-				else if (isSectionOfStringEquivalent(string,ifcct,">>=")) n_oID = 45;
+			if (fcct=='<' | fcct=='>'){
+				if (isSectionOfStringEquivalent(sourceContainer.string,ifcct,"<<="))      n_oID = 44;
+				else if (isSectionOfStringEquivalent(sourceContainer.string,ifcct,">>=")) n_oID = 45;
 			}
 		} else if (lengthOfStringInCurrentToken==2){
-			switch ((firstCharacterOfCurrentToken<<8)|string[ifcct+1]){
+			switch ((fcct<<8)|sourceContainer.string[ifcct+1]){
 				case ('+'<<8)|'+':n_oID = 52;break;
 				case ('-'<<8)|'-':n_oID = 53;break;
 				case ('-'<<8)|'>':n_oID =  6;break;
@@ -368,7 +371,7 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 				case ('|'<<8)|'=':n_oID = 48;break;
 			}
 		} else if (lengthOfStringInCurrentToken==1){
-			switch (firstCharacterOfCurrentToken){
+			switch (fcct){
 				case '(':n_oID = 63;break;
 				case '[':n_oID =  4;break;
 				case '.':n_oID =  5;break;
@@ -391,22 +394,22 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 			}
 		}
 		if (n_oID==0){
-			if (isLetter(firstCharacterOfCurrentToken) |
-				isDigit(firstCharacterOfCurrentToken) |
-				firstCharacterOfCurrentToken=='\"' |
-				firstCharacterOfCurrentToken=='\'' |
-				firstCharacterOfCurrentToken=='.'){
+			if (isLetter(fcct) |
+				isDigit(fcct) |
+				fcct=='\"' |
+				fcct=='\'' |
+				fcct=='.'){
 				
-				if (isExpressionTokenName(expressionTokenArray,i)){
-					n_oID = 59+(bool)isSubstringANameForAValidType(string,ifcct,currentTokenPtr->tokenEnd);
+				if (isExpressionTokenName(i)){
+					n_oID = 59+(bool)isSubstringANameForAValidType(sourceContainer.string,ifcct,currentTokenPtr->tokenEnd);
 				} else {
-					if (firstCharacterOfCurrentToken=='\"' |
-					    firstCharacterOfCurrentToken=='\'' |
-						(firstCharacterOfCurrentToken=='L' & 
-						 string[ifcct+1]=='\"')){
+					if (fcct=='\"' |
+					    fcct=='\'' |
+						(fcct=='L' & 
+						 sourceContainer.string[ifcct+1]=='\"')){
 						
 						n_oID = 61;
-					} else if (isDigit(firstCharacterOfCurrentToken) || (isDigit(string[ifcct+1]) & firstCharacterOfCurrentToken=='.')){
+					} else if (isDigit(fcct) || (isDigit(sourceContainer.string[ifcct+1]) & fcct=='.')){
 						n_oID = 62;
 					} else {
 						printf("ill-formed token detected: cannot discern between number, name, or literal\n");
@@ -422,32 +425,32 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 	
 	// currently, function calls are detected by the token to the left of an open parenthese being a name or through a pair of tokens like this: ")(" with some additional checks
 	
-	for (i=0;i<length;i++){ // initialize part 3: detect function calls, typecasts, and sizeof(type) for the token '(' . also set names that are expected to be functions
-		currentTokenPtr = &(expressionTokens[i]);
+	for (i=0;i<tokenLen;i++){ // initialize part 3: detect function calls, typecasts, and sizeof(type) for the token '(' . also set names that are expected to be functions
+		currentTokenPtr = tokens+i;
 		operatorIDofCurrentToken = currentTokenPtr->operatorID;
 		
 		if (operatorIDofCurrentToken==63){
 			bool isFirstToken = i==0;       // can also be seen as "does not have previous token"
-			bool isLastToken = i==length-1; // can also be seen as "does not have next token"
+			bool isLastToken = i==tokenLen-1; // can also be seen as "does not have next token"
 			bool voteForFunctionCall = false;
 			bool voteForTypeCast = false;
 			bool voteForSizeofArgument = false;
 			bool voteForDualSidedFunctionCall = false;
 			uint8_t totalNumberOfVotes = 0;
 			uint8_t n_oID = 0;
-			if (!isFirstToken && expressionTokens[i-1].operatorID==59){
+			if (!isFirstToken && tokens[i-1].operatorID==59){
 				voteForFunctionCall = true;
 				totalNumberOfVotes++;
 			}
-			if (!isFirstToken && expressionTokens[i-1].operatorID==17){
+			if (!isFirstToken && tokens[i-1].operatorID==17){
 				voteForSizeofArgument = true;
 				totalNumberOfVotes++;
-			} else if (i<length-3 && expressionTokens[i+1].operatorID==60 &&
-				(isFirstToken || expressionTokens[i-1].operatorID!=17)){
+			} else if (i<tokenLen-3 && tokens[i+1].operatorID==60 &&
+				(isFirstToken || tokens[i-1].operatorID!=17)){
 				
 				// by the way, the reason this is an "else if" is because a token sequence "sizeof" "(" "type" should only be recognized as the sizeof sequence and not a type cast
-				int32_t matchingIndexForEnclosement = currentTokenPtr->matchingIndex;
-				if (matchingIndexForEnclosement<length-1){
+				int16_t matchingIndexForEnclosement = currentTokenPtr->matchingIndex;
+				if (matchingIndexForEnclosement<tokenLen-1){
 					voteForTypeCast = true;
 					totalNumberOfVotes++;
 				} else {
@@ -456,10 +459,10 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 				}
 			}
 			if (!isFirstToken && (
-				expressionTokens[i-1].isCloseEnclosement & 
-				string[expressionTokens[i-1].tokenStart]==')' & 
+				tokens[i-1].isCloseEnclosement & 
+				sourceContainer.string[tokens[i-1].tokenStart]==')' & 
 				totalNumberOfVotes==0 & // this check is mostly for not having a vote for a type cast
-				expressionTokens[expressionTokens[i-1].matchingIndex].operatorID==58)){
+				tokens[tokens[i-1].matchingIndex].operatorID==58)){
 				
 				voteForDualSidedFunctionCall = true;
 				totalNumberOfVotes++;
@@ -471,14 +474,14 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 				if (voteForFunctionCall){
 					bool isActuallyDualSidedFunctionCall=false;
 					if (i>=2){
-						uint8_t farOpID=expressionTokens[i-2].operatorID;
+						uint8_t farOpID=tokens[i-2].operatorID;
 						isActuallyDualSidedFunctionCall= farOpID==5 | farOpID==6;
 					}
 					if (isActuallyDualSidedFunctionCall){
 						n_oID = 66;
 					} else {
 						n_oID = 3;
-						expressionTokens[i-1].operatorID = 65; // couldn't have been first token due to previous checks, so no index error
+						tokens[i-1].operatorID = 65; // couldn't have been first token due to previous checks, so no index error
 					}
 				} else if (voteForTypeCast){
 					n_oID = 14;
@@ -498,27 +501,27 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 			if (n_oID==14){
 				// if it is a typecast, then we must set the catagories of all tokens inside the parentheses to be catagory 60
 				doSetToCatagory60 = true;
-			} else if ((n_oID==64 & !isLastToken) && expressionTokens[i+1].operatorID==60){
+			} else if ((n_oID==64 & !isLastToken) && tokens[i+1].operatorID==60){
 				// then this is a sizeof argument with types in it, so we must set the catagories of all tokens inside the parentheses to be catagory 60
 				doSetToCatagory60 = true;
 			}
 			if (doSetToCatagory60){
-				int32_t matchingIndexForEnclosement = currentTokenPtr->matchingIndex;
+				int16_t matchingIndexForEnclosement = currentTokenPtr->matchingIndex;
 				for (i=i+1;i<matchingIndexForEnclosement;i++){
-					expressionTokens[i].operatorID = 60;
+					tokens[i].operatorID = 60;
 				}
 			}
 		}
 	}
-	for (i=0;i<length;i++){ // initialize part 4: mark comma tokens used as seperators for function calls
-		operatorIDofCurrentToken = expressionTokens[i].operatorID;
-		if (operatorIDofCurrentToken==3 | operatorIDofCurrentToken==66) markValidCommasAsSeperatorsForFunction(expressionTokens,i);
+	for (i=0;i<tokenLen;i++){ // initialize part 4: mark comma tokens used as seperators for function calls
+		operatorIDofCurrentToken = tokens[i].operatorID;
+		if (operatorIDofCurrentToken==3 | operatorIDofCurrentToken==66) markValidCommasAsSeperatorsForFunction(i);
 	}
-	for (i=0;i<length;i++){ // initialize part 5: set comma tokens with unknown meaning to have operator meaning
-		if (expressionTokens[i].operatorID==51) expressionTokens[i].operatorID = 49;
+	for (i=0;i<tokenLen;i++){ // initialize part 5: set comma tokens with unknown meaning to have operator meaning
+		if (tokens[i].operatorID==51) tokens[i].operatorID = 49;
 	}
-	for (i=0;i<length;i++){ // initialize part 6: for operators with multiple meanings, discern which meaning it to be used
-		currentTokenPtr = &(expressionTokens[i]);
+	for (i=0;i<tokenLen;i++){ // initialize part 6: for operators with multiple meanings, discern which meaning it to be used
+		currentTokenPtr = tokens+i;
 		operatorIDofCurrentToken = currentTokenPtr->operatorID;
 		uint8_t n_oID;
 		
@@ -529,19 +532,19 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 			if (i==0){
 				isPostfix = false;
 			} else {
-				ExpressionToken *previousTokenPtr = &(expressionTokens[i-1]);
+				ExpressionToken *previousTokenPtr = tokens+(i-1);
 				uint8_t previousOperatorID = previousTokenPtr->operatorID;
 				if (previousTokenPtr->isOpenEnclosement | (previousOperatorID<=50 & previousOperatorID>=8)) isPostfix = false;
 			}
 			if (isPostfix)
-				expressionTokens[i].operatorID -= 51; // this is relative, not absolute
+				tokens[i].operatorID -= 51; // this is relative, not absolute
 			else
-				expressionTokens[i].operatorID -= 44; // this is relative, not absolute
+				tokens[i].operatorID -= 44; // this is relative, not absolute
 			
 		} else if (operatorIDofCurrentToken>=54 & operatorIDofCurrentToken<=57){
 			bool isUnary = true;
 			if (i!=0){
-				ExpressionToken *previousTokenPtr = &(expressionTokens[i-1]);
+				ExpressionToken *previousTokenPtr = &(tokens[i-1]);
 				uint8_t previousOperatorID = previousTokenPtr->operatorID;
 				if (
 					(previousOperatorID==1 |
@@ -550,7 +553,7 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 					previousOperatorID==61 | 
 					previousOperatorID==62) ||
 					(previousTokenPtr->isCloseEnclosement && 
-					expressionTokens[previousTokenPtr->matchingIndex].operatorID!=14)){
+					tokens[previousTokenPtr->matchingIndex].operatorID!=14)){
 						// should the string literal be a check here?
 					
 					isUnary = false;
@@ -577,60 +580,60 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 	from now on, these loops build the precedence order so the expression tree can be built much easier
 	sometimes, the loops below go backward. That is because the associativity of those operators is right to left instead of left to right
 	*/
-	for (i=0;i<length;i++){ // enclosements (these aren't operators, but these need to be done because enclosements enclose things inside them)
+	for (i=0;i<tokenLen;i++){ // enclosements (these aren't operators, but these need to be done because enclosements enclose things inside them)
 		// also note that this must be reversed after everything else is built
-		currentTokenPtr = &(expressionTokens[i]);
+		currentTokenPtr = tokens+i;
 		
 		if (currentTokenPtr->isOpenEnclosement){
 			++currentTokenPtr->precedenceToAddImmediatelyBeforeToken;
-			++expressionTokens[currentTokenPtr->matchingIndex].precedenceToRemoveImmediatelyAfterToken;
+			++tokens[currentTokenPtr->matchingIndex].precedenceToRemoveImmediatelyAfterToken;
 		}
 	}
-	for (i=0;i<length;i++){ // precedence level 1
-		currentTokenPtr = &(expressionTokens[i]);
+	for (i=0;i<tokenLen;i++){ // precedence level 1
+		currentTokenPtr = tokens+i;
 		operatorIDofCurrentToken = currentTokenPtr->operatorID;
 		
 		if (operatorIDofCurrentToken==1 | operatorIDofCurrentToken==2){ // postfix ++ and --
-			leftIndexForPairing = findIndexForAppropriatePrecedenceToLeft(expressionTokens,true,i);
+			leftIndexForPairing = findIndexForAppropriatePrecedenceToLeft(true,i);
 			rightIndexForPairing = i;
 			doPairing = true;
 		} else if (operatorIDofCurrentToken==5 | operatorIDofCurrentToken==6){ // . and ->
-			leftIndexForPairing  =  findIndexForAppropriatePrecedenceToLeft(expressionTokens,true,i);
-			rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(expressionTokens,true,i,length);
+			leftIndexForPairing  =  findIndexForAppropriatePrecedenceToLeft(true,i);
+			rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(true,i);
 			doPairing = true;
 		} else if (operatorIDofCurrentToken==3){ // function call
 			leftIndexForPairing = i-1;
 			rightIndexForPairing = currentTokenPtr->matchingIndex;
 			doPairing = true;
 		} else if (operatorIDofCurrentToken==66){ // dual sided function call
-			leftIndexForPairing  = findIndexForAppropriatePrecedenceToLeft(expressionTokens,false,i); // I think don't include precedence?
+			leftIndexForPairing  = findIndexForAppropriatePrecedenceToLeft(false,i); // I think don't include precedence?
 			rightIndexForPairing = currentTokenPtr->matchingIndex;
 			doPairing = true;
 		} else if (operatorIDofCurrentToken==4){ // array item
-			leftIndexForPairing  = findIndexForAppropriatePrecedenceToLeft(expressionTokens,false,i); // don't include the enclosement precedence for array
+			leftIndexForPairing  = findIndexForAppropriatePrecedenceToLeft(false,i); // don't include the enclosement precedence for array
 			rightIndexForPairing = currentTokenPtr->matchingIndex;
 			doPairing = true;
 		}
 		if (doPairing){
 			doPairing = false;
-			++expressionTokens[leftIndexForPairing].precedenceToAddImmediatelyBeforeToken;
-			++expressionTokens[rightIndexForPairing].precedenceToRemoveImmediatelyAfterToken;
+			++tokens[leftIndexForPairing].precedenceToAddImmediatelyBeforeToken;
+			++tokens[rightIndexForPairing].precedenceToRemoveImmediatelyAfterToken;
 		}
 	}
-	for (i=length-1;i>=0;i--){ // precedence level 2
-		currentTokenPtr = &(expressionTokens[i]);
+	for (i=tokenLen-1;i>=0;i--){ // precedence level 2
+		currentTokenPtr = tokens+i;
 		operatorIDofCurrentToken = currentTokenPtr->operatorID;
 		
 		if (operatorIDofCurrentToken>=8 & operatorIDofCurrentToken<=17){
 			if (operatorIDofCurrentToken==14){ // type cast
 				leftIndexForPairing = i;
-				rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(expressionTokens,false,currentTokenPtr->matchingIndex,length);
+				rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(false,currentTokenPtr->matchingIndex);
 			} else { // prefixOperators ++ and --    and unaryOperators + and - and ! and ~ and * and & and sizeof
 				leftIndexForPairing = i;
-				rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(expressionTokens,true,i,length);
+				rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(true,i);
 			}
-			++expressionTokens[leftIndexForPairing].precedenceToAddImmediatelyBeforeToken;
-			++expressionTokens[rightIndexForPairing].precedenceToRemoveImmediatelyAfterToken;
+			++tokens[leftIndexForPairing].precedenceToAddImmediatelyBeforeToken;
+			++tokens[rightIndexForPairing].precedenceToRemoveImmediatelyAfterToken;
 		}
 	}
 
@@ -649,42 +652,42 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 			case 11:lowerOperaterID=34;upperOperatorID=34;break;
 			case 12:lowerOperaterID=35;upperOperatorID=35;break;
 		}
-		for (i=0;i<length;i++){
-			operatorIDofCurrentToken = expressionTokens[i].operatorID;
+		for (i=0;i<tokenLen;i++){
+			operatorIDofCurrentToken = tokens[i].operatorID;
 			
 			if (operatorIDofCurrentToken>=lowerOperaterID & operatorIDofCurrentToken<=upperOperatorID){
-				leftIndexForPairing  =  findIndexForAppropriatePrecedenceToLeft(expressionTokens,true,i);
-				rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(expressionTokens,true,i,length);
-				++expressionTokens[leftIndexForPairing].precedenceToAddImmediatelyBeforeToken;
-				++expressionTokens[rightIndexForPairing].precedenceToRemoveImmediatelyAfterToken;
+				leftIndexForPairing  =  findIndexForAppropriatePrecedenceToLeft(true,i);
+				rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(true,i);
+				++tokens[leftIndexForPairing].precedenceToAddImmediatelyBeforeToken;
+				++tokens[rightIndexForPairing].precedenceToRemoveImmediatelyAfterToken;
 			}
 		}
 	}
 	// precedence level 13 (ternary)
-	for (i=length-1;i>=0;i--){
-		operatorIDofCurrentToken = expressionTokens[i].operatorID;
-		if (operatorIDofCurrentToken==36 & !expressionTokens[i].isThisPieceOfTernaryBonded){
+	for (i=tokenLen-1;i>=0;i--){
+		operatorIDofCurrentToken = tokens[i].operatorID;
+		if (operatorIDofCurrentToken==36 & !tokens[i].isThisPieceOfTernaryBonded){
 			printf("This ternary is wrong, the \'?\' goes before the \':\', not after\n");
 			exit(1);
 		}
 		if (operatorIDofCurrentToken==37){
 			// now we need to find the '?' to the ':'
-			int32_t middleIndex;
+			int16_t middleIndex;
 			uint16_t tempTernaryLevel = 0;
 			bool didEndProperly = false;
-			for (int32_t i2=i-1;i2>=0;i2--){
-				uint8_t tempOperatorID = expressionTokens[i2].operatorID;
+			for (int16_t i2=i-1;i2>=0;i2--){
+				uint8_t tempOperatorID = tokens[i2].operatorID;
 				if (tempOperatorID==36){
 					if (tempTernaryLevel==0){
 						if (i2+1==i){
 							printf("For a ternary, the left side of the \':\' cannot be directly next to the \'?\'\n");
 							exit(1);
 						}
-						if (expressionTokens[i2].isThisPieceOfTernaryBonded){
+						if (tokens[i2].isThisPieceOfTernaryBonded){
 							printf("Error when parsing ternary\n"); // this case would be really weird (might even be impossible), and certainly wrong
 							exit(1);
 						}
-						expressionTokens[i2].isThisPieceOfTernaryBonded = true;
+						tokens[i2].isThisPieceOfTernaryBonded = true;
 						middleIndex = i2;
 						didEndProperly = true;
 						break;
@@ -701,48 +704,48 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 			}
 			// then we found the '?', and it's index is in middleIndex
 			// the operators are bonded in the tree as if the '?' and ':' are 2 operand operators, with the ':' on the right side the '?'
-			leftIndexForPairing  =  findIndexForAppropriatePrecedenceToLeft(expressionTokens,true,middleIndex);
-			rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(expressionTokens,true,i,length);
+			leftIndexForPairing  =  findIndexForAppropriatePrecedenceToLeft(true,middleIndex);
+			rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(true,i);
 			
-			++expressionTokens[middleIndex+1].precedenceToAddImmediatelyBeforeToken;
+			++tokens[middleIndex+1].precedenceToAddImmediatelyBeforeToken;
 			
-			++expressionTokens[leftIndexForPairing].precedenceToAddImmediatelyBeforeToken;
-			expressionTokens[rightIndexForPairing].precedenceToRemoveImmediatelyAfterToken+=2;
+			++tokens[leftIndexForPairing].precedenceToAddImmediatelyBeforeToken;
+			tokens[rightIndexForPairing].precedenceToRemoveImmediatelyAfterToken+=2;
 		}
 	}
-	for (i=length-1;i>=0;i--){ // precedence level 14
-		operatorIDofCurrentToken = expressionTokens[i].operatorID;
+	for (i=tokenLen-1;i>=0;i--){ // precedence level 14
+		operatorIDofCurrentToken = tokens[i].operatorID;
 		
 		if (operatorIDofCurrentToken>=38 && operatorIDofCurrentToken<=48){
-			leftIndexForPairing  =  findIndexForAppropriatePrecedenceToLeft(expressionTokens,true,i);
-			rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(expressionTokens,true,i,length);
-			++expressionTokens[leftIndexForPairing].precedenceToAddImmediatelyBeforeToken;
-			++expressionTokens[rightIndexForPairing].precedenceToRemoveImmediatelyAfterToken;
+			leftIndexForPairing  =  findIndexForAppropriatePrecedenceToLeft(true,i);
+			rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(true,i);
+			++tokens[leftIndexForPairing].precedenceToAddImmediatelyBeforeToken;
+			++tokens[rightIndexForPairing].precedenceToRemoveImmediatelyAfterToken;
 		}
 	}
-	for (i=0;i<length;i++){ // precedence level 15
-		if (expressionTokens[i].operatorID==49){
-			leftIndexForPairing  =  findIndexForAppropriatePrecedenceToLeft(expressionTokens,true,i);
-			rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(expressionTokens,true,i,length);
-			++expressionTokens[leftIndexForPairing].precedenceToAddImmediatelyBeforeToken;
-			++expressionTokens[rightIndexForPairing].precedenceToRemoveImmediatelyAfterToken;
+	for (i=0;i<tokenLen;i++){ // precedence level 15
+		if (tokens[i].operatorID==49){
+			leftIndexForPairing  =  findIndexForAppropriatePrecedenceToLeft(true,i);
+			rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(true,i);
+			++tokens[leftIndexForPairing].precedenceToAddImmediatelyBeforeToken;
+			++tokens[rightIndexForPairing].precedenceToRemoveImmediatelyAfterToken;
 		}
 	}
 	// all operators should now be bonded in the correct precedence order
 	
-	for (i=0;i<length;i++){ // enclosement reversal (needed for future parsing, especially array operators)
-		currentTokenPtr = &(expressionTokens[i]);
+	for (i=0;i<tokenLen;i++){ // enclosement reversal (needed for future parsing, especially array operators)
+		currentTokenPtr = tokens+i;
 		
 		if (currentTokenPtr->isOpenEnclosement){
 			--currentTokenPtr->precedenceToAddImmediatelyBeforeToken;
-			--expressionTokens[currentTokenPtr->matchingIndex].precedenceToRemoveImmediatelyAfterToken;
+			--tokens[currentTokenPtr->matchingIndex].precedenceToRemoveImmediatelyAfterToken;
 		}
 	}
 	
 	// just a little more processing to get the result to something that is easier to read elsewhere
 	int16_t precedenceWalkingTotal = 0;
-	for (i=0;i<length;i++){
-		currentTokenPtr = &(expressionTokens[i]);
+	for (i=0;i<tokenLen;i++){
+		currentTokenPtr = tokens+i;
 		
 		precedenceWalkingTotal += currentTokenPtr->precedenceToAddImmediatelyBeforeToken;
 		currentTokenPtr->precedenceTotal = precedenceWalkingTotal;
@@ -753,26 +756,28 @@ void generatePrecedenceTotal(ExpressionTokenArray expressionTokenArray){
 		printf("There was some sort of error when doing precedence evaluation on an expression. That is all that is known about this error.\n");
 		exit(1);
 	}
-	for (i=0;i<length;i++){
-		currentTokenPtr = &(expressionTokens[i]);
-		if (currentTokenPtr->isOpenEnclosement && expressionTokens[currentTokenPtr->matchingIndex].precedenceTotal != currentTokenPtr->precedenceTotal){
+	for (i=0;i<tokenLen;i++){
+		currentTokenPtr = tokens+i;
+		if (currentTokenPtr->isOpenEnclosement && tokens[currentTokenPtr->matchingIndex].precedenceTotal != currentTokenPtr->precedenceTotal){
 			printf("enclosement bounding check failed. This expression is ill-formed.\n");
 			exit(1);
 		}
 	}
 }
 
-void checkForZeroPrecedenceInPrecedenceTotal(ExpressionTokenArray expressionTokenArray){
-	for (int32_t i=0;i<expressionTokenArray.length;i++){
-		if (expressionTokenArray.expressionTokens[i].precedenceTotal==0){
-			printInformativeMessageAtSourceContainerIndex(true,"This expression should be two seperate expressions, the seperation must be about here",expressionTokenArray.expressionTokens[i].tokenStart-1,0);
+void checkForZeroPrecedenceInPrecedenceTotal(){
+	int16_t tokenLen=expressionTokenArray.len;
+	for (int16_t i=0;i<tokenLen;i++){
+		if (expressionTokenArray.tokens[i].precedenceTotal==0){
+			printInformativeMessageAtSourceContainerIndex(true,"This expression should be two seperate expressions, the seperation must be about here",expressionTokenArray.tokens[i].tokenStart-1,0);
 			exit(1);
 		}
 	}
 }
 
-int32_t matchSpecificEnclosementOnExpressionTokenArray(ExpressionTokenArray expressionTokenArray, int32_t tokenIndexToMatch){
-	char startTarget = sourceContainer.string[expressionTokenArray.expressionTokens[tokenIndexToMatch].tokenStart];
+int16_t matchSpecificEnclosementOnExpressionTokenArray(int16_t tokenIndexToMatch){
+	int16_t tokenLen=expressionTokenArray.len;
+	char startTarget = sourceContainer.string[expressionTokenArray.tokens[tokenIndexToMatch].tokenStart];
 	char endTarget;
 	if (startTarget=='('){
 		endTarget=')';
@@ -784,14 +789,14 @@ int32_t matchSpecificEnclosementOnExpressionTokenArray(ExpressionTokenArray expr
 		printf("Internal Error: sub enclosement matcher called with invalid start.\n");
 		exit(1); // then this function was called with an invalid start.
 	}
-	for (int32_t i=tokenIndexToMatch+1;i<expressionTokenArray.length;i++){
-		if (expressionTokenArray.expressionTokens[i].isOpenEnclosement){
-			i = matchSpecificEnclosementOnExpressionTokenArray(expressionTokenArray,i);
-		} else if (sourceContainer.string[expressionTokenArray.expressionTokens[i].tokenStart]==endTarget){ // if the first character of token[i] matches the endTarget
-			expressionTokenArray.expressionTokens[tokenIndexToMatch].matchingIndex = i;
-			expressionTokenArray.expressionTokens[i].matchingIndex = tokenIndexToMatch;
+	for (int16_t i=tokenIndexToMatch+1;i<tokenLen;i++){
+		if (expressionTokenArray.tokens[i].isOpenEnclosement){
+			i = matchSpecificEnclosementOnExpressionTokenArray(i);
+		} else if (sourceContainer.string[expressionTokenArray.tokens[i].tokenStart]==endTarget){ // if the first character of token[i] matches the endTarget
+			expressionTokenArray.tokens[tokenIndexToMatch].matchingIndex = i;
+			expressionTokenArray.tokens[i].matchingIndex = tokenIndexToMatch;
 			return i;
-		} else if (expressionTokenArray.expressionTokens[i].isCloseEnclosement){
+		} else if (expressionTokenArray.tokens[i].isCloseEnclosement){
 			printf("enclosement mismatch.\n");
 			exit(1); // then there would be an enclosement mismatch. The correct end would have been caught by the above if statement
 		}
@@ -800,16 +805,17 @@ int32_t matchSpecificEnclosementOnExpressionTokenArray(ExpressionTokenArray expr
 	exit(1);
 }
 
-void matchEnclosementsOnExpressionTokenArray(ExpressionTokenArray expressionTokenArray){
-	for (int32_t i=0;i<expressionTokenArray.length;i++){
-		char c = sourceContainer.string[expressionTokenArray.expressionTokens[i].tokenStart];
-		expressionTokenArray.expressionTokens[i].isOpenEnclosement  = c=='(' | c=='[' | c=='{';
-		expressionTokenArray.expressionTokens[i].isCloseEnclosement = c==')' | c==']' | c=='}';
+void matchEnclosementsOnExpressionTokenArray(){
+	int16_t tokenLen=expressionTokenArray.len;
+	for (int16_t i=0;i<tokenLen;i++){
+		char c = sourceContainer.string[expressionTokenArray.tokens[i].tokenStart];
+		expressionTokenArray.tokens[i].isOpenEnclosement  = c=='(' | c=='[' | c=='{';
+		expressionTokenArray.tokens[i].isCloseEnclosement = c==')' | c==']' | c=='}';
 	}
-	for (int32_t i=0;i<expressionTokenArray.length;i++){
-		if (expressionTokenArray.expressionTokens[i].isOpenEnclosement){
-			i = matchSpecificEnclosementOnExpressionTokenArray(expressionTokenArray,i);
-		} else if (expressionTokenArray.expressionTokens[i].isCloseEnclosement){
+	for (int16_t i=0;i<tokenLen;i++){
+		if (expressionTokenArray.tokens[i].isOpenEnclosement){
+			i = matchSpecificEnclosementOnExpressionTokenArray(i);
+		} else if (expressionTokenArray.tokens[i].isCloseEnclosement){
 			printf("enclosement mismatch.\n");
 			exit(1);
 		}
@@ -819,17 +825,18 @@ void matchEnclosementsOnExpressionTokenArray(ExpressionTokenArray expressionToke
 
 /*
 when the expression is terminated with a semicolon, then the following should be true:  sourceContainer.string[endIndex]==';'
-the array is allocated on heap, don't forget to cosmic_free() it
 also removes spaces and newlines (but notates if a newline existed)
 does not call the enclosement matcher or the expression parsing functions
 */
-ExpressionTokenArray generateTokenArrayForExpression(char* string, int32_t startIndex, int32_t endIndex){
+void generateTokenArrayForExpression(int32_t startIndex, int32_t endIndex){
 	bool terminatedAtCorrectIndex = false;
-	int32_t lengthCount = 0;
+	int16_t lengthCount = 0;
 	for (int32_t i=startIndex;i<endIndex;){
 		char c=sourceContainer.string[i];
 		if (!(c==' ' | c=='\n')){
-			lengthCount++;
+			if (++lengthCount>10000){
+				err_1111_("This expression is too large (>10000 tokens)",startIndex,endIndex);
+			}
 		}
 		i = getEndOfToken(i);
 		terminatedAtCorrectIndex=i==endIndex;
@@ -838,23 +845,28 @@ ExpressionTokenArray generateTokenArrayForExpression(char* string, int32_t start
 		printf("Internal Error: generateTokenArrayForExpression() was told to end at a character that is inside a token.\n");
 		exit(1); // the endIndex is inside of a token. That's the calling function's problem, and it shouldn't happen
 	}
-	ExpressionTokenArray expressionTokenArray;
-	expressionTokenArray.expressionTokens = cosmic_calloc(lengthCount,sizeof(ExpressionToken));
-	expressionTokenArray.length = lengthCount;
+	if (expressionTokenArray.allocLen<lengthCount){
+		expressionTokenArray.allocLen=lengthCount;
+		cosmic_free(expressionTokenArray.tokens);
+		expressionTokenArray.tokens = cosmic_calloc(lengthCount,sizeof(ExpressionToken));
+	} else {
+		memZero(expressionTokenArray.tokens,lengthCount*sizeof(ExpressionToken));
+	}
+	expressionTokenArray.len = lengthCount;
 	int32_t walkingIndex = 0;
 	for (int32_t i=startIndex;i<endIndex;){
 		int32_t tokenStart = i;
 		i = getEndOfToken(i);
 		char c=sourceContainer.string[tokenStart];
 		if (!(c==' ' | c=='\n')){
-			expressionTokenArray.expressionTokens[walkingIndex].tokenStart = tokenStart;
-			expressionTokenArray.expressionTokens[walkingIndex].tokenEnd = i;
+			expressionTokenArray.tokens[walkingIndex].tokenStart = tokenStart;
+			expressionTokenArray.tokens[walkingIndex].tokenEnd = i;
 			walkingIndex++;
 		} else if (c=='\n' & walkingIndex!=0){
-			expressionTokenArray.expressionTokens[walkingIndex-1].containedNewlineAfterThisToken = true;
+			expressionTokenArray.tokens[walkingIndex-1].containedNewlineAfterThisToken = true;
 		}
 	}
-	return expressionTokenArray;
+	return;
 }
 
 typedef struct {
@@ -925,7 +937,7 @@ void unpackExpressionTreeGlobalBuffer(ExpressionTreeGlobalBuffer* pack){
 }
 
 void genSinglePreWalkData(int16_t nodeIndex){
-	ExpressionTreeNode* etn = &(expressionTreeGlobalBuffer.expressionTreeNodes[nodeIndex]);
+	ExpressionTreeNode* etn = expressionTreeGlobalBuffer.expressionTreeNodes+nodeIndex;
 	uint8_t oID = etn->operatorID;
 	etn->pre.chainNode = etn->nextInChain;
 	etn->pre.hasChainNode = etn->hasNextChainElement;
@@ -1022,11 +1034,12 @@ static inline bool isTwoOperandOperatorForExpressionTree(const uint8_t oID){
 
 
 // returns index of specific node in expression tree
-int16_t generateSpecificNodeForExpressionTree(ExpressionTokenArray expressionTokenArray, int32_t targetIndex){
-	ExpressionToken *targetExpressionToken = &(expressionTokenArray.expressionTokens[targetIndex]);
+int16_t generateSpecificNodeForExpressionTree(int16_t targetIndex){
+	ExpressionToken *targetExpressionToken = expressionTokenArray.tokens+targetIndex;
 	ExpressionToken *currentExpressionToken;
 	int16_t indexOfThisExpressionTreeNode = partitionNewExpressionTreeNodeInGlobalBufferAndReturnIndex(); // going to have to happen unless there is an error, might as well do it now
-	ExpressionTreeNode *thisExpressionTreeNode = &(expressionTreeGlobalBuffer.expressionTreeNodes[indexOfThisExpressionTreeNode]); // this must be recalculated every time this recurses because of the potential for cosmic_realloc
+	int16_t tokenLen=expressionTokenArray.len;
+	ExpressionTreeNode *thisExpressionTreeNode = expressionTreeGlobalBuffer.expressionTreeNodes+indexOfThisExpressionTreeNode; // this must be recalculated every time this recurses because of the potential for cosmic_realloc
 	uint8_t thisOperatorID = targetExpressionToken->operatorID;
 	// basic set up and clearing of the node we are given
 	thisExpressionTreeNode->isEndNode = false; // will be changed to true if it is
@@ -1038,8 +1051,8 @@ int16_t generateSpecificNodeForExpressionTree(ExpressionTokenArray expressionTok
 	uint8_t countOfNonEnclosementAttached = 0;
 	int16_t tempStorageForRecursiveReturnValue;
 	
-	for (int32_t i=0;i<expressionTokenArray.length;i++){
-		currentExpressionToken = &(expressionTokenArray.expressionTokens[i]);
+	for (int16_t i=0;i<tokenLen;i++){
+		currentExpressionToken = expressionTokenArray.tokens+i;
 		if (currentExpressionToken->operatorTargetRoot==targetIndex & currentExpressionToken->operatorID!=58){
 			if (targetIndex==i){
 				printf("NOPE, go change function parameter chaining for statement in this function to be to be i>=targetIndex instead of i>targetIndex");
@@ -1053,30 +1066,30 @@ int16_t generateSpecificNodeForExpressionTree(ExpressionTokenArray expressionTok
 	}
 	if (isOperatorForExpressionTree(thisOperatorID)){
 		if (thisOperatorID==17){ // sizeof
-			if (targetIndex+1>=expressionTokenArray.length){
+			if (targetIndex+1>=expressionTokenArray.len){
 				printf("sizeof cannot be last token.\n");
 				exit(1);
 			}
-			if (expressionTokenArray.expressionTokens[targetIndex+1].operatorID==64){
-				int32_t matchingParenthese = expressionTokenArray.expressionTokens[targetIndex+1].matchingIndex;
-				if (targetIndex+2>=expressionTokenArray.length){
+			if (expressionTokenArray.tokens[targetIndex+1].operatorID==64){
+				int16_t matchingParenthese = expressionTokenArray.tokens[targetIndex+1].matchingIndex;
+				if (targetIndex+2>=expressionTokenArray.len){
 					printf("sizeof parenthese cannot be last token (how did you even do this without failing somewhere else first?).\n");
 					exit(1);
 				}
-				thisExpressionTreeNode->isArgumentTypeForSizeof = expressionTokenArray.expressionTokens[targetIndex+2].operatorID==60;
+				thisExpressionTreeNode->isArgumentTypeForSizeof = expressionTokenArray.tokens[targetIndex+2].operatorID==60;
 				if (thisExpressionTreeNode->isArgumentTypeForSizeof){
-					thisExpressionTreeNode->argumentIndexStart = expressionTokenArray.expressionTokens[targetIndex+2].tokenStart;
-					thisExpressionTreeNode->argumentIndexEnd = expressionTokenArray.expressionTokens[matchingParenthese-1].tokenEnd;
+					thisExpressionTreeNode->argumentIndexStart = expressionTokenArray.tokens[targetIndex+2].tokenStart;
+					thisExpressionTreeNode->argumentIndexEnd = expressionTokenArray.tokens[matchingParenthese-1].tokenEnd;
 					return indexOfThisExpressionTreeNode;
 				} else {
 					if (countOfNonEnclosementAttached!=2){
 						printf("sizeof without type inside with parentheses has wrong number of attachments to it\'s token\n");
 						exit(1);
 					}
-					for (int32_t i=targetIndex+2;i<matchingParenthese;i++){
-						currentExpressionToken = &(expressionTokenArray.expressionTokens[i]);
+					for (int16_t i=targetIndex+2;i<matchingParenthese;i++){
+						currentExpressionToken = expressionTokenArray.tokens+i;
 						if (currentExpressionToken->operatorTargetRoot==targetIndex && currentExpressionToken->operatorID!=58){
-							tempStorageForRecursiveReturnValue = generateSpecificNodeForExpressionTree(expressionTokenArray,i);
+							tempStorageForRecursiveReturnValue = generateSpecificNodeForExpressionTree(i);
 							thisExpressionTreeNode = &(expressionTreeGlobalBuffer.expressionTreeNodes[indexOfThisExpressionTreeNode]);
 							thisExpressionTreeNode->indexOfComponent1 = tempStorageForRecursiveReturnValue;
 							return indexOfThisExpressionTreeNode;
@@ -1090,11 +1103,11 @@ int16_t generateSpecificNodeForExpressionTree(ExpressionTokenArray expressionTok
 					printf("sizeof without type inside without parentheses has wrong number of attachments to it\'s token\n");
 					exit(1);
 				}
-				for (int32_t i=targetIndex+1;i<expressionTokenArray.length;i++){
-					currentExpressionToken = &(expressionTokenArray.expressionTokens[i]);
+				for (int16_t i=targetIndex+1;i<tokenLen;i++){
+					currentExpressionToken = expressionTokenArray.tokens+i;
 					if (currentExpressionToken->operatorTargetRoot==targetIndex & currentExpressionToken->operatorID!=58){
-						tempStorageForRecursiveReturnValue = generateSpecificNodeForExpressionTree(expressionTokenArray,i);
-						thisExpressionTreeNode = &(expressionTreeGlobalBuffer.expressionTreeNodes[indexOfThisExpressionTreeNode]);
+						tempStorageForRecursiveReturnValue = generateSpecificNodeForExpressionTree(i);
+						thisExpressionTreeNode = expressionTreeGlobalBuffer.expressionTreeNodes+indexOfThisExpressionTreeNode;
 						thisExpressionTreeNode->indexOfComponent1 = tempStorageForRecursiveReturnValue;
 						return indexOfThisExpressionTreeNode;
 					}
@@ -1103,13 +1116,13 @@ int16_t generateSpecificNodeForExpressionTree(ExpressionTokenArray expressionTok
 				exit(1);
 			}
 		} else if (thisOperatorID==14){ // type cast
-			int32_t matchingParenthese = expressionTokenArray.expressionTokens[targetIndex].matchingIndex;
-			thisExpressionTreeNode->argumentIndexStart = expressionTokenArray.expressionTokens[targetIndex+1].tokenStart; // that shouldn't fail
-			thisExpressionTreeNode->argumentIndexEnd = expressionTokenArray.expressionTokens[matchingParenthese-1].tokenEnd;
+			int16_t matchingParenthese = expressionTokenArray.tokens[targetIndex].matchingIndex;
+			thisExpressionTreeNode->argumentIndexStart = expressionTokenArray.tokens[targetIndex+1].tokenStart; // that shouldn't fail
+			thisExpressionTreeNode->argumentIndexEnd = expressionTokenArray.tokens[matchingParenthese-1].tokenEnd;
 			uint8_t alternateAttachCount=0;
 			int16_t indexForComponent1;
-			for (int32_t i=0;i<expressionTokenArray.length;i++){
-				currentExpressionToken = &(expressionTokenArray.expressionTokens[i]);
+			for (int16_t i=0;i<tokenLen;i++){
+				currentExpressionToken = expressionTokenArray.tokens+i;
 				if (currentExpressionToken->operatorTargetRoot==targetIndex & currentExpressionToken->operatorID!=58 & (i<targetIndex | i>matchingParenthese)){
 					alternateAttachCount++;
 					indexForComponent1=i;
@@ -1119,8 +1132,8 @@ int16_t generateSpecificNodeForExpressionTree(ExpressionTokenArray expressionTok
 				printf("type cast doesn\'t have single attachment\n");
 				exit(1);
 			}
-			tempStorageForRecursiveReturnValue = generateSpecificNodeForExpressionTree(expressionTokenArray,indexForComponent1);
-			thisExpressionTreeNode = &(expressionTreeGlobalBuffer.expressionTreeNodes[indexOfThisExpressionTreeNode]);
+			tempStorageForRecursiveReturnValue = generateSpecificNodeForExpressionTree(indexForComponent1);
+			thisExpressionTreeNode = expressionTreeGlobalBuffer.expressionTreeNodes+indexOfThisExpressionTreeNode;
 			thisExpressionTreeNode->indexOfComponent1 = tempStorageForRecursiveReturnValue;
 			return indexOfThisExpressionTreeNode;
 		} else if (thisOperatorID==65 | thisOperatorID==66){ // function call
@@ -1129,10 +1142,10 @@ int16_t generateSpecificNodeForExpressionTree(ExpressionTokenArray expressionTok
 			int16_t lastItemInChain;
 			int16_t tempIndex;
 			ExpressionTreeNode *tempPtr;
-			for (int32_t i=expressionTokenArray.length-1;i>targetIndex;i--){ 
+			for (int16_t i=tokenLen-1;i>targetIndex;i--){ 
 				// we go backwards to get the chain going forwards (so we can push in an order that more easily gives us the ability to do variable argument functions, because converting to instructions runs the chain backwards)
 				// also, we start at this index because of the dual sided function calls, where we don't want to add the operator to the left as a parameter
-				currentExpressionToken = &(expressionTokenArray.expressionTokens[i]);
+				currentExpressionToken = expressionTokenArray.tokens+i;
 				if (currentExpressionToken->operatorTargetRoot==targetIndex & currentExpressionToken->operatorID!=58 & currentExpressionToken->operatorID!=3){
 					if (currentExpressionToken->operatorID==50){
 						if (hasSeperatorOccured){
@@ -1154,19 +1167,19 @@ int16_t generateSpecificNodeForExpressionTree(ExpressionTokenArray expressionTok
 						}
 						hasSeperatorOccured = false;
 						if (hasChainBeenStarted){
-							tempIndex = generateSpecificNodeForExpressionTree(expressionTokenArray,i);
-							tempPtr = &(expressionTreeGlobalBuffer.expressionTreeNodes[tempIndex]);
+							tempIndex = generateSpecificNodeForExpressionTree(i);
+							tempPtr = expressionTreeGlobalBuffer.expressionTreeNodes+tempIndex;
 							tempPtr->hasNextChainElement = true;
 							tempPtr->nextInChain = lastItemInChain;
 							lastItemInChain = tempIndex;
 						} else {
-							lastItemInChain = generateSpecificNodeForExpressionTree(expressionTokenArray,i);
+							lastItemInChain = generateSpecificNodeForExpressionTree(i);
 						}
 						hasChainBeenStarted = true;
 					}
 				}
 			}
-			thisExpressionTreeNode = &(expressionTreeGlobalBuffer.expressionTreeNodes[indexOfThisExpressionTreeNode]);
+			thisExpressionTreeNode = expressionTreeGlobalBuffer.expressionTreeNodes+indexOfThisExpressionTreeNode;
 			if (hasChainBeenStarted){
 				if (hasSeperatorOccured){
 					printf("A seperator comma cannot exist directly next to the opening parentheses of a function call.\n");
@@ -1179,11 +1192,11 @@ int16_t generateSpecificNodeForExpressionTree(ExpressionTokenArray expressionTok
 			if (thisOperatorID==66){
 				// if this is a function call where the name is not known,
 				// then we need to add the expression that gives us the address of the function
-				int32_t indexForLeft;
+				int16_t indexForLeft;
 				bool hasFoundIndexForLeft = false;
-				for (int32_t i=0;i<targetIndex;i++){
+				for (int16_t i=0;i<targetIndex;i++){
 					// we don't want to add the parameters, so we stop at the index of this 
-					currentExpressionToken = &(expressionTokenArray.expressionTokens[i]);
+					currentExpressionToken = expressionTokenArray.tokens+i;
 					if (currentExpressionToken->operatorTargetRoot==targetIndex & currentExpressionToken->operatorID!=58){
 						if (hasFoundIndexForLeft){
 							printf("That is wrong 1\n"); // I don't feel like making an error message right now, this shouldn't happen...
@@ -1194,14 +1207,14 @@ int16_t generateSpecificNodeForExpressionTree(ExpressionTokenArray expressionTok
 						}
 					}
 				}
-				tempStorageForRecursiveReturnValue = generateSpecificNodeForExpressionTree(expressionTokenArray,indexForLeft);
-				thisExpressionTreeNode = &(expressionTreeGlobalBuffer.expressionTreeNodes[indexOfThisExpressionTreeNode]);
+				tempStorageForRecursiveReturnValue = generateSpecificNodeForExpressionTree(indexForLeft);
+				thisExpressionTreeNode = expressionTreeGlobalBuffer.expressionTreeNodes+indexOfThisExpressionTreeNode;
 				thisExpressionTreeNode->indexOfComponent2 = tempStorageForRecursiveReturnValue;
 			} else {
 				// lets just make sure there are no tokens that say they are attached to this but should not be
 				// we don't want to add the parameters, so we stop at the index of this
-				for (int32_t i=0;i<targetIndex;i++){ 
-					currentExpressionToken = &(expressionTokenArray.expressionTokens[i]);
+				for (int16_t i=0;i<targetIndex;i++){ 
+					currentExpressionToken = expressionTokenArray.tokens+i;
 					if (currentExpressionToken->operatorTargetRoot==targetIndex){
 						printf("That is wrong 2\n"); // I don't feel like making an error message right now, this shouldn't happen...
 						exit(1);
@@ -1212,11 +1225,11 @@ int16_t generateSpecificNodeForExpressionTree(ExpressionTokenArray expressionTok
 		} else if (isOneOperandOperatorForExpressionTree(thisOperatorID)){ // detect operators that should have one operand
 			if (countOfNonEnclosementAttached==1){
 				// good, it has the proper number of operators
-				for (int32_t i=0;i<expressionTokenArray.length;i++){
-					currentExpressionToken = &(expressionTokenArray.expressionTokens[i]);
+				for (int16_t i=0;i<tokenLen;i++){
+					currentExpressionToken = expressionTokenArray.tokens+i;
 					if (currentExpressionToken->operatorTargetRoot==targetIndex & currentExpressionToken->operatorID!=58){
-						tempStorageForRecursiveReturnValue = generateSpecificNodeForExpressionTree(expressionTokenArray,i);
-						thisExpressionTreeNode = &(expressionTreeGlobalBuffer.expressionTreeNodes[indexOfThisExpressionTreeNode]);
+						tempStorageForRecursiveReturnValue = generateSpecificNodeForExpressionTree(i);
+						thisExpressionTreeNode = expressionTreeGlobalBuffer.expressionTreeNodes+indexOfThisExpressionTreeNode;
 						thisExpressionTreeNode->indexOfComponent1 = tempStorageForRecursiveReturnValue;
 						return indexOfThisExpressionTreeNode;
 					}
@@ -1229,11 +1242,11 @@ int16_t generateSpecificNodeForExpressionTree(ExpressionTokenArray expressionTok
 			if (countOfNonEnclosementAttached==2){
 				// good, it has the proper number of operators
 				bool isFirst = true;
-				for (int32_t i=0;i<expressionTokenArray.length;i++){
-					currentExpressionToken = &(expressionTokenArray.expressionTokens[i]);
+				for (int16_t i=0;i<tokenLen;i++){
+					currentExpressionToken = expressionTokenArray.tokens+i;
 					if (currentExpressionToken->operatorTargetRoot==targetIndex & currentExpressionToken->operatorID!=58){
-						int16_t indexOfComponent = generateSpecificNodeForExpressionTree(expressionTokenArray,i);
-						thisExpressionTreeNode = &(expressionTreeGlobalBuffer.expressionTreeNodes[indexOfThisExpressionTreeNode]);
+						int16_t indexOfComponent = generateSpecificNodeForExpressionTree(i);
+						thisExpressionTreeNode = expressionTreeGlobalBuffer.expressionTreeNodes+indexOfThisExpressionTreeNode;
 						if (isFirst){
 							isFirst = false;
 							thisExpressionTreeNode->indexOfComponent1 = indexOfComponent;
@@ -1262,17 +1275,18 @@ int16_t generateSpecificNodeForExpressionTree(ExpressionTokenArray expressionTok
 }
 
 // returns index in expression tree of root
-int16_t generateExpressionTree(ExpressionTokenArray expressionTokenArray){
-	bool hasFoundRoot = false;
+int16_t generateExpressionTree(){
+	int16_t tokenLen=expressionTokenArray.len;
 	int16_t rootIndex;
-	for (int32_t i=0;i<expressionTokenArray.length;i++){
-		if (expressionTokenArray.expressionTokens[i].operatorTargetRoot==-2){
+	bool hasFoundRoot = false;
+	for (int16_t i=0;i<tokenLen;i++){
+		if (expressionTokenArray.tokens[i].operatorTargetRoot==-2){
 			if (hasFoundRoot){
 				printf("generateExpressionTree() found two roots to an expression.\n");
 				exit(1);
 			} else {
 				hasFoundRoot = true;
-				rootIndex = generateSpecificNodeForExpressionTree(expressionTokenArray,i);
+				rootIndex = generateSpecificNodeForExpressionTree(i);
 			}
 		}
 	}
@@ -1285,14 +1299,15 @@ int16_t generateExpressionTree(ExpressionTokenArray expressionTokenArray){
 
 
 
-void resetForOperatorTargetRoot(ExpressionTokenArray expressionTokenArray){
+void resetForOperatorTargetRoot(){
+	int16_t tokenLen=expressionTokenArray.len;
+	int16_t i;
 	ExpressionToken *expressionToken;
-	int32_t i;
-	for (i=0;i<expressionTokenArray.length;i++){
-		expressionTokenArray.expressionTokens[i].operatorTargetRoot=-3;
+	for (i=0;i<tokenLen;i++){
+		expressionTokenArray.tokens[i].operatorTargetRoot=-3;
 	}
-	for (i=0;i<expressionTokenArray.length;i++){
-		expressionToken = &(expressionTokenArray.expressionTokens[i]);
+	for (i=0;i<tokenLen;i++){
+		expressionToken = expressionTokenArray.tokens+i;
 		if (expressionToken->precedenceTotal==1){
 			if (isOperatorForExpressionTree(expressionToken->operatorID)){
 				expressionToken->operatorTargetRoot=-2;
@@ -1301,8 +1316,8 @@ void resetForOperatorTargetRoot(ExpressionTokenArray expressionTokenArray){
 			}
 		}
 	}
-	for (;i<expressionTokenArray.length;i++){
-		expressionToken = &(expressionTokenArray.expressionTokens[i]);
+	for (;i<tokenLen;i++){
+		expressionToken = expressionTokenArray.tokens+i;
 		if (expressionToken->precedenceTotal==1){
 			if (isOperatorForExpressionTree(expressionToken->operatorID)){
 				printf("Multiple roots of expression is wrong (the expression must be malformed).\n");
@@ -1327,50 +1342,51 @@ when isOperatorForExpressionTree()==false for the token, operatorTargetRoot give
 Also, it expects operatorTargetRoot==-3 for all tokens, except that it also expects the root token (at precedence 1) to have operatorTargetRoot==-2
 when started, it should be started with startIndex==0 , previousOperatorIndex==-2 , precedenceLevel==1
 */
-void generateOperatorTargetRoot(ExpressionTokenArray expressionTokenArray, int32_t startIndex, int32_t previousOperatorIndex, int16_t precedenceLevel){
-	int32_t thisOperatorIndex = -3;
-	int32_t modifiedStartIndex = startIndex;
-	int32_t i = startIndex;
-	while (i<expressionTokenArray.length && expressionTokenArray.expressionTokens[i].precedenceTotal!=precedenceLevel){
+void generateOperatorTargetRoot(int16_t startIndex, int16_t previousOperatorIndex, int16_t precedenceLevel){
+	int16_t tokenLen=expressionTokenArray.len;
+	int16_t thisOperatorIndex = -3;
+	int16_t modifiedStartIndex = startIndex;
+	int16_t i = startIndex;
+	while (i<tokenLen && expressionTokenArray.tokens[i].precedenceTotal!=precedenceLevel){
 		modifiedStartIndex = ++i;
 	}
 	i=modifiedStartIndex;
-	while (i<expressionTokenArray.length & i>=0){
-		if (isOperatorForExpressionTree(expressionTokenArray.expressionTokens[i].operatorID)){
+	while (i<tokenLen & i>=0){
+		if (isOperatorForExpressionTree(expressionTokenArray.tokens[i].operatorID)){
 			thisOperatorIndex = i;
-			expressionTokenArray.expressionTokens[i].operatorTargetRoot = previousOperatorIndex;
-			i=expressionTokenArray.expressionTokens[i].nextTokenIndexWithMatchingPrecedence; // this advancement is for the next while loop (which checks for an error)
+			expressionTokenArray.tokens[i].operatorTargetRoot = previousOperatorIndex;
+			i=expressionTokenArray.tokens[i].nextTokenIndexWithMatchingPrecedence; // this advancement is for the next while loop (which checks for an error)
 			break;
 		}
-		i=expressionTokenArray.expressionTokens[i].nextTokenIndexWithMatchingPrecedence;
+		i=expressionTokenArray.tokens[i].nextTokenIndexWithMatchingPrecedence;
 	}
 	if (thisOperatorIndex==-3){
 		printf("generateOperatorTargetRoot() failed to find operator on precedenceLevel==%d\n",precedenceLevel);
 		exit(1);
 	}
-	while (i<expressionTokenArray.length & i>=0){
-		if (isOperatorForExpressionTree(expressionTokenArray.expressionTokens[i].operatorID)){
+	while (i<tokenLen & i>=0){
+		if (isOperatorForExpressionTree(expressionTokenArray.tokens[i].operatorID)){
 			printf("generateOperatorTargetRoot() failed with multiple operators on same precedenceLevel , precedenceLevel==%d\n",precedenceLevel);
 			exit(1);
 		}
-		i=expressionTokenArray.expressionTokens[i].nextTokenIndexWithMatchingPrecedence;
+		i=expressionTokenArray.tokens[i].nextTokenIndexWithMatchingPrecedence;
 	}
 	i=modifiedStartIndex;
-	while (i<expressionTokenArray.length & i>=0){
-		if (!isOperatorForExpressionTree(expressionTokenArray.expressionTokens[i].operatorID)){
-			expressionTokenArray.expressionTokens[i].operatorTargetRoot = thisOperatorIndex;
+	while (i<tokenLen & i>=0){
+		if (!isOperatorForExpressionTree(expressionTokenArray.tokens[i].operatorID)){
+			expressionTokenArray.tokens[i].operatorTargetRoot = thisOperatorIndex;
 		}
-		i=expressionTokenArray.expressionTokens[i].nextTokenIndexWithMatchingPrecedence;
+		i=expressionTokenArray.tokens[i].nextTokenIndexWithMatchingPrecedence;
 	}
-	if (expressionTokenArray.expressionTokens[startIndex].precedenceTotal>precedenceLevel){
-		generateOperatorTargetRoot(expressionTokenArray,startIndex,thisOperatorIndex,precedenceLevel+1); // now that we know where this operator is, we can recurse
+	if (expressionTokenArray.tokens[startIndex].precedenceTotal>precedenceLevel){
+		generateOperatorTargetRoot(startIndex,thisOperatorIndex,precedenceLevel+1); // now that we know where this operator is, we can recurse
 	}
-	int32_t nextI;
+	int16_t nextI;
 	i=modifiedStartIndex;
-	while (i<expressionTokenArray.length & i>=0){
-		nextI=expressionTokenArray.expressionTokens[i].nextTokenIndexWithMatchingPrecedence;
+	while (i<expressionTokenArray.len & i>=0){
+		nextI=expressionTokenArray.tokens[i].nextTokenIndexWithMatchingPrecedence;
 		if (nextI!=i+1 & nextI!=-1 & nextI!=-3){
-			generateOperatorTargetRoot(expressionTokenArray,i+1,thisOperatorIndex,precedenceLevel+1);
+			generateOperatorTargetRoot(i+1,thisOperatorIndex,precedenceLevel+1);
 		}
 		i=nextI;
 	}
@@ -1388,44 +1404,46 @@ if nextTokenIndexWithMatchingPrecedence==-3 , this is the last token, so it defi
 nextTokenIndexWithMatchingPrecedence==-2 is generated from nextTokenIndexWithMatchingPrecedence==-1 after generateNextTokensUsingPrecedence() runs
 
 */
-int32_t generateNextTokensUsingPrecedence(ExpressionTokenArray expressionTokenArray, int32_t startIndex, int16_t precedenceLevel){
-	int32_t previousI = -2;
-	for (int32_t i=startIndex;i<expressionTokenArray.length;i++){
-		if (expressionTokenArray.expressionTokens[i].precedenceTotal>precedenceLevel){
-			i = generateNextTokensUsingPrecedence(expressionTokenArray,i,precedenceLevel+1);
+int16_t generateNextTokensUsingPrecedence(int16_t startIndex, int16_t precedenceLevel){
+	int16_t tokenLen=expressionTokenArray.len;
+	int16_t previousI = -2;
+	for (int16_t i=startIndex;i<tokenLen;i++){
+		if (expressionTokenArray.tokens[i].precedenceTotal>precedenceLevel){
+			i = generateNextTokensUsingPrecedence(i,precedenceLevel+1);
 			if (i==-1){
 				if (previousI!=-2){
-					expressionTokenArray.expressionTokens[previousI].nextTokenIndexWithMatchingPrecedence = -1;
+					expressionTokenArray.tokens[previousI].nextTokenIndexWithMatchingPrecedence = -1;
 				}
 				return -1;
-			} else if (expressionTokenArray.expressionTokens[i].precedenceTotal>precedenceLevel){
+			} else if (expressionTokenArray.tokens[i].precedenceTotal>precedenceLevel){
 				printf("generateNextTokensUsingPrecedence() sanity check fail (1)\n");
 				exit(1);
 			}
 		}
-		if (expressionTokenArray.expressionTokens[i].precedenceTotal<precedenceLevel){
+		if (expressionTokenArray.tokens[i].precedenceTotal<precedenceLevel){
 			if (previousI!=-2){
-				expressionTokenArray.expressionTokens[previousI].nextTokenIndexWithMatchingPrecedence = -1;
+				expressionTokenArray.tokens[previousI].nextTokenIndexWithMatchingPrecedence = -1;
 			}
 			return i;
 		}
 		if (previousI!=-2){
-			expressionTokenArray.expressionTokens[previousI].nextTokenIndexWithMatchingPrecedence = i;
+			expressionTokenArray.tokens[previousI].nextTokenIndexWithMatchingPrecedence = i;
 		}
 		previousI = i;
 	}
 	return -1;
 }
 
-void generateAllNextTokensUsingPrecedence(ExpressionTokenArray expressionTokenArray){
-	generateNextTokensUsingPrecedence(expressionTokenArray,0,1);
-	expressionTokenArray.expressionTokens[expressionTokenArray.length-1].nextTokenIndexWithMatchingPrecedence = -3;
-	for (int32_t i=0;i<expressionTokenArray.length-1;i++){
-		if (expressionTokenArray.expressionTokens[i  ].nextTokenIndexWithMatchingPrecedence==-1 & 
-			expressionTokenArray.expressionTokens[i  ].precedenceTotal <
-			expressionTokenArray.expressionTokens[i+1].precedenceTotal){
+void generateAllNextTokensUsingPrecedence(){
+	generateNextTokensUsingPrecedence(0,1);
+	expressionTokenArray.tokens[expressionTokenArray.len-1].nextTokenIndexWithMatchingPrecedence = -3;
+	int16_t tokenLen=expressionTokenArray.len;
+	for (int16_t i=0;i<tokenLen-1;i++){
+		if (expressionTokenArray.tokens[i  ].nextTokenIndexWithMatchingPrecedence==-1 & 
+			expressionTokenArray.tokens[i  ].precedenceTotal <
+			expressionTokenArray.tokens[i+1].precedenceTotal){
 			
-			expressionTokenArray.expressionTokens[i  ].nextTokenIndexWithMatchingPrecedence=-2;
+			expressionTokenArray.tokens[i  ].nextTokenIndexWithMatchingPrecedence=-2;
 		}
 	}
 }
@@ -1446,7 +1464,7 @@ void printLinesForDebugType2(int16_t numberOfSpaces){
 
 // this function was made before the abstractions to make walking the tree easier
 void debugPrintOfExpressionTreeFromTarget(char *string, int16_t targetIndex, int16_t currentNumberOfPrependSpaces){
-	ExpressionTreeNode *exTreeNode = &(expressionTreeGlobalBuffer.expressionTreeNodes[targetIndex]);
+	ExpressionTreeNode *exTreeNode = expressionTreeGlobalBuffer.expressionTreeNodes+targetIndex;
 	uint8_t thisOperatorID = exTreeNode->operatorID;
 	char *tempString = copyStringSegmentToHeap(string,exTreeNode->startIndexInString,exTreeNode->endIndexInString);
 	if (thisOperatorID==17){ // sizeof
@@ -1559,10 +1577,9 @@ int16_t buildExpressionTreeToGlobalBufferAndReturnRootIndex(int32_t startIndexIn
 #endif
 		return -1;
 	}
-	ExpressionTokenArray expressionTokenArray;
-	expressionTokenArray = generateTokenArrayForExpression(sourceContainer.string,startIndexInString,endIndexInString); // this is contained in this function (cosmic_free() is called it's array)
-	matchEnclosementsOnExpressionTokenArray(expressionTokenArray);
-	if (expressionTokenArray.expressionTokens[0].isOpenEnclosement==true && expressionTokenArray.expressionTokens[0].matchingIndex==expressionTokenArray.length-1){
+	generateTokenArrayForExpression(startIndexInString,endIndexInString);
+	matchEnclosementsOnExpressionTokenArray();
+	if (expressionTokenArray.tokens[0].isOpenEnclosement==true && expressionTokenArray.tokens[0].matchingIndex==expressionTokenArray.len-1){
 		// then the entire expression is in parentheses. This messes with some of the other algorithms used below, so lets try again without those unneeded parentheses.
 #ifdef COMPILE_EXP_DEBUG_PRINTOUT
 		{
@@ -1571,13 +1588,12 @@ int16_t buildExpressionTreeToGlobalBufferAndReturnRootIndex(int32_t startIndexIn
 		cosmic_free(tempString);
 		}
 #endif
-		int32_t newStartIndex = expressionTokenArray.expressionTokens[0].tokenEnd;
-		int32_t newEndIndex = expressionTokenArray.expressionTokens[expressionTokenArray.length-1].tokenStart;
-		cosmic_free(expressionTokenArray.expressionTokens);
+		int32_t newStartIndex = expressionTokenArray.tokens[0].tokenEnd;
+		int32_t newEndIndex = expressionTokenArray.tokens[expressionTokenArray.len-1].tokenStart;
 		return buildExpressionTreeToGlobalBufferAndReturnRootIndex(newStartIndex,newEndIndex,doClearPreviousExpressions);
 	}
-	generatePrecedenceTotal(expressionTokenArray);
-	if (expressionTokenArray.length==1 & expressionTokenArray.expressionTokens[0].operatorID>=59 & expressionTokenArray.expressionTokens[0].operatorID<=62){
+	generatePrecedenceTotal();
+	if (expressionTokenArray.len==1 & expressionTokenArray.tokens[0].operatorID>=59 & expressionTokenArray.tokens[0].operatorID<=62){
 		/*
 		The algorithms used later on in this function to build the tree don't work for expressions without operators. 
 		And if it doesn't have operators, then it's just a single node on the tree. 
@@ -1593,13 +1609,12 @@ int16_t buildExpressionTreeToGlobalBufferAndReturnRootIndex(int32_t startIndexIn
 		int16_t treeIndexForSingle = partitionNewExpressionTreeNodeInGlobalBufferAndReturnIndex();
 		
 		ExpressionTreeNode expressionTreeNodeForSingle = {0};
-		ExpressionToken expressionTokenOfSingle = expressionTokenArray.expressionTokens[0];
+		ExpressionToken expressionTokenOfSingle = expressionTokenArray.tokens[0];
 		expressionTreeNodeForSingle.startIndexInString = expressionTokenOfSingle.tokenStart;
 		expressionTreeNodeForSingle.endIndexInString = expressionTokenOfSingle.tokenEnd;
 		expressionTreeNodeForSingle.operatorID = expressionTokenOfSingle.operatorID;
 		expressionTreeNodeForSingle.isEndNode = true;
 		expressionTreeGlobalBuffer.expressionTreeNodes[treeIndexForSingle] = expressionTreeNodeForSingle;
-		cosmic_free(expressionTokenArray.expressionTokens);
 		genAllPreWalkData(treeIndexForSingle);
 		return treeIndexForSingle;
 	}
@@ -1611,12 +1626,12 @@ int16_t buildExpressionTreeToGlobalBufferAndReturnRootIndex(int32_t startIndexIn
 	cosmic_free(tempString);
 	}
 	printf("  Operation on tokens partially completed (1/3). Partial results follow:\n");
-	for (int32_t i=0;i<expressionTokenArray.length;i++){
+	for (int16_t i=0;i<expressionTokenArray.length;i++){
 		char *tokenStringContents = copyStringSegmentToHeap(
 			sourceContainer.string,
-			expressionTokenArray.expressionTokens[i].tokenStart,
-			expressionTokenArray.expressionTokens[i].tokenEnd);
-		ExpressionToken token = expressionTokenArray.expressionTokens[i];
+			expressionTokenArray.tokens[i].tokenStart,
+			expressionTokenArray.tokens[i].tokenEnd);
+		ExpressionToken token = expressionTokenArray.tokens[i];
 		printf("    Token %3d has precedence %2d:%2d:%2d, catagory %2d, isOperator %1d , and contents \"%s\"\n",
 			i,
 			token.precedenceTotal,
@@ -1630,18 +1645,18 @@ int16_t buildExpressionTreeToGlobalBufferAndReturnRootIndex(int32_t startIndexIn
 #endif
 
 
-	checkForZeroPrecedenceInPrecedenceTotal(expressionTokenArray);
-	generateAllNextTokensUsingPrecedence(expressionTokenArray);
+	checkForZeroPrecedenceInPrecedenceTotal();
+	generateAllNextTokensUsingPrecedence();
 	
 #ifdef COMPILE_EXP_DEBUG_PRINTOUT
 	
 	printf("  Operation on tokens partially completed (2/3). Partial results follow:\n");
-	for (int32_t i=0;i<expressionTokenArray.length;i++){
+	for (int16_t i=0;i<expressionTokenArray.length;i++){
 		char *tokenStringContents = copyStringSegmentToHeap(
 			sourceContainer.string,
-			expressionTokenArray.expressionTokens[i].tokenStart,
-			expressionTokenArray.expressionTokens[i].tokenEnd);
-		ExpressionToken token = expressionTokenArray.expressionTokens[i];
+			expressionTokenArray.tokens[i].tokenStart,
+			expressionTokenArray.tokens[i].tokenEnd);
+		ExpressionToken token = expressionTokenArray.tokens[i];
 		printf("    Token %3d has precedence %2d:%2d:%2d, catagory %2d, isOperator %1d , nextWithPrecMatch %3d, and contents \"%s\"\n",
 			i,
 			token.precedenceTotal,
@@ -1655,24 +1670,24 @@ int16_t buildExpressionTreeToGlobalBufferAndReturnRootIndex(int32_t startIndexIn
 	}
 #endif
 
-	resetForOperatorTargetRoot(expressionTokenArray);
-	generateOperatorTargetRoot(expressionTokenArray,0,-2,1);
+	resetForOperatorTargetRoot();
+	generateOperatorTargetRoot(0,-2,1);
 	
 	if (doClearPreviousExpressions){
 		clearPreviousExpressions();
 	}
 	
-	int16_t rootIndex = generateExpressionTree(expressionTokenArray);
+	int16_t rootIndex = generateExpressionTree();
 
 #ifdef COMPILE_EXP_DEBUG_PRINTOUT
 	
 	printf("  Operation on tokens completed (3/3). Full results follow:\n");
-	for (int32_t i=0;i<expressionTokenArray.length;i++){
+	for (int16_t i=0;i<expressionTokenArray.length;i++){
 		char *tokenStringContents = copyStringSegmentToHeap(
 		sourceContainer.string,
-		expressionTokenArray.expressionTokens[i].tokenStart,
-		expressionTokenArray.expressionTokens[i].tokenEnd);
-		ExpressionToken token = expressionTokenArray.expressionTokens[i];
+		expressionTokenArray.tokens[i].tokenStart,
+		expressionTokenArray.tokens[i].tokenEnd);
+		ExpressionToken token = expressionTokenArray.tokens[i];
 		printf("    Token %3d has precedence %2d:%2d:%2d, catagory %2d, operatorTargetRoot %3d, isOperator %1d , nextWithPrecMatch %3d, and contents \"%s\"\n",
 			i,
 			token.precedenceTotal,
@@ -1690,7 +1705,6 @@ int16_t buildExpressionTreeToGlobalBufferAndReturnRootIndex(int32_t startIndexIn
 	printf("\n  End of printout for this expression.\n\n");
 #endif
 
-	cosmic_free(expressionTokenArray.expressionTokens);
 	genAllPreWalkData(rootIndex);
 	return rootIndex;
 }

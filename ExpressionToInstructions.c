@@ -1690,11 +1690,11 @@ void applyOperator(ExpressionTreeNode* thisNode){
 		break;
 		case 19:{
 			if (operatorTypeID==1){
-				ib_core0=&ib_i_32div_s_s;
+				ib_core0=&ib_intrinsic_front_i_32div_s_s;
 			} else if (operatorTypeID==2){
 				ib_core0=&ib_i_16div_s_s;				
 			} else if (operatorTypeID==3){
-				ib_core0=&ib_i_32div_u_u;
+				ib_core0=&ib_intrinsic_front_i_32div_u_u;
 			} else {
 				ib_core0=&ib_i_16div_u_u;
 			}
@@ -1703,11 +1703,11 @@ void applyOperator(ExpressionTreeNode* thisNode){
 		break;
 		case 20:{
 			if (operatorTypeID==1){
-				ib_core0=&ib_i_32mod_s_s;
+				ib_core0=&ib_intrinsic_front_i_32mod_s_s;
 			} else if (operatorTypeID==2){
 				ib_core0=&ib_i_16mod_s_s;
 			} else if (operatorTypeID==3){
-				ib_core0=&ib_i_32mod_u_u;
+				ib_core0=&ib_intrinsic_front_i_32mod_u_u;
 			} else {
 				ib_core0=&ib_i_16mod_u_u;
 			}
@@ -1742,13 +1742,13 @@ void applyOperator(ExpressionTreeNode* thisNode){
 			} else {
 				tripleMergeIB(ib,ibLeft,ibRight,&ib_i_32sub);
 				insert_IB_load_dword(ib,extraVal);
-				singleMergeIB(ib,&ib_i_32div_u_u);
+				singleMergeIB(ib,&ib_intrinsic_front_i_32div_u_u);
 			}
 		}
 		break;
 		case 23:{
 			if (operatorTypeID==1){
-				ib_core0=&ib_Lshift32;
+				ib_core0=&ib_intrinsic_front_Lshift32;
 			} else {
 				ib_core0=&ib_Lshift16;				
 			}
@@ -1757,7 +1757,7 @@ void applyOperator(ExpressionTreeNode* thisNode){
 		break;
 		case 24:{
 			if (operatorTypeID==1){
-				ib_core0=&ib_Rshift32;
+				ib_core0=&ib_intrinsic_front_Rshift32;
 			} else {
 				ib_core0=&ib_Rshift16;				
 			}
@@ -2129,7 +2129,7 @@ void applyOperator(ExpressionTreeNode* thisNode){
 			dualMergeIB(ib,ibRight,ibLeft);
 			switch (operatorTypeID){
 				case 1:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32div_s_s,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
+					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32div_s_s,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
 				}
 				break;
 				case 2:{
@@ -2141,7 +2141,7 @@ void applyOperator(ExpressionTreeNode* thisNode){
 				}
 				break;
 				case 4:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32div_u_u,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
+					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32div_u_u,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
 				}
 				break;
 				case 5:{
@@ -2153,7 +2153,7 @@ void applyOperator(ExpressionTreeNode* thisNode){
 				}
 				break;
 				case 7:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32div_s_s,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
+					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32div_s_s,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
 				}
 				break;
 				case 8:{
@@ -2165,7 +2165,7 @@ void applyOperator(ExpressionTreeNode* thisNode){
 				}
 				break;
 				case 10:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32div_u_u,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
+					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32div_u_u,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
 				}
 				break;
 				case 11:{
@@ -2185,7 +2185,7 @@ void applyOperator(ExpressionTreeNode* thisNode){
 			dualMergeIB(ib,ibRight,ibLeft);
 			switch (operatorTypeID){
 				case 1:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32mod_s_s,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
+					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32mod_s_s,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
 				}
 				break;
 				case 2:{
@@ -2197,7 +2197,7 @@ void applyOperator(ExpressionTreeNode* thisNode){
 				}
 				break;
 				case 4:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32mod_u_u,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
+					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32mod_u_u,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
 				}
 				break;
 				case 5:{
@@ -2209,7 +2209,7 @@ void applyOperator(ExpressionTreeNode* thisNode){
 				}
 				break;
 				case 7:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32mod_s_s,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
+					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32mod_s_s,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
 				}
 				break;
 				case 8:{
@@ -2221,7 +2221,7 @@ void applyOperator(ExpressionTreeNode* thisNode){
 				}
 				break;
 				case 10:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32mod_u_u,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
+					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32mod_u_u,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
 				}
 				break;
 				case 11:{

@@ -28,13 +28,14 @@ enum InstructionBufferCoreEntryType{
 	IB_i_16div_s_s, // int divide  16 bits wide, both signed
 	IB_i_16mod_s_s, // int modulus 16 bits wide, both signed
 	
-	IB_i_32div_u_u, // int divide  32 bits wide, both unsigned
-	IB_i_32mod_u_u, // int modulus 32 bits wide, both unsigned
-	IB_i_32div_s_s, // int divide  32 bits wide, both signed
-	IB_i_32mod_s_s, // int modulus 32 bits wide, both signed
+	IB_intrinsic_front_i_32div_u_u, // int divide  32 bits wide, both unsigned
+	IB_intrinsic_front_i_32mod_u_u, // int modulus 32 bits wide, both unsigned
+	IB_intrinsic_front_i_32div_s_s, // int divide  32 bits wide, both signed
+	IB_intrinsic_front_i_32mod_s_s, // int modulus 32 bits wide, both signed
 	
 	// float, double, and long double would make sense to go here as things like "IB_f_add" for 'float add' and "IB_ld_mul" for 'long double multiply'
 	// we would also need conversions between float, double, and long double
+	// long double will be represented as double internally
 	
 	// sign does not matter for equality
 	IB_comp_eq_int,   // int  == int
@@ -77,9 +78,9 @@ enum InstructionBufferCoreEntryType{
 	IB_logic_or_with_jmp,  // logical or  with short circuited jump
 	
 	/*
-	Currently, logical operations without a jump are unused.
+	Currently, logical operations without a jump are unused, and not made.
 	logical operations without a jump do not need initialization
-	logical operations without a jump are only to be used in situations where evaluating the right operand has the following constraints:
+	logical operations without a jump could only to be used in situations where evaluating the right operand has the following constraints:
 	 1. evaluation requires a small amount of calculation
 	 2. evaluation produces no side effects (such as function calls)
 	 3.	evaluation only accesses local variables (no memory read/write except for memory reads only inside the local stack space)
@@ -186,9 +187,18 @@ enum InstructionBufferCoreEntryType{
 	// they will take the left operand pushed first, and the size indicated is the size of the left operand. The right operand is always 1 word (2 bytes)
 	IB_Lshift16,
 	IB_Rshift16,
-	IB_Lshift32,
-	IB_Rshift32
-	
+	IB_intrinsic_front_Lshift32,
+	IB_intrinsic_front_Rshift32,
+
+
+
+	// these are the backend of the intrinsics
+	IB_intrinsic_back_i_32div_u_u,
+	IB_intrinsic_back_i_32mod_u_u,
+	IB_intrinsic_back_i_32div_s_s,
+	IB_intrinsic_back_i_32mod_s_s,
+	IB_intrinsic_back_Lshift32,
+	IB_intrinsic_back_Rshift32,
 	
 };
 

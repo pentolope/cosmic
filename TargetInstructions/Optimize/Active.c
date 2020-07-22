@@ -393,7 +393,7 @@ sanityCheck(ib);
 					writeIS.arg.BW.a_1=cv0-cv1;
 					break;
 					case I_SUBC:
-					writeIS.arg.BW.a_1=(((uint32_t)cv0-(uint32_t)cv1)&(uint32_t)0x00010000lu)!=0u;
+					writeIS.arg.BW.a_1=(((uint32_t)cv0+(~(uint32_t)cv1&0xFFFFu)+1u)&(uint32_t)0x00010000lu)!=0u;
 					break;
 					case I_SHFT:
 					writeIS.arg.BW.a_1=cv0>>1;
@@ -417,7 +417,7 @@ sanityCheck(ib);
 					writeIS.id=I_RL2_;
 					writeIS.arg.BBD.a_0=II.regOUT[1];
 					writeIS.arg.BBD.a_1=II.regOUT[0];
-					writeIS.arg.BBD.a_2=(uint32_t)cv0+(uint32_t)cv1+(uint32_t)((~cv2)&0xFFFFu);
+					writeIS.arg.BBD.a_2=(uint32_t)cv0+(uint32_t)cv1+(~(uint32_t)cv2&0xFFFFu);
 					writeIS.arg.BBD.a_2=((uint32_t)((writeIS.arg.BBD.a_2&(uint32_t)0x00030000lu)!=0u)<<16)|(writeIS.arg.BBD.a_2&0xFFFFu); // this step ensures that the value is calculated exactly.
 					break;
 					case I_MULL:
@@ -776,15 +776,16 @@ sanityCheck(ib);
 					uint32_t upperRenameBound;
 					if (findRegRenameBoundaryFromOrigin(ib,i0,rTo,&upperRenameBound)){
 						//printf("{mov calling doRegRename at place 1 start}\n");
-						if (wouldRegRenameViolateMultiOutputLaw(ib,i0,upperRenameBound,rTo,rFrom)) {makeColor(COLOR_TO_TEXT,COLOR_RED);makeColor(COLOR_TO_BACKGROUND,COLOR_CYAN);printf("WARNING: THIS WILL BE WRONG!\n");resetColor();exit(1);}
-						doRegRename(ib,i0,upperRenameBound,rTo,rFrom);
-						//printf("{mov calling doRegRename at place 1 end}\n");
-						IS_i0->id=I_NOP_; // do not need this mov instruction anymore, it is moving to the same register it is coming from
+						if (!wouldRegRenameViolateMultiOutputLaw(ib,i0,upperRenameBound,rTo,rFrom)) {
+							doRegRename(ib,i0,upperRenameBound,rTo,rFrom);
+							//printf("{mov calling doRegRename at place 1 end}\n");
+							IS_i0->id=I_NOP_; // do not need this mov instruction anymore, it is moving to the same register it is coming from
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
-						didSucceedAtLeastOnce=true;
-						didThisReduceSucceed=true;
+							didSucceedAtLeastOnce=true;
+							didThisReduceSucceed=true;
+						}
 					}
 				}
 				if (!isFromUsed & !didThisReduceSucceed){
@@ -827,18 +828,19 @@ sanityCheck(ib);
 					}
 					if (!didFindFailingUsage){
 						//printf("{mov calling doRegRename at place 3 start}\n");
-						if (wouldRegRenameViolateMultiOutputLaw(ib,backwardsRenameStart,i0,rFrom,rTo)) {makeColor(COLOR_TO_TEXT,COLOR_RED);makeColor(COLOR_TO_BACKGROUND,COLOR_CYAN);printf("WARNING: THIS WILL BE WRONG!\n");resetColor();exit(1);}
-						doRegRename(ib,backwardsRenameStart,i0,rFrom,rTo);
+						if (!(didFindFailingUsage=wouldRegRenameViolateMultiOutputLaw(ib,backwardsRenameStart,i0,rFrom,rTo))){
+							doRegRename(ib,backwardsRenameStart,i0,rFrom,rTo);
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
-						IS_i0->id=I_NOP_; // do not need this mov instruction anymore, it is moving to the same register it is coming from
+							IS_i0->id=I_NOP_; // do not need this mov instruction anymore, it is moving to the same register it is coming from
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
-						//printf("{mov calling doRegRename at place 3 end}\n");
-						didSucceedAtLeastOnce=true;
-						didThisReduceSucceed=true;
+							//printf("{mov calling doRegRename at place 3 end}\n");
+							didSucceedAtLeastOnce=true;
+							didThisReduceSucceed=true;
+						}
 					}
 				}
 				if (!didThisReduceSucceed){

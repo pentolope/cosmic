@@ -20,7 +20,7 @@ struct GlobalSDL_Information{
 	SDL_Window* window;
 	SDL_Surface* surfaceOnWindow;
 	SDL_Event event;
-	const struct WindowSize{
+	const struct {
 		uint16_t width;
 		uint16_t height;
 		uint16_t sizeOfUnit;
@@ -28,6 +28,7 @@ struct GlobalSDL_Information{
 	uint8_t* pixelState;
 	uint16_t eventPullCountdown;
 	bool isSLD_initialized;
+	bool hasPixelBeenWritten;
 } globalSDL_Information = {.windowSize = {320,200,3},.eventPullCountdown=1};
 
 
@@ -78,12 +79,16 @@ void performTraceback(uint64_t);
 noreturn void bye(void){
 	printf("\nTotal instructions executed:%llu\n",(unsigned long long)instructionExecutionCount);
 	if (globalSDL_Information.isSLD_initialized){
-		if (globalSDL_Information.event.type != SDL_QUIT){
-			printf("Waiting for quit event from SDL...\n");
-			do {
-				Sleep(10);
-				SDL_PollEvent(&globalSDL_Information.event);
-			} while (globalSDL_Information.event.type != SDL_QUIT);
+		if (globalSDL_Information.hasPixelBeenWritten){
+			if (globalSDL_Information.event.type != SDL_QUIT){
+				printf("Waiting for SDL_QUIT event...\n");
+				do {
+					Sleep(15);
+					SDL_PollEvent(&globalSDL_Information.event);
+				} while (globalSDL_Information.event.type != SDL_QUIT);
+			}
+		} else {
+			printf("All pixels never left the initialized state. Therefore not waiting for SDL_QUIT event.\n");
 		}
 		SDL_Quit();
 	}
@@ -94,6 +99,7 @@ noreturn void bye(void){
 void writePixelToScreenWithSDL(uint16_t a, uint8_t c){
 	if (a<(uint32_t)globalSDL_Information.windowSize.width*globalSDL_Information.windowSize.height && globalSDL_Information.pixelState[a]!=c){
 		globalSDL_Information.pixelState[a]=c;
+		globalSDL_Information.hasPixelBeenWritten=true;
 		const uint8_t r=(255u/7u)*(7u&(unsigned)c/32u)+1u;
 		const uint8_t g=(255u/7u)*(7u&(unsigned)c/4u)+1u;
 		const uint8_t b=(255u/3u)*(3u&(unsigned)c);
@@ -384,12 +390,12 @@ void singleExecute(){
 		machineState->ieCountAtSetReg[15]=instructionExecutionCount;
 		break;
 		case 0x0C:
-		temp=(uint32_t)machineState->reg[r1]+~((uint32_t)machineState->reg[r2])+(uint32_t)1;
+		temp=(uint32_t)machineState->reg[r1]+(~(uint32_t)machineState->reg[r2]&0xFFFFu)+(uint32_t)1;
 		machineState->reg[r0]=(uint16_t)temp;
 		machineState->ieCountAtSetReg[r0]=instructionExecutionCount;
 		break;
 		case 0x0D:
-		temp=(uint32_t)machineState->reg[r1]+~((uint32_t)machineState->reg[r2])+(uint32_t)1;
+		temp=(uint32_t)machineState->reg[r1]+(~(uint32_t)machineState->reg[r2]&0xFFFFu)+(uint32_t)1;
 		machineState->reg[r0]=(temp&0x00010000)!=0;
 		machineState->ieCountAtSetReg[r0]=instructionExecutionCount;
 		break;
@@ -534,6 +540,31 @@ uint32_t getLabelAddress(uint32_t labelToSearch,uint32_t labelTotal,uint32_t* la
 	bye();
 }
 
+uint16_t getIntrinsicID(enum InstructionTypeID id){
+	switch (id){
+		case I_D32U:return 0x01;
+		case I_R32U:return 0x02;
+		case I_D32S:return 0x03;
+		case I_R32S:return 0x04;
+		case I_D64U:return 0x05;
+		case I_R64U:return 0x06;
+		case I_D64S:return 0x07;
+		case I_R64S:return 0x08;
+		case I_LAD4:return 0x09;
+		case I_LAD5:return 0x0A;
+		case I_LSU4:return 0x0B;
+		case I_LSU5:return 0x0C;
+		case I_LMU4:return 0x0D;
+		case I_LMU5:return 0x0E;
+		case I_LDI4:return 0x0F;
+		case I_LDI5:return 0x10;
+		case I_LLS6:return 0x11;
+		case I_LLS7:return 0x12;
+		case I_LRS6:return 0x13;
+		case I_LRS7:return 0x14;
+	}
+	return 0;
+}
 
 int main(int argc, char** argv){
 	if (argc<2){
@@ -578,12 +609,41 @@ int main(int argc, char** argv){
 	
 	InstructionBuffer allData;
 	initInstructionBuffer(&allData);
-	//if (!printEachInstruction) quadMergeIB(&allData,&ib_internal_div32_s_s,&ib_internal_div32_u_u,&ib_internal_mod32_s_s,&ib_internal_mod32_u_u);
-	dualMergeIB(&allData,&binContainer.functions,&binContainer.staticData);
+	singleMergeIB(&allData,&binContainer.functions);
 	//printInstructionBufferWithMessageAndNumber(&binContainer.functions,"functions:",allData.numberOfSlotsTaken);
 	//printInstructionBufferWithMessageAndNumber(&binContainer.staticData,"staticData:",allData.numberOfSlotsTaken);
 	destroyInstructionBuffer(&binContainer.functions);
+	{
+	bool doesHaveIntrinsic[0x1F]={0};
+	for (uint32_t i=0;i<allData.numberOfSlotsTaken;i++){
+		switch (allData.buffer[i].id){
+			case I_D32U:if (!doesHaveIntrinsic[0x01]) singleMergeIB(&allData,&ib_intrinsic_back_div32_u_u);doesHaveIntrinsic[0x01]=1;break;
+			case I_R32U:if (!doesHaveIntrinsic[0x02]) singleMergeIB(&allData,&ib_intrinsic_back_mod32_u_u);doesHaveIntrinsic[0x02]=1;break;
+			case I_D32S:if (!doesHaveIntrinsic[0x03]) singleMergeIB(&allData,&ib_intrinsic_back_div32_s_s);doesHaveIntrinsic[0x03]=1;break;
+			case I_R32S:if (!doesHaveIntrinsic[0x04]) singleMergeIB(&allData,&ib_intrinsic_back_mod32_s_s);doesHaveIntrinsic[0x04]=1;break;
+			case I_LLS6:if (!doesHaveIntrinsic[0x11]) singleMergeIB(&allData,&ib_intrinsic_back_Lshift32);doesHaveIntrinsic[0x11]=1;break;
+			case I_LRS6:if (!doesHaveIntrinsic[0x13]) singleMergeIB(&allData,&ib_intrinsic_back_Rshift32);doesHaveIntrinsic[0x13]=1;break;
+			case I_D64U: //if (!doesHaveIntrinsic[0x05]) singleMergeIB(&allData,&ib_intrinsic_back_div64_u_u);doesHaveIntrinsic[0x05]=1;break;
+			case I_R64U: //if (!doesHaveIntrinsic[0x06]) singleMergeIB(&allData,&ib_intrinsic_back_mod64_u_u);doesHaveIntrinsic[0x06]=1;break;
+			case I_D64S: //if (!doesHaveIntrinsic[0x07]) singleMergeIB(&allData,&ib_intrinsic_back_div64_s_s);doesHaveIntrinsic[0x07]=1;break;
+			case I_R64S: //if (!doesHaveIntrinsic[0x08]) singleMergeIB(&allData,&ib_intrinsic_back_mod64_s_s);doesHaveIntrinsic[0x08]=1;break;
+			case I_LAD4: //if (!doesHaveIntrinsic[0x09]) singleMergeIB(&allData,&ib_intrinsic_back_);doesHaveIntrinsic[0x09]=1;break;
+			case I_LAD5: //if (!doesHaveIntrinsic[0x0A]) singleMergeIB(&allData,&ib_intrinsic_back_);doesHaveIntrinsic[0x0A]=1;break;
+			case I_LSU4: //if (!doesHaveIntrinsic[0x0B]) singleMergeIB(&allData,&ib_intrinsic_back_);doesHaveIntrinsic[0x0B]=1;break;
+			case I_LSU5: //if (!doesHaveIntrinsic[0x0C]) singleMergeIB(&allData,&ib_intrinsic_back_);doesHaveIntrinsic[0x0C]=1;break;
+			case I_LMU4: //if (!doesHaveIntrinsic[0x0D]) singleMergeIB(&allData,&ib_intrinsic_back_);doesHaveIntrinsic[0x0D]=1;break;
+			case I_LMU5: //if (!doesHaveIntrinsic[0x0E]) singleMergeIB(&allData,&ib_intrinsic_back_);doesHaveIntrinsic[0x0E]=1;break;
+			case I_LDI4: //if (!doesHaveIntrinsic[0x0F]) singleMergeIB(&allData,&ib_intrinsic_back_);doesHaveIntrinsic[0x0F]=1;break;
+			case I_LDI5: //if (!doesHaveIntrinsic[0x10]) singleMergeIB(&allData,&ib_intrinsic_back_);doesHaveIntrinsic[0x10]=1;break;
+			case I_LRS7: //if (!doesHaveIntrinsic[0x14]) singleMergeIB(&allData,&ib_intrinsic_back_);doesHaveIntrinsic[0x14]=1;break;
+			case I_LLS7: //if (!doesHaveIntrinsic[0x12]) singleMergeIB(&allData,&ib_intrinsic_back_);doesHaveIntrinsic[0x12]=1;break;
+			printf("Backend not ready for that instruction\n");
+			bye();
+		}
+	}
+	singleMergeIB(&allData,&binContainer.staticData);
 	destroyInstructionBuffer(&binContainer.staticData);
+	}
 	uint32_t labelCount=0;
 	uint32_t labelTotal;
 	for (uint32_t i=0;i<allData.numberOfSlotsTaken;i++){
@@ -631,71 +691,46 @@ int main(int argc, char** argv){
 	}
 	uint32_t storageSize=storageAddress;
 	{
-	uint32_t D32U_label_address=0x04000000;
-	uint32_t R32U_label_address=0x04000000;
-	uint32_t D32S_label_address=0x04000000;
-	uint32_t R32S_label_address=0x04000000;
-	for (uint32_t i=0;i<labelTotal;i++){
-		if (labelNames[i]<=4){
-			uint32_t v=labelAddresses[i];
-			switch (labelNames[i]){
-				case 0:printf("NULL label is invalid\n");bye();
-				case 1:D32U_label_address=v;break;
-				case 2:R32U_label_address=v;break;
-				case 3:D32S_label_address=v;break;
-				case 4:R32S_label_address=v;break;
-			}
-		}
-	}
 	uint16_t func_stack_size;
 	uint8_t func_stack_initial;
 	uint8_t* temporaryStorageBuffer=cosmic_calloc(storageAddress,sizeof(uint8_t));
 	uint8_t* temporaryStorageBufferWalk=temporaryStorageBuffer+(1LU<<16);
 	for (uint32_t i=0;i<allData.numberOfSlotsTaken;i++){
 		InstructionSingle IS=allData.buffer[i];
+		uint16_t intrinsicID=getIntrinsicID(IS.id);
 		uint32_t symVal;
-		switch (IS.id){
-			case I_FCST:
-			func_stack_initial=IS.arg.BWD.a_0;
-			func_stack_size=IS.arg.BWD.a_1;
-			break;
-			case I_D32U:symVal=D32U_label_address;break;
-			case I_R32U:symVal=R32U_label_address;break;
-			case I_D32S:symVal=D32S_label_address;break;
-			case I_R32S:symVal=R32S_label_address;break;
-			case I_JTEN:
-			symVal=getLabelAddress(IS.arg.D.a_0,labelTotal,labelNames,labelAddresses);
-			break;
-			case I_SYRD:
-			case I_SYDD:
-			{
-			InstructionSingle IS_temp0=allData.buffer[i+1];
-			InstructionSingle IS_temp1=allData.buffer[i+2];
-			if (IS_temp0.id!=I_SYCL | (IS_temp1.id!=I_SYRE & IS_temp1.id!=I_SYDE)){
+		if (intrinsicID!=0){
+			symVal=getLabelAddress(intrinsicID,labelTotal,labelNames,labelAddresses);
+		} else {
+			switch (IS.id){
+				case I_FCST:
+				func_stack_initial=IS.arg.BWD.a_0;
+				func_stack_size=IS.arg.BWD.a_1;
+				break;
+				case I_JTEN:
+				symVal=getLabelAddress(IS.arg.D.a_0,labelTotal,labelNames,labelAddresses);
+				break;
+				case I_SYRD:
+				case I_SYDD:
+				{
+				InstructionSingle IS_temp0=allData.buffer[i+1];
+				InstructionSingle IS_temp1=allData.buffer[i+2];
+				if (IS_temp0.id!=I_SYCL | (IS_temp1.id!=I_SYRE & IS_temp1.id!=I_SYDE)){
+					printf("I don't wanna do that yet...");
+					bye();
+				}
+				symVal=getLabelAddress(IS_temp0.arg.D.a_0,labelTotal,labelNames,labelAddresses);
+				}
+				break;
+				case I_SYDB:
+				case I_SYRB:
+				case I_SYRW:
+				case I_SYDW:
+				case I_SYRQ:
+				case I_SYDQ:
 				printf("I don't wanna do that yet...");
 				bye();
-			}
-			symVal=getLabelAddress(IS_temp0.arg.D.a_0,labelTotal,labelNames,labelAddresses);
-			}
-			break;
-			case I_SYDB:
-			case I_SYRB:
-			case I_SYRW:
-			case I_SYDW:
-			case I_SYRQ:
-			case I_SYDQ:
-			printf("I don't wanna do that yet...");
-			bye();
-			default:;
-		}
-		switch (IS.id){
-			case I_D32U:
-			case I_R32U:
-			case I_D32S:
-			case I_R32S:
-			if (symVal==0x04000000){
-				printf("Error: div32 components not linked put were needed\n");
-				bye();
+				default:;
 			}
 		}
 		backendInstructionWrite(&temporaryStorageBufferWalk,symVal,func_stack_size,func_stack_initial,IS);
