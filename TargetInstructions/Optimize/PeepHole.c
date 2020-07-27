@@ -1,6 +1,6 @@
 
 
-#define PH_VTEP_COUNT 49 // number of peephole templates
+#define PH_VTEP_COUNT 44 // number of peephole templates
 #define PH_VTEP_MAX_SYM_CONST 3 // maxiumum number of symbolic constants
 #define PH_VTEP_MAX_IDEN 1 // maxiumum iden value in templates
 #define PH_VTEP_MAX_DEPTH 5 // maxiumum (potentially UNSAFE) depth of VTE
@@ -151,46 +151,6 @@ const ValueTraceEntry VTE_arr_03[] = {
   {I_DEPL,0xB0},
   {I_RL1_,0x30,.cv=0},
  {I_RL1_,0x30,.cv=0}
-};
-
-const ValueTraceEntry VTE_arr_04[] = {
-{I_XOR_,0x20},
- {I_XOR_,0x28},
-  {I_PEPH,0x60},{I_RL1_,0x40,.cv=0},
-  {I_PEPH,0x60},{I_DEPL,0xB0},
- {I_PEPH,0x60},{I_RL1_,0x40,.cv=1}
-};
-
-const ValueTraceEntry VTE_arr_05[] = {
-{I_AND_,0x20},
- {I_AND_,0x28},
-  {I_PEPH,0x60},{I_RL1_,0x40,.cv=0},
-  {I_PEPH,0x60},{I_DEPL,0xB0},
- {I_PEPH,0x60},{I_RL1_,0x40,.cv=1}
-};
-
-const ValueTraceEntry VTE_arr_06[] = {
-{I_OR__,0x20},
- {I_OR__,0x28},
-  {I_PEPH,0x60},{I_RL1_,0x40,.cv=0},
-  {I_PEPH,0x60},{I_DEPL,0xB0},
- {I_PEPH,0x60},{I_RL1_,0x40,.cv=1}
-};
-
-const ValueTraceEntry VTE_arr_07[] = {
-{I_ADDN,0x20},
- {I_ADDN,0x28},
-  {I_PEPH,0x60},{I_RL1_,0x40,.cv=0},
-  {I_PEPH,0x60},{I_DEPL,0xB0},
- {I_PEPH,0x60},{I_RL1_,0x40,.cv=1}
-};
-
-const ValueTraceEntry VTE_arr_08[] = {
-{I_MULS,0x20},
- {I_MULS,0x28},
-  {I_PEPH,0x60},{I_RL1_,0x40,.cv=0},
-  {I_PEPH,0x60},{I_DEPL,0xB0},
- {I_PEPH,0x60},{I_RL1_,0x40,.cv=1}
 };
 
 const ValueTraceEntry VTE_arr_09[] = { // this transformation is not always valid! if the result of the multiplication is larger then a word, then there will be different behavior.
@@ -484,13 +444,6 @@ const ValueTraceEntry VTE_arr_25[] = {
 
 
 
-
-
-
-
-
-
-
 const ValueTraceEntry VTE_arr_79[] = {
 {I_OR__,0x20},
  {I_SSUB,0x24},
@@ -650,11 +603,7 @@ ValueTraceEntriesPacket VTEP_arr[PH_VTEP_COUNT] = {
 {0,0,0,0,VTE_arr_01},
 {0,0,0,0,VTE_arr_02},
 {0,0,0,0,VTE_arr_03},
-{0,1,2,0,VTE_arr_04},
-{0,1,2,0,VTE_arr_05},
-{0,1,2,0,VTE_arr_06},
-{0,1,2,0,VTE_arr_07},
-{0,1,2,0,VTE_arr_08},
+
 {0,3,2,5,NULL}, // for VTE_arr_09 when I make a way to check for validity
 {0,0,0,0,VTE_arr_0A},
 {0,2,0,1,VTE_arr_0B,IIP_arr_0B},

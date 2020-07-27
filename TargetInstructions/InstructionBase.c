@@ -299,18 +299,20 @@ uint32_t backendInstructionSize(const InstructionSingle IS){
 		case I_JTEN:
 		case I_SYDD:
 		case I_DWRD:
-		case I_LAD1:
-		case I_LAD2:
 		return 4;
 		case I_STPA:
 		case I_ALOC:
 		case I_LAD0:
+		case I_LAD1:
+		case I_LAD2:
 		case I_LSU0:
 		return 6;
 		case I_RL2_:
 		case I_SYRD:
 		case I_SYDQ:
 		return 8;
+		case I_LAD3:
+		return 10;
 		case I_D32U:
 		case I_R32U:
 		case I_D32S:
@@ -334,11 +336,11 @@ uint32_t backendInstructionSize(const InstructionSingle IS){
 		return 14;
 		case I_SYRQ:
 		return 16;
+		
 		case I_ALCR:return 4u+(((unsigned)IS.arg.BW.a_1&0xFF00u)!=0u)*2u;
 		case I_STOF:return 8u+(((unsigned)IS.arg.BW.a_1&0xFF00u)!=0u)*2u;
 		case I_ZNXB:return IS.arg.D.a_0;
 		
-		case I_LAD3:
 		case I_LSU3:
 		case I_LMU3:
 		assert(false);// backend not ready for those instructions yet
@@ -561,19 +563,13 @@ void backendInstructionWrite(uint8_t** byte,uint32_t symVal,uint16_t func_stack_
 		}
 		return;
 		case I_LAD0:
+		*((*byte)++)=0xFu;*((*byte)++)=0;
 		*((*byte)++)=(((unsigned)IS.arg.B6.a_2&0xFu)<<4)|((unsigned)IS.arg.B6.a_0&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B6.a_4&0xFu);
-		bh.id=I_ADDN;
-		bh.arg.B3.a_0=IS.arg.B6.a_1;
-		bh.arg.B3.a_1=IS.arg.B6.a_3;
-		bh.arg.B3.a_2=IS.arg.B6.a_5;
-		backendInstructionWrite(byte,0,0,0,bh);
-		bh.id=I_ADDN;
-		bh.arg.B3.a_0=IS.arg.B6.a_1;
-		bh.arg.B3.a_1=IS.arg.B6.a_1;
-		bh.arg.B3.a_2=15;
-		backendInstructionWrite(byte,0,0,0,bh);
+		*((*byte)++)=(((unsigned)IS.arg.B6.a_3&0xFu)<<4)|((unsigned)IS.arg.B6.a_1&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B6.a_5&0xFu);
+		//Explanation: *((*byte)++)=(((unsigned) r1 &0xFu)<<4)|((unsigned) r0 &0xFu);*((*byte)++)=0xB0u|((unsigned) r2 &0xFu);
 		return;
 		case I_LAD1:
+		*((*byte)++)=0xFu;*((*byte)++)=0;
 		*((*byte)++)=(((unsigned)IS.arg.B5.a_2&0xFu)<<4)|((unsigned)IS.arg.B5.a_0&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B5.a_4&0xFu);
 		bh.id=I_ADDN;
 		bh.arg.B3.a_0=IS.arg.B5.a_1;
@@ -582,6 +578,7 @@ void backendInstructionWrite(uint8_t** byte,uint32_t symVal,uint16_t func_stack_
 		backendInstructionWrite(byte,0,0,0,bh);
 		return;
 		case I_LAD2:
+		*((*byte)++)=0xFu;*((*byte)++)=0;
 		*((*byte)++)=(((unsigned)IS.arg.B4.a_2&0xFu)<<4)|((unsigned)IS.arg.B4.a_0&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B4.a_3&0xFu);
 		bh.id=I_MOV_;
 		bh.arg.B2.a_0=IS.arg.B4.a_1;
@@ -603,6 +600,13 @@ void backendInstructionWrite(uint8_t** byte,uint32_t symVal,uint16_t func_stack_
 		bh.arg.B3.a_1=IS.arg.B4.a_1;
 		bh.arg.B3.a_2=IS.arg.B4.a_3;
 		backendInstructionWrite(byte,0,0,0,bh);
+		return;
+		case I_LAD3:
+		*((*byte)++)=0xFu;*((*byte)++)=0;
+		*((*byte)++)=(((unsigned)IS.arg.B8.a_0&0xFu)<<4)|((unsigned)IS.arg.B8.a_0&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B8.a_4&0xFu);
+		*((*byte)++)=(((unsigned)IS.arg.B8.a_1&0xFu)<<4)|((unsigned)IS.arg.B8.a_1&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B8.a_5&0xFu);
+		*((*byte)++)=(((unsigned)IS.arg.B8.a_2&0xFu)<<4)|((unsigned)IS.arg.B8.a_2&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B8.a_6&0xFu);
+		*((*byte)++)=(((unsigned)IS.arg.B8.a_3&0xFu)<<4)|((unsigned)IS.arg.B8.a_3&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B8.a_7&0xFu);
 		return;
 		default:;
 	}

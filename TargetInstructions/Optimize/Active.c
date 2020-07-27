@@ -213,7 +213,6 @@ sanityCheck(ib);
 
 
 
-
 bool attemptConstOpt(InstructionBuffer* ib){
 #ifdef OPT_DEBUG_CONST
 printInstructionBufferWithMessageAndNumber(ib,"starting const opt",0);
@@ -221,10 +220,10 @@ printInstructionBufferWithMessageAndNumber(ib,"starting const opt",0);
 	bool didSucceedAtLeastOnce_0=false;
 	bool didSucceedAtLeastOnce_1=false;
 	bool isQuickEndTriggered=false;
+	uint32_t i;
 	while (true){
 		didSucceedAtLeastOnce_0|=didSucceedAtLeastOnce_1;
 		didSucceedAtLeastOnce_1=false;
-		uint32_t i;
 		InstructionSingle* buffer=ib->buffer;
 		InstructionInformation II;
 		{
@@ -242,13 +241,16 @@ printInstructionBufferWithMessageAndNumber(ib,"starting const opt",0);
 			isRegValueUnused[12]=1;
 			isRegValueUnused[13]=1;
 			isRegValueUnused[14]=1;
+			// isRegValueUnused[15] doesn't matter
+			isRegValueUnused[16]=1;
 			i=ib->numberOfSlotsTaken;
 			while (i--!=0){
+				InstructionSingle writeIS;
 				UnusedResultLoopStart:
 				fillInstructionInformation(&II,ib,i);
 				if (II.isSymbolicInternal | II.id==I_NOP_) continue;
+				isRegValueUnused[16]=1;
 				if (II.regIN[0]==II.regIN[1] & II.regIN[0]!=16){
-					InstructionSingle writeIS;
 					if (II.id==I_XOR_){
 						writeIS.id=I_BL1_;
 						writeIS.arg.B2.a_0=II.regOUT[0];
@@ -262,20 +264,41 @@ printInstructionBufferWithMessageAndNumber(ib,"starting const opt",0);
 						writeIS.arg.B2.a_0=II.regOUT[0];
 						writeIS.arg.B2.a_1=II.regIN[0];
 					} else {
-						goto ExitForNoSpecial;
+						goto ExitForNoSpecial_0;
 					}
 					didSucceedAtLeastOnce_1=true;
 					buffer[i]=writeIS;
 #ifdef OPT_DEBUG_CONST
-printInstructionBufferWithMessageAndNumber(ib,"const opt by special",i);
+printInstructionBufferWithMessageAndNumber(ib,"const opt by special 0",i);
 #endif
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
 					goto UnusedResultLoopStart;
 				}
-				ExitForNoSpecial:
-				isRegValueUnused[16]=1;
+				ExitForNoSpecial_0:;
+				
+				if (!isRegValueUnused[II.regOUT[0]] & isRegValueUnused[II.regOUT[1]] & II.regOUT[1]!=16 & (II.id==I_LAD0 | II.id==I_LAD1 | II.id==I_LAD2 | II.id==I_MULL)){
+					if (II.id==I_MULL){
+						writeIS.id=I_MULS;
+						writeIS.arg.B2.a_0=13;
+						writeIS.arg.B2.a_1=II.regIN[0];
+					} else {
+						writeIS.arg.B3.a_2=II.id==I_LAD2?II.regIN[1]:II.regIN[2];
+						writeIS.id=I_ADDN;
+						writeIS.arg.B3.a_0=II.regOUT[0];
+						writeIS.arg.B3.a_1=II.regIN[0];
+					}
+					didSucceedAtLeastOnce_1=true;
+					buffer[i]=writeIS;
+#ifdef OPT_DEBUG_CONST
+printInstructionBufferWithMessageAndNumber(ib,"const opt by special 1",i);
+#endif
+#ifdef OPT_DEBUG_SANITY
+sanityCheck(ib);
+#endif
+					goto UnusedResultLoopStart;
+				}
 				bool canRemove=
 					(II.regOUT[0]!=16 & !(II.doesMoveStack | II.isMemoryAccess)) && (
 					isRegValueUnused[II.regOUT[0]] &
@@ -350,8 +373,10 @@ sanityCheck(ib);
 			isRegValueConst[14]=0;
 			bool isRegINconst[8];
 			uint16_t constVal[17]={0};
+			uint16_t partialConstApplyCount;
 			uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
-			InstructionSingle writeIS;
+			InstructionSingle writeIS_0;
+			InstructionSingle writeIS_1;
 			for (i=0;i<numberOfSlotsTaken;i++){
 				ConstifyLoopStart:
 #ifdef OPT_DEBUG_SANITY
@@ -359,23 +384,24 @@ sanityCheck(ib);
 #endif
 				fillInstructionInformation(&II,ib,i);
 				if (II.isSymbolicInternal | II.id==I_NOP_) continue;
+				// `unsigned` is used here to avoid potential promotions to signed int
 				isRegValueConst[16]=1;
 				isRegINconst[0]=isRegValueConst[II.regIN[0]];
-				uint16_t cv0=constVal[II.regIN[0]];
+				unsigned cv0=constVal[II.regIN[0]];
 				isRegINconst[1]=isRegValueConst[II.regIN[1]];
-				uint16_t cv1=constVal[II.regIN[1]];
+				unsigned cv1=constVal[II.regIN[1]];
 				isRegINconst[2]=isRegValueConst[II.regIN[2]];
-				uint16_t cv2=constVal[II.regIN[2]];
+				unsigned cv2=constVal[II.regIN[2]];
 				isRegINconst[3]=isRegValueConst[II.regIN[3]];
-				uint16_t cv3=constVal[II.regIN[3]];
+				unsigned cv3=constVal[II.regIN[3]];
 				isRegINconst[4]=isRegValueConst[II.regIN[4]];
-				uint16_t cv4=constVal[II.regIN[4]];
+				unsigned cv4=constVal[II.regIN[4]];
 				isRegINconst[5]=isRegValueConst[II.regIN[5]];
-				uint16_t cv5=constVal[II.regIN[5]];
+				unsigned cv5=constVal[II.regIN[5]];
 				isRegINconst[6]=isRegValueConst[II.regIN[6]];
-				uint16_t cv6=constVal[II.regIN[6]];
+				unsigned cv6=constVal[II.regIN[6]];
 				isRegINconst[7]=isRegValueConst[II.regIN[7]];
-				uint16_t cv7=constVal[II.regIN[7]];
+				unsigned cv7=constVal[II.regIN[7]];
 				if ((
 					isRegINconst[0] & isRegINconst[1] &
 					isRegINconst[2] & isRegINconst[3] &
@@ -384,76 +410,112 @@ sanityCheck(ib);
 					(!(II.doesMoveStack | II.isMemoryAccess) & 
 					II.id!=I_MOV_ & II.regIN[0]!=16)
 				){
-					writeIS.id=I_RL1_; writeIS.arg.BW.a_0=II.regOUT[0]; // this is typically what is needed there, otherwise it is modified
+					writeIS_0.id=I_RL1_; writeIS_0.arg.BW.a_0=II.regOUT[0]; // this is typically what is needed there, otherwise it is modified
 					switch (II.id){
 					case I_ADDN:
-					writeIS.arg.BW.a_1=cv0+cv1;
+					writeIS_0.arg.BW.a_1=cv0+cv1;
 					break;
 					case I_SUBN:
-					writeIS.arg.BW.a_1=cv0-cv1;
+					writeIS_0.arg.BW.a_1=cv0-cv1;
 					break;
 					case I_SUBC:
-					writeIS.arg.BW.a_1=(((uint32_t)cv0+(~(uint32_t)cv1&0xFFFFu)+1u)&(uint32_t)0x00010000lu)!=0u;
+					writeIS_0.arg.BW.a_1=(((uint32_t)cv0+(~(uint32_t)cv1&0xFFFFu)+1u)&(uint32_t)0x00010000lu)!=0u;
 					break;
 					case I_SHFT:
-					writeIS.arg.BW.a_1=cv0>>1;
+					writeIS_0.arg.BW.a_1=cv0>>1;
 					break;
 					case I_BSWP:
-					writeIS.arg.BW.a_1=((cv0>>8)&0x00FFu)|((cv0<<8)&0xFF00u);
+					writeIS_0.arg.BW.a_1=((cv0>>8)&0x00FFu)|((cv0<<8)&0xFF00u);
 					break;
 					case I_AND_:
-					writeIS.arg.BW.a_1=cv0&cv1;
+					writeIS_0.arg.BW.a_1=cv0&cv1;
 					break;
 					case I_OR__:
-					writeIS.arg.BW.a_1=cv0|cv1;
+					writeIS_0.arg.BW.a_1=cv0|cv1;
 					break;
 					case I_XOR_:
-					writeIS.arg.BW.a_1=cv0^cv1;
+					writeIS_0.arg.BW.a_1=cv0^cv1;
 					break;
 					case I_MULS:
-					writeIS.arg.BW.a_1=cv0*cv1;
+					writeIS_0.arg.BW.a_1=cv0*cv1;
 					break;
 					case I_SSUB:
-					writeIS.id=I_RL2_;
-					writeIS.arg.BBD.a_0=II.regOUT[1];
-					writeIS.arg.BBD.a_1=II.regOUT[0];
-					writeIS.arg.BBD.a_2=(uint32_t)cv0+(uint32_t)cv1+(~(uint32_t)cv2&0xFFFFu);
-					writeIS.arg.BBD.a_2=((uint32_t)((writeIS.arg.BBD.a_2&(uint32_t)0x00030000lu)!=0u)<<16)|(writeIS.arg.BBD.a_2&0xFFFFu); // this step ensures that the value is calculated exactly.
+					writeIS_0.id=I_RL2_;
+					writeIS_0.arg.BBD.a_0=II.regOUT[1];
+					writeIS_0.arg.BBD.a_1=II.regOUT[0];
+					writeIS_0.arg.BBD.a_2=(uint32_t)cv0+(uint32_t)cv1+(~(uint32_t)cv2&0xFFFFu);
+					writeIS_0.arg.BBD.a_2=((uint32_t)((writeIS_0.arg.BBD.a_2&(uint32_t)0x00030000lu)!=0u)<<16)|(writeIS_0.arg.BBD.a_2&0xFFFFu); // this step ensures that the value is calculated exactly.
+					break;
+					case I_LAD0:
+					writeIS_0.id=I_RL2_;
+					writeIS_0.arg.BBD.a_0=II.regOUT[0];
+					writeIS_0.arg.BBD.a_1=II.regOUT[1];
+					writeIS_0.arg.BBD.a_2=(((uint32_t)cv1<<16)|(uint32_t)cv0)+(((uint32_t)cv3<<16)|(uint32_t)cv2);
+					break;
+					case I_LAD1:
+					writeIS_0.id=I_RL2_;
+					writeIS_0.arg.BBD.a_0=II.regOUT[0];
+					writeIS_0.arg.BBD.a_1=II.regOUT[1];
+					writeIS_0.arg.BBD.a_2=(((uint32_t)cv1<<16)|(uint32_t)cv0)+(uint32_t)cv2;
+					break;
+					case I_LAD2:
+					writeIS_0.id=I_RL2_;
+					writeIS_0.arg.BBD.a_0=II.regOUT[0];
+					writeIS_0.arg.BBD.a_1=II.regOUT[1];
+					writeIS_0.arg.BBD.a_2=(uint32_t)cv0+(uint32_t)cv1;
+					break;
+					case I_LSU0:
+					writeIS_0.id=I_RL2_;
+					writeIS_0.arg.BBD.a_0=II.regOUT[0];
+					writeIS_0.arg.BBD.a_1=II.regOUT[1];
+					writeIS_0.arg.BBD.a_2=(((uint32_t)cv1<<16)|(uint32_t)cv0)-(((uint32_t)cv3<<16)|(uint32_t)cv2);
+					break;
+					case I_LLS6:
+					writeIS_0.id=I_RL2_;
+					writeIS_0.arg.BBD.a_0=II.regOUT[0];
+					writeIS_0.arg.BBD.a_1=II.regOUT[1];
+					writeIS_0.arg.BBD.a_2=(((uint32_t)cv1<<16)|(uint32_t)cv0)<<cv2;
+					break;
+					case I_LRS6:
+					writeIS_0.id=I_RL2_;
+					writeIS_0.arg.BBD.a_0=II.regOUT[0];
+					writeIS_0.arg.BBD.a_1=II.regOUT[1];
+					writeIS_0.arg.BBD.a_2=(((uint32_t)cv1<<16)|(uint32_t)cv0)>>cv2;
 					break;
 					case I_MULL:
-					writeIS.id=I_RL2_;
-					writeIS.arg.BBD.a_0=14;
-					writeIS.arg.BBD.a_1=15;
-					writeIS.arg.BBD.a_2=(((uint32_t)cv1<<16)|(uint32_t)cv0)*(((uint32_t)cv3<<16)|(uint32_t)cv2);
+					writeIS_0.id=I_RL2_;
+					writeIS_0.arg.BBD.a_0=13;
+					writeIS_0.arg.BBD.a_1=14;
+					writeIS_0.arg.BBD.a_2=(((uint32_t)cv1<<16)|(uint32_t)cv0)*(((uint32_t)cv3<<16)|(uint32_t)cv2);
 					break;
 					case I_D32U:
-					writeIS.id=I_RL2_;
-					writeIS.arg.BBD.a_0=8;
-					writeIS.arg.BBD.a_1=9;
-					writeIS.arg.BBD.a_2=(((uint32_t)cv1<<16)|(uint32_t)cv0)/(((uint32_t)cv3<<16)|(uint32_t)cv2);
+					writeIS_0.id=I_RL2_;
+					writeIS_0.arg.BBD.a_0=8;
+					writeIS_0.arg.BBD.a_1=9;
+					writeIS_0.arg.BBD.a_2=(((uint32_t)cv1<<16)|(uint32_t)cv0)/(((uint32_t)cv3<<16)|(uint32_t)cv2);
 					break;
 					case I_R32U:
-					writeIS.id=I_RL2_;
-					writeIS.arg.BBD.a_0=6;
-					writeIS.arg.BBD.a_1=7;
-					writeIS.arg.BBD.a_2=(((uint32_t)cv1<<16)|(uint32_t)cv0)%(((uint32_t)cv3<<16)|(uint32_t)cv2);
+					writeIS_0.id=I_RL2_;
+					writeIS_0.arg.BBD.a_0=6;
+					writeIS_0.arg.BBD.a_1=7;
+					writeIS_0.arg.BBD.a_2=(((uint32_t)cv1<<16)|(uint32_t)cv0)%(((uint32_t)cv3<<16)|(uint32_t)cv2);
 					break;
 					case I_D32S:
-					writeIS.id=I_RL2_;
-					writeIS.arg.BBD.a_0=8;
-					writeIS.arg.BBD.a_1=9;
-					writeIS.arg.BBD.a_2=((( int32_t)cv1<<16)|( int32_t)cv0)/((( int32_t)cv3<<16)|( int32_t)cv2);
+					writeIS_0.id=I_RL2_;
+					writeIS_0.arg.BBD.a_0=8;
+					writeIS_0.arg.BBD.a_1=9;
+					writeIS_0.arg.BBD.a_2=((( int32_t)cv1<<16)|( int32_t)cv0)/((( int32_t)cv3<<16)|( int32_t)cv2);
 					break;
 					case I_R32S:
-					writeIS.id=I_RL2_;
-					writeIS.arg.BBD.a_0=6;
-					writeIS.arg.BBD.a_1=7;
-					writeIS.arg.BBD.a_2=((( int32_t)cv1<<16)|( int32_t)cv0)%((( int32_t)cv3<<16)|( int32_t)cv2);
+					writeIS_0.id=I_RL2_;
+					writeIS_0.arg.BBD.a_0=6;
+					writeIS_0.arg.BBD.a_1=7;
+					writeIS_0.arg.BBD.a_2=((( int32_t)cv1<<16)|( int32_t)cv0)%((( int32_t)cv3<<16)|( int32_t)cv2);
 					break;
 					default:goto ConstifySwitchExit;
 					}
 					didSucceedAtLeastOnce_1=true;
-					buffer[i]=writeIS;
+					buffer[i]=writeIS_0;
 #ifdef OPT_DEBUG_CONST
 printInstructionBufferWithMessageAndNumber(ib,"const opt by result known",i);
 #endif
@@ -479,101 +541,222 @@ printInstructionBufferWithMessageAndNumber(ib,"const opt by result known",i);
 					continue;
 					case I_ADDN:
 					if ((t=(isRegINconst[0] & cv0==0))|(isRegINconst[1] & cv1==0)){
-						writeIS.arg.B2.a_1=t?II.regIN[1]:II.regIN[0];
-						writeIS.id=I_MOV_;
-						writeIS.arg.B2.a_0=II.regOUT[0];
-						buffer[i]=writeIS;
-						goto ConstifyLoopStart;
+						writeIS_0.arg.B2.a_1=t?II.regIN[1]:II.regIN[0];
+						writeIS_0.id=I_MOV_;
+						writeIS_0.arg.B2.a_0=II.regOUT[0];
+						partialConstApplyCount=1;
+						goto ApplyPartialConst;
 					}
 					break;
 					case I_AND_:
 					if ((isRegINconst[0] & cv0==0)|(isRegINconst[1] & cv1==0)){
-						writeIS.id=I_BL1_;
-						writeIS.arg.B2.a_0=II.regOUT[0];
-						writeIS.arg.B2.a_1=0;
-						buffer[i]=writeIS;
-						goto ConstifyLoopStart;
+						writeIS_0.id=I_BL1_;
+						writeIS_0.arg.B2.a_0=II.regOUT[0];
+						writeIS_0.arg.B2.a_1=0;
+						partialConstApplyCount=1;
+						goto ApplyPartialConst;
 					}
 					if ((t=(isRegINconst[0] & cv0==0xFFFFu))|(isRegINconst[1] & cv1==0xFFFFu)){
-						writeIS.arg.B2.a_1=t?II.regIN[1]:II.regIN[0];
-						writeIS.id=I_MOV_;
-						writeIS.arg.B2.a_0=II.regOUT[0];
-						buffer[i]=writeIS;
-						goto ConstifyLoopStart;
+						writeIS_0.arg.B2.a_1=t?II.regIN[1]:II.regIN[0];
+						writeIS_0.id=I_MOV_;
+						writeIS_0.arg.B2.a_0=II.regOUT[0];
+						partialConstApplyCount=1;
+						goto ApplyPartialConst;
 					}
 					break;
 					case I_OR__:
 					if ((t=(isRegINconst[0] & cv0==0))|(isRegINconst[1] & cv1==0)){
-						writeIS.arg.B2.a_1=t?II.regIN[1]:II.regIN[0];
-						writeIS.id=I_MOV_;
-						writeIS.arg.B2.a_0=II.regOUT[0];
-						buffer[i]=writeIS;
-						goto ConstifyLoopStart;
+						writeIS_0.arg.B2.a_1=t?II.regIN[1]:II.regIN[0];
+						writeIS_0.id=I_MOV_;
+						writeIS_0.arg.B2.a_0=II.regOUT[0];
+						partialConstApplyCount=1;
+						goto ApplyPartialConst;
 					}
 					if ((t=(isRegINconst[0] & cv0==0xFFFFu))|(isRegINconst[1] & cv1==0xFFFFu)){
-						writeIS.arg.B2.a_1=t?II.regIN[0]:II.regIN[1];
-						writeIS.id=I_MOV_;
-						writeIS.arg.B2.a_0=II.regOUT[0];
-						buffer[i]=writeIS;
-						goto ConstifyLoopStart;
+						writeIS_0.arg.B2.a_1=t?II.regIN[0]:II.regIN[1];
+						writeIS_0.id=I_MOV_;
+						writeIS_0.arg.B2.a_0=II.regOUT[0];
+						partialConstApplyCount=1;
+						goto ApplyPartialConst;
 					}
 					break;
 					case I_XOR_:
 					if ((t=(isRegINconst[0] & cv0==0))|(isRegINconst[1] & cv1==0)){
-						writeIS.arg.B2.a_1=t?II.regIN[1]:II.regIN[0];
-						writeIS.id=I_MOV_;
-						writeIS.arg.B2.a_0=II.regOUT[0];
-						buffer[i]=writeIS;
-						goto ConstifyLoopStart;
+						writeIS_0.arg.B2.a_1=t?II.regIN[1]:II.regIN[0];
+						writeIS_0.id=I_MOV_;
+						writeIS_0.arg.B2.a_0=II.regOUT[0];
+						partialConstApplyCount=1;
+						goto ApplyPartialConst;
 					}
 					break;
 					case I_MULS:
 					if ((isRegINconst[0] & cv0==0)|(isRegINconst[1] & cv1==0)){
-						writeIS.id=I_BL1_;
-						writeIS.arg.B2.a_0=II.regOUT[0];
-						writeIS.arg.B2.a_1=0;
-						buffer[i]=writeIS;
-						goto ConstifyLoopStart;
+						writeIS_0.id=I_BL1_;
+						writeIS_0.arg.B2.a_0=II.regOUT[0];
+						writeIS_0.arg.B2.a_1=0;
+						partialConstApplyCount=1;
+						goto ApplyPartialConst;
 					}
 					if (isRegINconst[0] & cv0==1){
-						writeIS.id=I_MOV_;
-						writeIS.arg.B2.a_0=II.regOUT[0];
-						writeIS.arg.B2.a_1=II.regIN[1];
-						buffer[i]=writeIS;
-						goto ConstifyLoopStart;
+						writeIS_0.id=I_MOV_;
+						writeIS_0.arg.B2.a_0=II.regOUT[0];
+						writeIS_0.arg.B2.a_1=II.regIN[1];
+						partialConstApplyCount=1;
+						goto ApplyPartialConst;
 					}
 					if (isRegINconst[1] & cv1==1){
 						buffer[i].id=I_NOP_;
-						goto ConstifyLoopStart;
+						goto ConstifyLoopStart; // trivial, don't bother using ApplyPartialConst
 					}
 					break;
 					case I_MULL:
 					if (((isRegINconst[0] & cv0==0)&(isRegINconst[1] & cv1==0))|((isRegINconst[2] & cv2==0)&(isRegINconst[3] & cv3==0))){
-						writeIS.id=I_RL2_;
-						writeIS.arg.BBD.a_0=14;
-						writeIS.arg.BBD.a_1=15;
-						writeIS.arg.BBD.a_2=0;
-						buffer[i]=writeIS;
-						goto ConstifyLoopStart;
+						writeIS_0.id=I_RL2_;
+						writeIS_0.arg.BBD.a_0=13;
+						writeIS_0.arg.BBD.a_1=14;
+						writeIS_0.arg.BBD.a_2=0;
+						partialConstApplyCount=1;
+						goto ApplyPartialConst;
 					}
 					if ((isRegINconst[0] & cv0==1)&(isRegINconst[1] & cv1==0)){
 						buffer[i].id=I_NOP_;
-						goto ConstifyLoopStart;
+						goto ConstifyLoopStart; // trivial, don't bother using ApplyPartialConst
 					}
 					if ((isRegINconst[2] & cv2==1)&(isRegINconst[3] & cv3==0)){
-						writeIS.id=I_MOV_;
-						writeIS.arg.B2.a_0=14;
-						writeIS.arg.B2.a_1=II.regIN[0];
-						buffer[i]=writeIS;
-						writeIS.arg.B2.a_0=15;
-						writeIS.arg.B2.a_1=II.regIN[1];
-						insertInstructionAt(ib,i,writeIS);
-						buffer=ib->buffer;
-						goto ConstifyLoopStart;
+						writeIS_0.id=I_MOV_;
+						writeIS_0.arg.B2.a_0=13;
+						writeIS_0.arg.B2.a_1=II.regIN[0];
+						writeIS_1.id=I_MOV_;
+						writeIS_1.arg.B2.a_0=14;
+						writeIS_1.arg.B2.a_1=II.regIN[1];
+						partialConstApplyCount=2;
+						goto ApplyPartialConst;
+					}
+					break;
+					case I_LAD0:
+					if (isRegINconst[3] & cv3==0){
+						writeIS_0.id=I_LAD1;
+						writeIS_0.arg.B5.a_0=II.regOUT[0];
+						writeIS_0.arg.B5.a_1=II.regOUT[1];
+						writeIS_0.arg.B5.a_2=II.regIN[0];
+						writeIS_0.arg.B5.a_3=II.regIN[1];
+						writeIS_0.arg.B5.a_4=II.regIN[2];
+						partialConstApplyCount=1;
+						goto ApplyPartialConst;
+					}
+					if (isRegINconst[1] & cv1==0){
+						writeIS_0.id=I_LAD1;
+						writeIS_0.arg.B5.a_0=II.regOUT[0];
+						writeIS_0.arg.B5.a_1=II.regOUT[1];
+						writeIS_0.arg.B5.a_2=II.regIN[2];
+						writeIS_0.arg.B5.a_3=II.regIN[3];
+						writeIS_0.arg.B5.a_4=II.regIN[0];
+						partialConstApplyCount=1;
+						goto ApplyPartialConst;
+					}
+					break;
+					case I_LAD1:
+					if (isRegINconst[1] & cv1==0){
+						writeIS_0.id=I_LAD2;
+						writeIS_0.arg.B4.a_0=II.regOUT[0];
+						writeIS_0.arg.B4.a_1=II.regOUT[1];
+						writeIS_0.arg.B4.a_2=II.regIN[0];
+						writeIS_0.arg.B4.a_3=II.regIN[2];
+						partialConstApplyCount=1;
+						goto ApplyPartialConst;
+					}
+					break;
+					case I_LSU0:
+					if ((isRegINconst[2] & cv2==0) & (isRegINconst[3] & cv3==0)){
+						buffer[i].id=I_NOP_;
+						goto ConstifyLoopStart; // trivial, don't bother using ApplyPartialConst
+					}
+					break;
+					case I_LLS6: // what is neat about this one: it natually destroys registers, so the optimization application can use any registers with no repercussions
+					if (isRegINconst[2]){
+						if (cv2>31){
+							writeIS_0.id=I_BL1_;
+							writeIS_0.arg.B2.a_0=2;
+							writeIS_0.arg.B2.a_1=0;
+							writeIS_1.id=I_BL1_;
+							writeIS_1.arg.B2.a_0=3;
+							writeIS_1.arg.B2.a_1=0;
+							partialConstApplyCount=2;
+							goto ApplyPartialConst;
+						}
+						if (cv2==0){
+							writeIS_0.id=I_MOV_;
+							writeIS_0.arg.B2.a_0=2;
+							writeIS_0.arg.B2.a_1=6;
+							writeIS_1.id=I_MOV_;
+							writeIS_1.arg.B2.a_0=3;
+							writeIS_1.arg.B2.a_1=7;
+							partialConstApplyCount=2;
+							goto ApplyPartialConst;
+						}
+						if (cv2==16){
+							writeIS_0.id=I_BL1_;
+							writeIS_0.arg.B2.a_0=2;
+							writeIS_0.arg.B2.a_1=0;
+							writeIS_1.id=I_MOV_;
+							writeIS_1.arg.B2.a_0=3;
+							writeIS_1.arg.B2.a_1=6;
+							partialConstApplyCount=2;
+							goto ApplyPartialConst;
+						}
+					}
+					break;
+					case I_LRS6: // what is neat about this one: it natually destroys registers, so the optimization application can use any registers with no repercussions
+					if (isRegINconst[2]){
+						if (cv2>31){
+							writeIS_0.id=I_BL1_;
+							writeIS_0.arg.B2.a_0=2;
+							writeIS_0.arg.B2.a_1=0;
+							writeIS_1.id=I_BL1_;
+							writeIS_1.arg.B2.a_0=3;
+							writeIS_1.arg.B2.a_1=0;
+							partialConstApplyCount=2;
+							goto ApplyPartialConst;
+						}
+						if (cv2==0){
+							writeIS_0.id=I_MOV_;
+							writeIS_0.arg.B2.a_0=2;
+							writeIS_0.arg.B2.a_1=6;
+							writeIS_1.id=I_MOV_;
+							writeIS_1.arg.B2.a_0=3;
+							writeIS_1.arg.B2.a_1=7;
+							partialConstApplyCount=2;
+							goto ApplyPartialConst;
+						}
+						if (cv2==16){
+							writeIS_0.id=I_MOV_;
+							writeIS_0.arg.B2.a_0=2;
+							writeIS_0.arg.B2.a_1=7;
+							writeIS_1.id=I_BL1_;
+							writeIS_1.arg.B2.a_0=3;
+							writeIS_1.arg.B2.a_1=0;
+							partialConstApplyCount=2;
+							goto ApplyPartialConst;
+						}
 					}
 					break;
 					// todo: add more checks here (mainly for MULL and 32 bit division)
 					
+					
+					
+					ApplyPartialConst:;
+					switch (partialConstApplyCount){
+						case 1:
+						buffer[i]=writeIS_0;
+						break;
+						case 2:
+						buffer[i]=writeIS_0;
+						insertInstructionAt(ib,i+1,writeIS_1);
+						buffer=ib->buffer;
+						break;
+						default:;assert(false);
+					}
+					goto ConstifyLoopStart;
 					default:; // used to avoid warnings about missing enumeration values
 				}
 				isRegValueConst[II.regOUT[0]]=0;
@@ -643,14 +826,14 @@ sanityCheck(ib);
 
 
 
-// expandPushPop() should be run on the input before this is run (unless ib.isPushPopOptLocked==true, then it doesn't matter)
+// expandPushPop() should be run on the input before this is run
 bool attemptMovPushPopOpt(InstructionBuffer* ib){
 	bool didSucceedAtLeastOnce=false;
 	uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
 	uint32_t i0=numberOfSlotsTaken;
 	while (i0--!=0){
 		LoopStart:;
-		InstructionSingle* IS_i0 = &(ib->buffer[i0]);
+		InstructionSingle* IS_i0 = ib->buffer+i0;
 		enum InstructionTypeID id0 = IS_i0->id;
 		if (id0==I_MOV_){
 			/*
@@ -776,7 +959,7 @@ sanityCheck(ib);
 					uint32_t upperRenameBound;
 					if (findRegRenameBoundaryFromOrigin(ib,i0,rTo,&upperRenameBound)){
 						//printf("{mov calling doRegRename at place 1 start}\n");
-						if (!wouldRegRenameViolateMultiOutputLaw(ib,i0,upperRenameBound,rTo,rFrom)) {
+						if (!wouldRegRenameViolateMultiOutputLaws(ib,i0,upperRenameBound,rTo,rFrom)) {
 							doRegRename(ib,i0,upperRenameBound,rTo,rFrom);
 							//printf("{mov calling doRegRename at place 1 end}\n");
 							IS_i0->id=I_NOP_; // do not need this mov instruction anymore, it is moving to the same register it is coming from
@@ -828,7 +1011,7 @@ sanityCheck(ib);
 					}
 					if (!didFindFailingUsage){
 						//printf("{mov calling doRegRename at place 3 start}\n");
-						if (!(didFindFailingUsage=wouldRegRenameViolateMultiOutputLaw(ib,backwardsRenameStart,i0,rFrom,rTo))){
+						if (!(didFindFailingUsage=wouldRegRenameViolateMultiOutputLaws(ib,backwardsRenameStart,i0,rFrom,rTo))){
 							doRegRename(ib,backwardsRenameStart,i0,rFrom,rTo);
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
@@ -871,7 +1054,6 @@ sanityCheck(ib);
 						if (doReorder){
 							//printf("{mov calling applyReorder at place 6}\n");
 							applyReorder(ib,i0,upperReorderBoundry);
-							
 							// This (probably) will not cause infinite loops, because of the checking done above
 #ifdef OPT_DEBUG_GENERAL_ACTIVE
 							printf("*");
@@ -1045,17 +1227,16 @@ bool attemptStackMemoryOpt(InstructionBuffer* ib){
 					if (II_1.id==I_MOV_){
 						target_1=II_1.regIN[0];
 					} else {
-						if (II_1.id==I_ADDN & target_1==16){  // MIGRATION: FIND NEW WAY TO DO THIS (This was the detection that 32bit add with upper words zero going into a memory instruction meant that the carry could be assumed to be 0 because it could only be 0 or 1 and only from a carry from addition)
-							assert(false);
-							/*
-							insertInstructionAt(ib,i0--,IS_BL1);
+						if (II_1.id==I_LAD2 & target_1==II_1.regOUT[1]){
+							insertInstructionAt(ib,i1+1,IS_BL1);
+							i0--;
 							didSucceedAtLeastOnce=true;
 							buffer=ib->buffer;
 							numberOfSlotsTaken=ib->numberOfSlotsTaken;
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
-*/
+							break;
 						} else if (II_1.id==I_BL1_ & !II_0.usesReg_D & isStackSizeKnown){
 							// `!II_0.usesReg_D` is to check if the memory operation is not a byte instruction
 							if (buffer[i1].arg.B2.a_1==0){
@@ -1273,12 +1454,13 @@ err_00__0("Optimizer detected out of bounds memory access on stack\n  no source 
 bool attemptSTPoffsetOpt(InstructionBuffer* ib){
 	InstructionInformation II_0;
 	InstructionSingle IS_stp;
+	InstructionSingle* buffer=ib->buffer;
 	IS_stp.id=I_STPA;
 	bool didSucceedAtLeastOnce=false;
 	uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
 	uint32_t i0=numberOfSlotsTaken;
 	while (i0--!=0){
-		if (ib->buffer[i0].id==I_ADDN){
+		if (buffer[i0].id==I_ADDN){
 			fillInstructionInformation(&II_0,ib,i0);
 			uint16_t valTraceRaw0;
 			bool traceRaw0;
@@ -1296,8 +1478,9 @@ bool attemptSTPoffsetOpt(InstructionBuffer* ib){
 					if (valTraceStp>=valTraceRaw){
 						IS_stp.arg.BW.a_1=valTraceStp-valTraceRaw;
 						IS_stp.arg.BW.a_0=II_0.regOUT[0];
-						ib->buffer[i0]=IS_stp;
 						didSucceedAtLeastOnce=true;
+						buffer[i0]=IS_stp;
+						
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
@@ -1315,7 +1498,163 @@ err_00__0("Optimizer detected out of bounds memory access on stack\n  no source 
 }
 
 
-
+bool attemptRepeatedConstantOpt(InstructionBuffer* ib){
+	bool didSucceedAtLeastOnce=false;
+	InstructionInformation II_0;
+	InstructionInformation II_1;
+	InstructionSingle* buffer=ib->buffer;
+	struct RepeatedConstInfo repeatedConstInfo;
+	repeatedConstInfo.ib=ib;
+	repeatedConstInfo.i0=ib->numberOfSlotsTaken;
+	while (repeatedConstInfo.i0--!=0){
+		InstructionSingle writeIS;
+		repeatedConstInfo.id=buffer[repeatedConstInfo.i0].id;
+		switch (repeatedConstInfo.id){
+			case I_AND_:
+			case I_XOR_:
+			case I_OR__:
+			case I_MULS:
+			case I_ADDN:
+			if (attemptRepeatedConstantOpt_sub1(&repeatedConstInfo)){
+				//printInstructionBufferWithMessageAndNumber(ib,"Before",repeatedConstInfo.i0);
+				uint16_t cv;
+				switch (repeatedConstInfo.id){
+					case I_AND_:
+					cv=repeatedConstInfo.cvBuff[0] & repeatedConstInfo.cvBuff[1];
+					break;
+					case I_XOR_:
+					cv=repeatedConstInfo.cvBuff[0] ^ repeatedConstInfo.cvBuff[1];
+					break;
+					case I_OR__:
+					cv=repeatedConstInfo.cvBuff[0] | repeatedConstInfo.cvBuff[1];
+					break;
+					case I_MULS:
+					cv=repeatedConstInfo.cvBuff[0] * repeatedConstInfo.cvBuff[1];
+					break;
+					case I_ADDN:
+					cv=repeatedConstInfo.cvBuff[0] + repeatedConstInfo.cvBuff[1];
+					break;
+					default:;
+				}
+				
+				uint8_t r1=repeatedConstInfo.II_0.regIN[repeatedConstInfo.types[0]];
+				uint8_t r0=repeatedConstInfo.II_0.regIN[repeatedConstInfo.types[0]^1];
+				uint8_t r2=repeatedConstInfo.II_0.regOUT[0];
+				uint8_t r3=r0!=r2?r0:r1;
+				assert(r0!=r2 | r1!=r2); // this transform would be invalid if this fails, but I don't think that should fail
+				if (repeatedConstInfo.id==I_MULS){
+					writeIS.arg.B2.a_0=r2;
+					writeIS.arg.B2.a_1=r3;
+				} else {
+					writeIS.arg.B3.a_0=r2;
+					writeIS.arg.B3.a_1=r2;
+					writeIS.arg.B3.a_2=r3;
+				}
+				writeIS.id=repeatedConstInfo.id;
+				buffer[repeatedConstInfo.i0]=writeIS;
+				
+				writeIS.id=I_RL1_;
+				writeIS.arg.BW.a_0=r2;
+				writeIS.arg.BW.a_1=cv;
+				insertInstructionAt(ib,repeatedConstInfo.i0,writeIS);
+				
+				writeIS.id=I_POP1;
+				writeIS.arg.B1.a_0=r3;
+				insertInstructionAt(ib,repeatedConstInfo.i0,writeIS);
+				
+				writeIS.id=I_PU1_;
+				writeIS.arg.B1.a_0=repeatedConstInfo.II_1.regIN[repeatedConstInfo.types[1]];
+				insertInstructionAt(ib,repeatedConstInfo.indexBuff[0],writeIS);
+				
+				//printInstructionBufferWithMessageAndNumber(ib,"After",repeatedConstInfo.i0);
+				//exit(0);
+				buffer=ib->buffer;
+				didSucceedAtLeastOnce=true;
+#ifdef OPT_DEBUG_SANITY
+sanityCheck(ib);
+#endif
+			}
+			break;
+			case I_LAD0:
+			case I_LAD1:
+			// I_LAD2 is not here on purpose, it will need to use a different detection method. Also, I_LAD2 would only trace back to I_ADDN, not any of these: I_LAD0,I_LAD1,I_LAD2
+			if (attemptRepeatedConstantOpt_sub3(&repeatedConstInfo)){
+				//printInstructionBufferWithMessageAndNumber(ib,"Before",repeatedConstInfo.i0);
+				uint32_t cvLarge=(repeatedConstInfo.cvBuff[0] | ((uint32_t)repeatedConstInfo.cvBuff[1]<<16)) + (repeatedConstInfo.cvBuff[2] | ((uint32_t)repeatedConstInfo.cvBuff[3]<<16));
+				bool does0have2ConstInputRegisters=repeatedConstInfo.normalizedReg0[3]!=16;
+				bool does1have2NonconstInputRegisters=repeatedConstInfo.normalizedReg1[3]!=16;
+				
+				if (!does0have2ConstInputRegisters & (cvLarge&0xFFFF0000LU)!=0){
+					uint8_t extraReg=16;
+					for (uint8_t r=2;r<15;r++){
+						if (!doesRegListContain(repeatedConstInfo.II_0.regIN,r)){
+							// it might not matter for regOUT
+							if (!doesRegListContain(repeatedConstInfo.II_0.regOUT,r)){
+								if (!isValueInRegUsedAfterTarget(ib,repeatedConstInfo.i0,r,NULL)){
+									extraReg=r;
+									break;
+								}
+							}
+						}
+					}
+					if (extraReg==16){
+						break; // break the switch, causing the for loop to continue. This optimization cannot be performed in that case, as there are no temporary registers to use and one is needed
+					}
+					writeIS.id=I_LAD0;
+					writeIS.arg.B6.a_0=repeatedConstInfo.II_0.regOUT[0];
+					writeIS.arg.B6.a_1=repeatedConstInfo.II_0.regOUT[1];
+					writeIS.arg.B6.a_2=repeatedConstInfo.II_0.regIN[0];
+					writeIS.arg.B6.a_3=repeatedConstInfo.II_0.regIN[1];
+					writeIS.arg.B6.a_4=repeatedConstInfo.II_0.regIN[2];
+					writeIS.arg.B6.a_5=extraReg;
+					buffer[repeatedConstInfo.i0]=writeIS;
+					
+					writeIS.id=I_RL2_;
+					writeIS.arg.BBD.a_0=repeatedConstInfo.normalizedReg0[2];
+					writeIS.arg.BBD.a_1=extraReg;
+					writeIS.arg.BBD.a_2=cvLarge;
+					insertInstructionAt(ib,repeatedConstInfo.i0,writeIS);
+				} else if (does0have2ConstInputRegisters){
+					writeIS.id=I_RL2_;
+					writeIS.arg.BBD.a_0=repeatedConstInfo.normalizedReg0[2];
+					writeIS.arg.BBD.a_1=repeatedConstInfo.normalizedReg0[3];
+					writeIS.arg.BBD.a_2=cvLarge;
+					insertInstructionAt(ib,repeatedConstInfo.i0,writeIS);
+				} else {
+					assert((cvLarge&0xFFFF0000LU)==0);
+					writeIS.id=I_RL1_;
+					writeIS.arg.BW.a_0=repeatedConstInfo.normalizedReg0[2];
+					writeIS.arg.BW.a_1=(uint16_t)cvLarge;
+					insertInstructionAt(ib,repeatedConstInfo.i0,writeIS);
+				}
+				writeIS.id=I_POP1;
+				writeIS.arg.B1.a_0=repeatedConstInfo.normalizedReg0[0];
+				insertInstructionAt(ib,repeatedConstInfo.i0,writeIS);
+				if (does1have2NonconstInputRegisters){
+					writeIS.id=I_POP1;
+					writeIS.arg.B1.a_0=repeatedConstInfo.normalizedReg0[1];
+					insertInstructionAt(ib,repeatedConstInfo.i0,writeIS);
+					writeIS.id=I_PU1_;
+					writeIS.arg.B1.a_0=repeatedConstInfo.normalizedReg1[3];
+					insertInstructionAt(ib,repeatedConstInfo.indexBuff[0],writeIS);
+				}
+				writeIS.id=I_PU1_;
+				writeIS.arg.B1.a_0=repeatedConstInfo.normalizedReg1[2];
+				insertInstructionAt(ib,repeatedConstInfo.indexBuff[0],writeIS);
+				
+				//printInstructionBufferWithMessageAndNumber(ib,"After",repeatedConstInfo.i0);
+				//exit(0);
+				didSucceedAtLeastOnce=true;
+				buffer=ib->buffer;
+#ifdef OPT_DEBUG_SANITY
+sanityCheck(ib);
+#endif
+			}
+			default:;
+		}
+	}
+	return didSucceedAtLeastOnce;
+}
 
 
 
@@ -1408,6 +1747,7 @@ uint16_t state=
 	sdfma_0.isRead*4U |
 	sdfma_1.isRead*8U |
 	isExactEqual*16U ;
+
 switch (state){
 // !isExactEqual
 	
@@ -1913,40 +2253,44 @@ void attemptAllActiveOptPhase2(InstructionBuffer* ib){
 	bool v3=1;
 	bool v4=1;
 	bool v5=1;
-	bool v6;
+	bool v6=1;
+	bool v7;
 	DEBUG_STATUS("jmp->","",1);
-	v6=attemptJmpOpt(ib);
-	DEBUG_STATUS("[YES]\n","[NO]\n",v6);
+	v7=attemptJmpOpt(ib);
+	DEBUG_STATUS("[YES]\n","[NO]\n",v7);
 	while (1){
 		Start:;
 		DEBUG_STATUS("spo->","",1);
 		v0 = attemptSTPoffsetOpt(ib);
 		DEBUG_STATUS("[YES]\n","[NO]\n",v0);
-		if (!(v0|v1|v2|v3|v4|v5)) break;
+		if (!(v0|v1|v2|v3|v4|v5|v6)) break;
 		DEBUG_STATUS("stm->","",1);
 		v1 = attemptStackMemoryOpt(ib);
 		DEBUG_STATUS("[YES]\n","[NO]\n",v1);
-		if (!(v0|v1|v2|v3|v4|v5)) break;
+		if (!(v0|v1|v2|v3|v4|v5|v6)) break;
 		DEBUG_STATUS("mar->","",1);
 		v2 = attemptStackMemoryAccessReduction(ib);
 		DEBUG_STATUS("[YES]\n","[NO]\n",v2);
-		if (!(v0|v1|v2|v3|v4|v5)) break;
-		Middle:;
-		DEBUG_STATUS("mpp->","",1);
-		v3 = attemptMovPushPopOpt(ib);
+		if (!(v0|v1|v2|v3|v4|v5|v6)) break;
+		DEBUG_STATUS("rco->","",1);
+		v3 = attemptRepeatedConstantOpt(ib);
 		DEBUG_STATUS("[YES]\n","[NO]\n",v3);
-		if (!(v0|v1|v2|v3|v4|v5)) break;
+		Middle:;
 		DEBUG_STATUS("con->","",1);
 		v4 = attemptConstOpt(ib);
 		DEBUG_STATUS("[YES]\n","[NO]\n",v4);
-		if (!(v0|v1|v2|v3|v4|v5)) break;
-		DEBUG_STATUS("dup->","",1);
-		v5 = attemptDupeConstOpt(ib);
+		if (!(v0|v1|v2|v3|v4|v5|v6)) break;
+		DEBUG_STATUS("mpp->","",1);
+		v5 = attemptMovPushPopOpt(ib);
 		DEBUG_STATUS("[YES]\n","[NO]\n",v5);
+		if (!(v0|v1|v2|v3|v4|v5|v6)) break;
+		DEBUG_STATUS("dup->","",1);
+		v6 = attemptDupeConstOpt(ib);
+		DEBUG_STATUS("[YES]\n","[NO]\n",v6);
 		DEBUG_STATUS("tgh->","",1);
 		applyTightOpt(ib);
 		DEBUG_STATUS("[DONE]\n","",1);
-		if (!(v0|v1|v2|v3|v4|v5)) break;
+		if (!(v0|v1|v2|v3|v4|v5|v6)) break;
 		if (i++>1000){
 			printInstructionBufferWithMessageAndNumber(ib,"attemptAllActiveOptPhase2() took too long",0);
 			exit(0);
@@ -1954,14 +2298,14 @@ void attemptAllActiveOptPhase2(InstructionBuffer* ib){
 	}
 	if (compileSettings.optLevel>2){
 		DEBUG_STATUS("pep->","",1);
-		v6 = attemptPeepHoleOpt(ib);
-		DEBUG_STATUS("[YES]\n","[NO]\n",v6);
-		if (v6) {v0=1;v1=1;v2=1;v3=1;v4=1;v5=1;goto Middle;}
-	} else v6=false;
+		v7 = attemptPeepHoleOpt(ib);
+		DEBUG_STATUS("[YES]\n","[NO]\n",v7);
+		if (v7) {v0=1;v1=1;v2=1;v3=1;v4=1;v5=1;v6=1;goto Middle;}
+	}
 	DEBUG_STATUS("jmp->","",1);
-	v6=attemptJmpOpt(ib);
-	DEBUG_STATUS("[YES]\n","[NO]\n",v6);
-	if (v6) {v0=1;v1=1;v2=1;v3=1;v4=1;v5=1;goto Start;}
+	v7=attemptJmpOpt(ib);
+	DEBUG_STATUS("[YES]\n","[NO]\n",v7);
+	if (v7) {v0=1;v1=1;v2=1;v3=1;v4=1;v5=1;v6=1;goto Start;}
 	applySTPAtoSTPSopt(ib);
 	applyMovFromSmallConstOpt(ib);
 	removeNop(ib); // not all passes do this, because some passes do not add many. this just ensures that they are all gone at the end

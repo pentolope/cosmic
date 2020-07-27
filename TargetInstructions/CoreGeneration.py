@@ -424,8 +424,8 @@ PU1_ %2
 
 "IB_intrinsic_front_i_32div_u_u":"""
 
-POP2 %2 %3
 POP2 %4 %5
+POP2 %2 %3
 D32U
 PU2_ %9 %8
 
@@ -434,8 +434,8 @@ PU2_ %9 %8
 
 "IB_intrinsic_front_i_32mod_u_u":"""
 
-POP2 %2 %3
 POP2 %4 %5
+POP2 %2 %3
 R32U
 PU2_ %7 %6
 
@@ -444,8 +444,8 @@ PU2_ %7 %6
 
 "IB_intrinsic_front_i_32div_s_s":"""
 
-POP2 %2 %3
 POP2 %4 %5
+POP2 %2 %3
 D32S
 PU2_ %9 %8
 
@@ -454,8 +454,8 @@ PU2_ %9 %8
 
 "IB_intrinsic_front_i_32mod_s_s":"""
 
-POP2 %2 %3
 POP2 %4 %5
+POP2 %2 %3
 R32S
 PU2_ %7 %6
 
@@ -1787,9 +1787,40 @@ FCEN
 
 """,
 
+
 "IB_intrinsic_back_div32_u_u":"""
 
 FCST $0A #000A :00000001
+
+BL1_ %6 $00
+BL1_ %7 $00
+BL1_ %B $00
+LABL :00000024
+LAD3 %2 %3 %6 %7 %2 %3 %6 %7
+PU2_ %2 %3
+MOV_ %2 %6
+MOV_ %3 %7
+BL1_ %A $01
+SSUB %A %2 %4
+SSUB %A %3 %5
+LAD0 %8 %9 %8 %9 %8 %9
+OR__ %8 %8 %A
+SYRD %C %D
+SYCL @00000025
+SYRE
+CJMP %C %D %A
+MOV_ %6 %2
+MOV_ %7 %3
+LABL :00000025
+POP2 %3 %2
+BL1_ %A $01
+ADDN %B %B %A
+BL1_ %A $20
+SUBC %A %B %A
+SYRD %C %D
+SYCL @00000024
+SYRE
+CJMP %C %D %A
 
 RET_
 FCEN
@@ -1799,7 +1830,33 @@ FCEN
 "IB_intrinsic_back_mod32_u_u":"""
 
 FCST $0A #000A :00000002
-
+BL1_ %6 $00
+BL1_ %7 $00
+BL1_ %B $00
+SYRD %8 %9
+SYCL @00000027
+SYRE
+SYRD %C %D
+SYCL @00000026
+SYRE
+LABL :00000026
+LAD3 %2 %3 %6 %7 %2 %3 %6 %7
+PU2_ %2 %3
+MOV_ %2 %6
+MOV_ %3 %7
+BL1_ %A $01
+SSUB %A %2 %4
+SSUB %A %3 %5
+CJMP %8 %9 %A
+MOV_ %6 %2
+MOV_ %7 %3
+LABL :00000027
+POP2 %3 %2
+BL1_ %A $01
+ADDN %B %B %A
+BL1_ %A $20
+SUBC %A %B %A
+CJMP %C %D %A
 RET_
 FCEN
 
@@ -1808,7 +1865,26 @@ FCEN
 "IB_intrinsic_back_div32_s_s":"""
 
 FCST $0A #000A :00000003
-
+LAD2 %D %6 %3 %3
+LAD2 %D %7 %5 %5
+RL1_ %D #FFFF
+MOV_ %C %D
+MULS %C %6
+MULS %D %7
+XOR_ %2 %2 %C
+XOR_ %3 %3 %C
+XOR_ %4 %4 %D
+XOR_ %5 %5 %D
+LAD1 %2 %3 %2 %3 %6
+LAD1 %4 %5 %4 %5 %7
+XOR_ %6 %6 %7
+XOR_ %C %C %D
+PU2_ %C %6
+D32U
+POP2 %D %C
+XOR_ %8 %8 %C
+XOR_ %9 %9 %C
+LAD1 %8 %9 %8 %9 %D
 RET_
 FCEN
 
@@ -1817,7 +1893,24 @@ FCEN
 "IB_intrinsic_back_mod32_s_s":"""
 
 FCST $0A #000A :00000004
-
+LAD2 %D %6 %3 %3
+LAD2 %D %7 %5 %5
+RL1_ %D #FFFF
+MOV_ %C %D
+MULS %C %6
+MULS %D %7
+XOR_ %2 %2 %C
+XOR_ %3 %3 %C
+XOR_ %4 %4 %D
+XOR_ %5 %5 %D
+LAD1 %2 %3 %2 %3 %6
+LAD1 %4 %5 %4 %5 %7
+PU2_ %C %6
+R32U
+POP2 %D %C
+XOR_ %6 %6 %C
+XOR_ %7 %7 %C
+LAD1 %6 %7 %6 %7 %D
 RET_
 FCEN
 

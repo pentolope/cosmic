@@ -1,15 +1,18 @@
-machine language description
+Machine Language Description
 
 Notes:
-  memory is little-endian and byte accessed (except for stack instructions, which are word accessed and word alligned)
-  instruction decoder only needs 5 bits of input from the instruction: the 4 important ones and one bit to say if the first 4 bits were 1111
-  have assembler take hex digit for reg number
-  when memory addresses are referred to, the form r1,r2 is often used. r1 is the less significant word, r2 is the more significant word
-  when registers are referred to using assembly notation (like this: %F ) then literally that register is being referred to, it is not an argument for that instruction
+  Memory is little-endian and byte accessed (except for stack instructions, which are word accessed and word alligned)
+  Instruction decoder only needs 5 bits of input from the instruction: the 4 important ones and one bit to say if the first 4 bits were 1111
+  When memory addresses are referred to, the form r1,r2 is often used. r1 is the less significant word, r2 is the more significant word
+  When registers are referred to using assembly notation (like this: %F ) then literally that register is being referred to, it is not an argument for that instruction
   
-  
+  Have `8bit * 8bit` multiplication on (either 1 or 2) flash chip(s), and on the same flash chip(s) have the bootloading code
+    There will be a bit from microcode that changes which is to be outputted from the flash chip(s)
+	This is decently important because the hardware cannot directly do 32bit multiplication
+	The output of this multiplication should be able to span a full word (2 bytes)
 
-format:
+
+Format:
 
 
     more significant bits                    less significant bits
@@ -22,7 +25,7 @@ format:
 
 
 
-instructions:
+Instructions:
 
 0 -     0,0, - immediate -> r0[7:0] , 0 -> r0[F:8]
 0 -     0,1, - immediate -> r0[F:8] , r0[7:0] is unchanged
@@ -32,11 +35,11 @@ instructions:
 1 - 0,1,0,0, - r1  and r2 -> r0
 1 - 0,1,0,1, - r1  or  r2 -> r0
 1 - 0,1,1,0, - r1  xor r2 -> r0
-1 - 0,1,1,1, - do r0+r1+~r2 -> r1, with carry stored to ones bit of r0, if carry would be larger then 1, r0 would still hold 1.
+1 - 0,1,1,1, - r0 + r1 +~r2 -> r1, with carry stored to ones bit of r0, if carry would be larger then 1, r0 would still hold 1.
 1 - 1,0,0,0, - memory read a  word into r0 at r1,r2  (must be aligned to word boundry)
 1 - 1,0,0,1, - memory write the word in r0 at r1,r2  (must be aligned to word boundry)
 1 - 1,0,1,0, - r1 + r2 -> r0
-1 - 1,0,1,1, - r1 + r2 -> r0 , r1 + r2 (carry)-> %F  (%F gets the carry in the ones bit, 0 in all other bits)
+1 - 1,0,1,1, - r1 + r2 + %F -> r0, with carry stored to ones bit of %F, if carry would be larger then 1, r0 would still hold 1.
 1 - 1,1,0,0, - r1 - r2 -> r0
 1 - 1,1,0,1, - r1 - r2 (carry)-> r0
 1 - 1,1,1,0, - conditional jump if(r2 == 0) to r0,r1 (must be aligned to word boundry)
@@ -48,7 +51,7 @@ instructions:
 2 - 0,1,0,0, - mov r1 to r0
 2 - 0,1,0,1, - swap bytes in r1, place result in r0 (r1 is not modified)
 2 - 0,1,1,0, - shift r1 down one bit towards lower bits and store in r0 (r1 is not modified)
-2 - 0,1,1,1, - r0 * r1 -> r0 (the upper word is not generated)
+2 - 0,1,1,1, - r0 * r1 -> r0 (word multiply, the upper word is not generated)
 2 - 1,0,0,0, - %D,%E * r0,r1 -> %D,%E  (32 bit multiplication, lower 32 bits are stored. %E is the upper word.)
 2 - 1,0,0,1, - r0 / r1 -> r0 , r0 % r1 -> r1   (% is the remainder of the division)
 2 - 1,0,1,0, - call to address at r0,r1
@@ -59,7 +62,7 @@ instructions:
 2 - 1,1,1,1, - SP - r0 -> SP , then SP -> r0
 
 
-CALL and RET_ details
+CALL and RET_ details:
 
   When CALL is executed, it pushes %0 to the stack, 
   Then, it pushes %1 to the stack,
@@ -78,7 +81,7 @@ CALL and RET_ details
 
 
 
-bootloading:
+Bootloading:
   
   when the CPU is turned on, there are 4 phases of turning on
   the reset signals A and B start low and go high

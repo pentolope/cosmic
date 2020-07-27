@@ -366,7 +366,6 @@ void fillInstructionInformation(InstructionInformation* II, const InstructionBuf
 		II->regIN[5]=IS.arg.B8.a_5;
 		II->regIN[6]=IS.arg.B8.a_6;
 		II->regIN[7]=IS.arg.B8.a_7;
-		II->isAllowedInVTE=true;
 		return;
 		case I_LLS6:
 		case I_LRS6:
@@ -766,6 +765,12 @@ void sanityCheck(const InstructionBuffer* ib){
 				getRegOriginInfo(ib,&regOriginInfo);
 				//printf("~%01X->%08X\n",regOriginInfo.targetRegister,regOriginInfo.originLocation);
 			}
+			if (r==15){
+				printf("{ Caught during sanity check }\n");
+				printf("{%d}",r);
+				printInstructionBufferWithMessageAndNumber(ib,"Instruction uses %%F:",i);
+				exit(1);
+			}
 		}
 		ri=0;
 		while ((r=II.regOUT[ri++])!=16){
@@ -776,6 +781,13 @@ void sanityCheck(const InstructionBuffer* ib){
 				printInstructionBufferWithMessageAndNumber(ib,"Instruction destroys the Base Pointer or Frame Pointer:",i);
 				exit(1);
 			}
+			if (r==15){
+				printf("{ Caught during sanity check }\n");
+				printf("{%d}",r);
+				printInstructionBufferWithMessageAndNumber(ib,"Instruction uses %%F:",i);
+				exit(1);
+			}
+			
 		}
 		{
 			uint8_t r2;
@@ -787,6 +799,26 @@ void sanityCheck(const InstructionBuffer* ib){
 					if (ri2!=ri3 & r2==r3){
 						printf("{ Caught during sanity check }\n");
 						printInstructionBufferWithMessageAndNumber(ib,"Instructions cannot use identical registers for different outputs:",i);
+						exit(1);
+					}
+				}
+			}
+		}
+		if (II.id==I_LAD3 | II.id==I_LSU3 | II.id==I_LMU3){
+			uint8_t r2;
+			uint8_t r3;
+			uint8_t ri2=0;
+			uint8_t ri3=0;
+			while ((r2=II.regIN[ri2++])!=16){
+				while ((r3=II.regIN[ri3++])!=16){
+					if ((unsigned)ri2%4u!=(unsigned)ri3%4u & r2==r3){
+						printf("{ Caught during sanity check }\n");
+						printInstructionBufferWithMessageAndNumber(ib,"Instructions LAD3,LSU3,LMU3 must have order not violated:",i);
+						exit(1);
+					}
+					if ((unsigned)ri2/4u!=(unsigned)ri3/4u & r2==r3){
+						printf("{ Caught during sanity check }\n");
+						printInstructionBufferWithMessageAndNumber(ib,"Instructions LAD3,LSU3,LMU3 must have unique registers for first four and last four registers:",i);
 						exit(1);
 					}
 				}
@@ -955,7 +987,7 @@ bool isValueInRegUsedAnywhereThroughoutRangeWithExtentionCheck(const Instruction
 	return false;
 }
 
-bool wouldRegRenameViolateMultiOutputLaw(const InstructionBuffer *ib,const uint32_t start,const uint32_t end,const uint8_t regFrom,const uint8_t regTo){
+bool wouldRegRenameViolateMultiOutputLaws(const InstructionBuffer *ib,const uint32_t start,const uint32_t end,const uint8_t regFrom,const uint8_t regTo){
 	InstructionInformation II;
 	for (uint32_t i=start;i<=end;i++){
 		fillInstructionInformation(&II,ib,i);
@@ -967,6 +999,11 @@ bool wouldRegRenameViolateMultiOutputLaw(const InstructionBuffer *ib,const uint3
 				uint8_t ri1=0;
 				while ((r1=II.regOUT[ri1++])!=16){
 					if (ri0!=ri1 & r1==regTo){
+						return true;
+					}
+				}
+				if (II.id==I_LAD3 | II.id==I_LSU3 | II.id==I_LMU3){
+					if (II.regIN[4]==regTo | II.regIN[5]==regTo | II.regIN[6]==regTo | II.regIN[7]==regTo){
 						return true;
 					}
 				}
@@ -1004,7 +1041,15 @@ bool findUnusedRegsAfterTarget(const InstructionBuffer* ib,const uint32_t start,
 	return false;
 }
 
-
+// returns 16 if it couldn't find one
+uint8_t findUnusedRegisterAfter(const InstructionBuffer* ib,const uint32_t index,const uint8_t notThis0,const uint8_t notThis1){
+	for (uint8_t r=2;r<15;r++){
+		if ((r!=notThis0 & r!=notThis1) && !isValueInRegUsedAfterTarget(ib,index,r,NULL)){
+			return r;
+		}
+	}
+	return 16;
+}
 
 struct RegRenameInfo{
 	// these three are input
@@ -1040,7 +1085,7 @@ void getRegRenameInfo(const InstructionBuffer *ib, struct RegRenameInfo* regRena
 				if (
 				rTry!=regOriginInfo.targetRegister && 
 				!isValueInRegUsedAnywhereThroughoutRangeWithExtentionCheck(ib,regOriginInfo.originLocation,upperBound,rTry) &&
-				!wouldRegRenameViolateMultiOutputLaw(ib,regOriginInfo.originLocation,upperBound,regOriginInfo.targetRegister,rTry)){
+				!wouldRegRenameViolateMultiOutputLaws(ib,regOriginInfo.originLocation,upperBound,regOriginInfo.targetRegister,rTry)){
 					
 					regRenameInfo->suggestedReg=rTry;
 					return;
@@ -1048,7 +1093,7 @@ void getRegRenameInfo(const InstructionBuffer *ib, struct RegRenameInfo* regRena
 			}
 		} else if (
 				!isValueInRegUsedAnywhereThroughoutRangeWithExtentionCheck(ib,regOriginInfo.originLocation,upperBound,desiredRegTo) &&
-				!wouldRegRenameViolateMultiOutputLaw(ib,regOriginInfo.originLocation,upperBound,regOriginInfo.targetRegister,desiredRegTo)){
+				!wouldRegRenameViolateMultiOutputLaws(ib,regOriginInfo.originLocation,upperBound,regOriginInfo.targetRegister,desiredRegTo)){
 			return;
 		}
 	}
@@ -1063,7 +1108,7 @@ if value==NULL, then the constant is not written
 */
 bool getValueInRegisterIfTraceableToRawConstants(const InstructionBuffer* ib,const uint32_t start, uint8_t reg, uint16_t* value){
 	uint32_t i=start;
-	struct InstructionInformation II;
+	InstructionInformation II;
 	while (true){
 		fillInstructionInformation(&II,ib,i);
 		if (doesRegListContain(II.regOUT,reg)){
@@ -1083,10 +1128,188 @@ bool getValueInRegisterIfTraceableToRawConstants(const InstructionBuffer* ib,con
 	}
 }
 
+struct RepeatedConstInfo{
+	uint32_t i0;
+	enum InstructionTypeID id;
+	InstructionBuffer* ib;
+	InstructionInformation II_0;
+	InstructionInformation II_1;
+	uint32_t indexBuff[2];
+	uint16_t cvBuff[4];
+	uint8_t types[2];
+	uint8_t normalizedReg0[4];
+	uint8_t normalizedReg1[4];
+};
+
+bool attemptRepeatedConstantOpt_sub0(const InstructionBuffer* ib,uint32_t* location,const uint32_t start,uint8_t reg,enum InstructionTypeID id){
+	uint32_t i=start-1;
+	InstructionInformation II;
+	while (true){
+		fillInstructionInformation(&II,ib,i);
+		if (doesRegListContain(II.regOUT,reg)){
+			if (II.id==id){
+				*location=i;
+				return true;
+			}
+			if (II.id!=I_MOV_) return false;
+			reg=II.regIN[0];
+		}
+		if (doesRegListContain(II.regIN,reg)) return false; // this is because we don't want to perform the optimization if the intermediate value is needed for something else anyway
+		if (II.doesMoveStack | II.doesRelyOnStack) return false; // this is because the optimization uses the stack as temporary storage
+		assert(!(i==0 | II.doesDestroyReg | II.stopLinearRegTrace));
+		i--;
+	}
+}
+
+
+bool attemptRepeatedConstantOpt_sub1(struct RepeatedConstInfo* repeatedConstInfoPtr){
+	struct RepeatedConstInfo repeatedConstInfo;
+	repeatedConstInfo.i0=repeatedConstInfoPtr->i0;
+	repeatedConstInfo.id=repeatedConstInfoPtr->id;
+	repeatedConstInfo.ib=repeatedConstInfoPtr->ib;
+	fillInstructionInformation(&repeatedConstInfo.II_0,repeatedConstInfo.ib,repeatedConstInfo.i0);
+	if (repeatedConstInfo.II_0.regIN[0]==repeatedConstInfo.II_0.regIN[1])
+		return false; // no need to check, it will and should fail
+	if (attemptRepeatedConstantOpt_sub0(repeatedConstInfo.ib,repeatedConstInfo.indexBuff+0,repeatedConstInfo.i0,repeatedConstInfo.II_0.regIN[0],repeatedConstInfo.id)){
+		repeatedConstInfo.types[0]=1;
+	} else if (attemptRepeatedConstantOpt_sub0(repeatedConstInfo.ib,repeatedConstInfo.indexBuff+0,repeatedConstInfo.i0,repeatedConstInfo.II_0.regIN[1],repeatedConstInfo.id)){
+		repeatedConstInfo.types[0]=0;
+	} else return false;
+	if (repeatedConstInfo.II_0.regIN[repeatedConstInfo.types[0]^1]!=repeatedConstInfo.II_0.regOUT[0]){
+		if (isValueInRegUsedAfterTarget(repeatedConstInfo.ib,repeatedConstInfo.i0,repeatedConstInfo.II_0.regIN[repeatedConstInfo.types[0]^1],NULL))
+			return false; // this is because we don't want to perform the optimization if the intermediate value is needed for something else
+	}
+	if (getValueInRegisterIfTraceableToRawConstants(repeatedConstInfo.ib,repeatedConstInfo.i0-1,repeatedConstInfo.II_0.regIN[repeatedConstInfo.types[0]],repeatedConstInfo.cvBuff+0)){
+		fillInstructionInformation(&repeatedConstInfo.II_1,repeatedConstInfo.ib,repeatedConstInfo.indexBuff[0]);
+		if (getValueInRegisterIfTraceableToRawConstants(repeatedConstInfo.ib,repeatedConstInfo.indexBuff[0]-1,repeatedConstInfo.II_1.regIN[0],repeatedConstInfo.cvBuff+1)){
+			repeatedConstInfo.types[1]=1;
+		} else if (getValueInRegisterIfTraceableToRawConstants(repeatedConstInfo.ib,repeatedConstInfo.indexBuff[0]-1,repeatedConstInfo.II_1.regIN[1],repeatedConstInfo.cvBuff+1)){
+			repeatedConstInfo.types[1]=0;
+		} else return false;
+	} else return false;
+	*repeatedConstInfoPtr=repeatedConstInfo;
+	return true;
+}
+
+bool attemptRepeatedConstantOpt_sub2(const InstructionBuffer* ib,uint32_t* location,const uint32_t start,uint8_t reg,uint8_t expectedOutIndex){
+	uint32_t i=start-1;
+	InstructionInformation II;
+	while (true){
+		fillInstructionInformation(&II,ib,i);
+		if (doesRegListContain(II.regOUT,reg)){
+			if ((II.id==I_LAD0 | II.id==I_LAD1 | II.id==I_LAD2) & II.regOUT[expectedOutIndex]==reg & II.regOUT[expectedOutIndex^1]!=reg){
+				*location=i;
+				return true;
+			}
+			if (II.id!=I_MOV_) return false;
+			reg=II.regIN[0];
+		}
+		if (doesRegListContain(II.regIN,reg)) return false; // this is because we don't want to perform the optimization if the intermediate value is needed for something else anyway
+		if (II.doesMoveStack | II.doesRelyOnStack) return false; // this is because the optimization uses the stack as temporary storage
+		assert(!(i==0 | II.doesDestroyReg | II.stopLinearRegTrace));
+		i--;
+	}
+}
+
+
+bool attemptRepeatedConstantOpt_sub3(struct RepeatedConstInfo* repeatedConstInfoPtr){
+	struct RepeatedConstInfo repeatedConstInfo;
+	repeatedConstInfo.i0=repeatedConstInfoPtr->i0;
+	repeatedConstInfo.id=repeatedConstInfoPtr->id;
+	repeatedConstInfo.ib=repeatedConstInfoPtr->ib;
+	repeatedConstInfo.cvBuff[0]=0;
+	repeatedConstInfo.cvBuff[1]=0;
+	repeatedConstInfo.cvBuff[2]=0;
+	repeatedConstInfo.cvBuff[3]=0;
+	fillInstructionInformation(&repeatedConstInfo.II_0,repeatedConstInfo.ib,repeatedConstInfo.i0);
+	repeatedConstInfo.normalizedReg0[0]=repeatedConstInfo.II_0.regIN[0];
+	repeatedConstInfo.normalizedReg0[1]=repeatedConstInfo.II_0.regIN[1];
+	repeatedConstInfo.normalizedReg0[2]=repeatedConstInfo.II_0.regIN[2];
+	repeatedConstInfo.normalizedReg0[3]=repeatedConstInfo.II_0.regIN[3];
+	//printf("Phase 0\n");
+	if (
+	repeatedConstInfo.normalizedReg0[0]==repeatedConstInfo.normalizedReg0[1] |
+	repeatedConstInfo.normalizedReg0[2]==repeatedConstInfo.normalizedReg0[3] | 
+	repeatedConstInfo.normalizedReg0[0]==repeatedConstInfo.normalizedReg0[2] | 
+	repeatedConstInfo.normalizedReg0[1]==repeatedConstInfo.normalizedReg0[3])
+		return false; // no need to check, it will and should fail
+	//printf("Phase 1\n");
+	if (!(
+	attemptRepeatedConstantOpt_sub2(repeatedConstInfo.ib,repeatedConstInfo.indexBuff+0,repeatedConstInfo.i0,repeatedConstInfo.normalizedReg0[repeatedConstInfo.types[0]=0],0) ||
+	attemptRepeatedConstantOpt_sub2(repeatedConstInfo.ib,repeatedConstInfo.indexBuff+0,repeatedConstInfo.i0,repeatedConstInfo.normalizedReg0[repeatedConstInfo.types[0]=2],0)))
+		return false;
+	repeatedConstInfo.indexBuff[1]=repeatedConstInfo.indexBuff[0];
+	//printf("Phase 2\n");
+	for (uint8_t ri=0;ri<4;ri++){
+		uint8_t r=repeatedConstInfo.normalizedReg0[ri];
+		if ((r!=16 && !doesRegListContain(repeatedConstInfo.II_0.regOUT,r)) && isValueInRegUsedAfterTarget(repeatedConstInfo.ib,repeatedConstInfo.i0,r,NULL))
+			return false; // this is because we don't want to perform the optimization if the intermediate value is needed for something else
+	}
+	//printf("Phase 3\n");
+	if (repeatedConstInfo.types[0]!=0){
+		uint8_t r;
+		r=repeatedConstInfo.normalizedReg0[2];
+		repeatedConstInfo.normalizedReg0[2]=repeatedConstInfo.normalizedReg0[0];
+		repeatedConstInfo.normalizedReg0[0]=r;
+		r=repeatedConstInfo.normalizedReg0[3];
+		repeatedConstInfo.normalizedReg0[3]=repeatedConstInfo.normalizedReg0[1];
+		repeatedConstInfo.normalizedReg0[1]=r;
+	}
+	if (
+	!(repeatedConstInfo.normalizedReg0[1]==16 || attemptRepeatedConstantOpt_sub2(repeatedConstInfo.ib,repeatedConstInfo.indexBuff+1,repeatedConstInfo.i0,repeatedConstInfo.normalizedReg0[1],1)))
+		return false;
+	//printf("Phase 4\n");
+	if (
+	repeatedConstInfo.indexBuff[1]!=repeatedConstInfo.indexBuff[0])
+		return false;
+	//printf("Phase 5\n");
+	if (
+	!getValueInRegisterIfTraceableToRawConstants(repeatedConstInfo.ib,repeatedConstInfo.i0-1,repeatedConstInfo.normalizedReg0[2],repeatedConstInfo.cvBuff+0))
+		return false;
+	//printf("Phase 6\n");
+	if (
+	!(repeatedConstInfo.normalizedReg0[3]==16 || 
+	 getValueInRegisterIfTraceableToRawConstants(repeatedConstInfo.ib,repeatedConstInfo.i0-1,repeatedConstInfo.normalizedReg0[3],repeatedConstInfo.cvBuff+1)))
+		return false;
+	fillInstructionInformation(&repeatedConstInfo.II_1,repeatedConstInfo.ib,repeatedConstInfo.indexBuff[0]);
+	repeatedConstInfo.normalizedReg1[0]=repeatedConstInfo.II_1.regIN[0];
+	repeatedConstInfo.normalizedReg1[1]=repeatedConstInfo.II_1.regIN[1];
+	repeatedConstInfo.normalizedReg1[2]=repeatedConstInfo.II_1.regIN[2];
+	repeatedConstInfo.normalizedReg1[3]=repeatedConstInfo.II_1.regIN[3];
+	if (repeatedConstInfo.II_1.id==I_LAD2){
+		repeatedConstInfo.normalizedReg1[1]=16;
+		repeatedConstInfo.normalizedReg1[2]=repeatedConstInfo.II_1.regIN[1];
+	}
+	//printf("Phase 7\n");
+	if (!(
+	getValueInRegisterIfTraceableToRawConstants(repeatedConstInfo.ib,repeatedConstInfo.indexBuff[0]-1,repeatedConstInfo.normalizedReg1[repeatedConstInfo.types[1]=0],repeatedConstInfo.cvBuff+2) ||
+	getValueInRegisterIfTraceableToRawConstants(repeatedConstInfo.ib,repeatedConstInfo.indexBuff[0]-1,repeatedConstInfo.normalizedReg1[repeatedConstInfo.types[1]=2],repeatedConstInfo.cvBuff+2)))
+		return false;
+	if (repeatedConstInfo.types[1]!=0){
+		uint8_t r;
+		r=repeatedConstInfo.normalizedReg1[2];
+		repeatedConstInfo.normalizedReg1[2]=repeatedConstInfo.normalizedReg1[0];
+		repeatedConstInfo.normalizedReg1[0]=r;
+		r=repeatedConstInfo.normalizedReg1[3];
+		repeatedConstInfo.normalizedReg1[3]=repeatedConstInfo.normalizedReg1[1];
+		repeatedConstInfo.normalizedReg1[1]=r;
+	}
+	//printf("Phase 8\n");
+	if (
+	!(repeatedConstInfo.normalizedReg1[1]==16 || 
+	 getValueInRegisterIfTraceableToRawConstants(repeatedConstInfo.ib,repeatedConstInfo.indexBuff[0]-1,repeatedConstInfo.normalizedReg1[1],repeatedConstInfo.cvBuff+3)))
+		return false;
+	
+	//printf("Phase 9\n");
+	*repeatedConstInfoPtr=repeatedConstInfo;
+	return true;
+}
+
+
 
 bool getValueInSTPifTracableToSTP(const InstructionBuffer* ib,const uint32_t target, uint8_t reg, uint16_t* value){
 	uint32_t i=target;
-	struct InstructionInformation II;
+	InstructionInformation II;
 	while (true){
 		fillInstructionInformation(&II,ib,i);
 		if (doesRegListContain(II.regOUT,reg)){
@@ -1124,7 +1347,7 @@ uint8_t attemptToGetStackInfoForMemoryAccess(const InstructionBuffer* ib,const u
 	assert(II.isMemoryAccess);
 	assert(sdfma!=NULL);
 	sdfma->isDiscrete=II.regIN[1]!=16;
-	sdfma->isWord=!II.usesReg_E;
+	sdfma->isWord=!II.usesReg_D;
 	sdfma->isRead=II.regOUT[0]!=16;
 	if (II.regIN[1]==16){
 		sdfma->offset=ib->buffer[target].arg.B2.a_1;
@@ -1174,17 +1397,24 @@ bool isTraceableToBool(const InstructionBuffer* ib,uint32_t target,uint8_t reg){
 		}
 		case I_SUBC:
 		return true;
+		
 		case I_SSUB:
 		return reg==II.regOUT[0];
+		
+		case I_LAD2:
+		return reg==II.regOUT[1];
+		
 		case I_BL1_:
 		cv=ib->buffer[target].arg.B2.a_1;
 		return cv==1 | cv==0;
+		
 		case I_RL1_:
 		cv=ib->buffer[target].arg.BW.a_1;
 		return cv==1 | cv==0;
-		default:break;
+		
+		default:
+		return false;
 	}
-	return false;
 }
 
 
@@ -1240,16 +1470,5 @@ bool isValueInRegUsedAfterTargetExceptAt(const InstructionBuffer *ib,const uint3
 	}
 	return false;
 }
-
-// returns 16 if it couldn't find one
-uint8_t findUnusedRegisterAfter(const InstructionBuffer* ib,const uint32_t index,const uint8_t notThis0,const uint8_t notThis1){
-	for (uint8_t r=2;r<15;r++){
-		if ((r!=notThis0 & r!=notThis1) && !isValueInRegUsedAfterTarget(ib,index,r,NULL)){
-			return r;
-		}
-	}
-	return 16;
-}
-
 
 

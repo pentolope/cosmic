@@ -496,14 +496,14 @@ FCEN - indicates the end of a function is here (the instruction above is the las
 
 D32U - performs a 32bit division operation for unsigned inputs.
 		[%8,%9]=[%2,%3]/[%4,%5]
-		destroys register values, uses label 00000001
+		destroys register values, uses label 00000001              [internal label usage:00000024,00000025]
 		internally, this pushes a zero to the stack, 
 		then it will load the address of label 00000001,
 		then CALL to the address
 
 R32U - performs a 32bit remainder operation for unsigned inputs. (`/` is used for clearity of register notation)
 		[%6,%7]=[%2,%3]/[%4,%5]
-		destroys register values, uses label 00000002
+		destroys register values, uses label 00000002              [internal label usage:00000026,00000027]
 
 D32S - performs a 32bit division operation for signed inputs.
 		[%8,%9]=[%2,%3]/[%4,%5]
@@ -537,9 +537,9 @@ LAD2 - adds two 32bit numbers, word_1 and word_3 are known to be zero
 		[r0,r1]=[r2,~0]+[r3,~0]
 LAD3 - adds two 64bit numbers
 		[r0,r1,r2,r3]=[r0,r1,r2,r3]+[r4,r5,r6,r7]
-LAD4 - adds two floats                               destroys register values, uses label 00000009
+LAD4 - adds two floats                                destroys register values, uses label 00000009
 		[%2,%3]=[%4,%5]+[%6,%7]
-LAD5 - adds two doubles                              destroys register values, uses label 0000000A
+LAD5 - adds two doubles                               destroys register values, uses label 0000000A
 		[%2,%3,%4,%5]=[%6,%7,%8,%9]+[%A,%B,%C,%D]
 
 LSU0 - subtracts two 32bit numbers

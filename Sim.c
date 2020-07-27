@@ -78,6 +78,12 @@ void performTraceback(uint64_t);
 
 noreturn void bye(void){
 	printf("\nTotal instructions executed:%llu\n",(unsigned long long)instructionExecutionCount);
+	
+	// these were allocated using normal calloc, not cosmic_calloc
+	free(globalSDL_Information.pixelState);
+	free(machineState);
+	free(initialMachineState);
+	
 	if (globalSDL_Information.isSLD_initialized){
 		if (globalSDL_Information.hasPixelBeenWritten){
 			if (globalSDL_Information.event.type != SDL_QUIT){
@@ -197,6 +203,7 @@ void handleCacheMiss(){
 
 
 uint16_t readWord(uint32_t a){
+	//if (a!=machineState->pc) printf("MEM R word:[%08X]\n",a);
 	uint32_t aL=a&((1LU<<11)-1);
 	uint32_t aU=(a>>11);
 	uint32_t aU_=aU&((1LU<<15)-1);
@@ -227,6 +234,7 @@ uint16_t readWord(uint32_t a){
 }
 
 uint8_t readByte(uint32_t a){
+	//printf("MEM R byte:[%08X]\n",a);
 	uint32_t aL=a&((1LU<<11)-1);
 	uint32_t aU=(a>>11);
 	uint32_t aU_=aU&((1LU<<15)-1);
@@ -247,6 +255,7 @@ uint8_t readByte(uint32_t a){
 }
 
 void writeWord(uint32_t a,uint16_t w){
+	//printf("MEM W word:[%08X,%04X]\n",a,w);
 	uint32_t aL=a&((1LU<<11)-1);
 	uint32_t aU=(a>>11);
 	uint32_t aU_=aU&((1LU<<15)-1);
@@ -283,6 +292,7 @@ void writeWord(uint32_t a,uint16_t w){
 }
 
 void writeByte(uint32_t a,uint8_t b){
+	//printf("MEM W byte:[%08X,%02X]\n",a,b);
 	uint32_t aL=a&((1LU<<11)-1);
 	uint32_t aU=(a>>11);
 	uint32_t aU_=aU&((1LU<<15)-1);
@@ -383,9 +393,9 @@ void singleExecute(){
 		case 0x09:writeWord(((uint32_t)machineState->reg[r2]<<16)|machineState->reg[r1],machineState->reg[r0]);break;
 		case 0x0A:machineState->reg[r0]=machineState->reg[r1]+machineState->reg[r2];machineState->ieCountAtSetReg[r0]=instructionExecutionCount;break;
 		case 0x0B:
-		temp=(uint32_t)machineState->reg[r1]+(uint32_t)machineState->reg[r2];
+		temp=(uint32_t)machineState->reg[r1]+(uint32_t)machineState->reg[r2]+(uint32_t)machineState->reg[15];
 		machineState->reg[r0]=(uint16_t)temp;
-		machineState->reg[15]=(temp&0x00010000)!=0;
+		machineState->reg[15]=(temp&0x00030000)!=0;
 		machineState->ieCountAtSetReg[r0]=instructionExecutionCount;
 		machineState->ieCountAtSetReg[15]=instructionExecutionCount;
 		break;
@@ -578,12 +588,14 @@ int main(int argc, char** argv){
 		printf("No arguments given, you give me no reason to start\n");
 		exit(0);
 	}
-	printf("Loading Binary...\n");
-	globalSDL_Information.pixelState=cosmic_calloc((uint32_t)globalSDL_Information.windowSize.width*globalSDL_Information.windowSize.height,sizeof(uint8_t));
-	machineState=cosmic_calloc(1,sizeof(struct MachineState));
-	initialMachineState=cosmic_calloc(1,sizeof(struct MachineState));
+	printf("Initializing Memory...\n");
+	// These allocations use normal calloc, not cosmic_calloc
+	globalSDL_Information.pixelState=calloc((uint32_t)globalSDL_Information.windowSize.width*globalSDL_Information.windowSize.height,sizeof(uint8_t));
+	machineState=calloc(1,sizeof(struct MachineState));
+	initialMachineState=calloc(1,sizeof(struct MachineState));
 	machineState->pc=1LU<<16;
 	machineState->sp=0xFFFE;
+	printf("Loading Binary...\n");
 	struct BinContainer binContainer=loadFileContentsAsBinContainer(argv[1+printEachInstruction]);
 	printf("Integrating Binary...\n");
 	uint32_t mainLabelNumber=0;
