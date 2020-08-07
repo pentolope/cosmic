@@ -21,10 +21,6 @@ struct {
 
 
 
-
-
-
-
 struct cosmic_alloc_block{
 	uint8_t entries[ALT_ALLOC_BLK_SIZE*8][ALT_ALLOC_BLK_SIZE];
 	uint8_t isNotTaken[ALT_ALLOC_BLK_SIZE];

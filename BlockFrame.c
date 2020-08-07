@@ -753,23 +753,19 @@ struct TypeMemberEntry* getOffsetAndTypeStringOfMemberInType(const char* typeStr
 	searchForType(&typeSearchResult,typeString+(indexOfFirstSpaceInTypeString+1),typeNumber);
 	assert(typeSearchResult.didExist);
 	if (typeSearchResult.isGlobal){
-		struct GlobalTypeEntry* globalTypeEntryPtr = 
-			&(blockFrameArray.globalBlockFrame
-			.globalTypeEntries[typeSearchResult.typeEntryIndex]);
+		struct GlobalTypeEntry* globalTypeEntryPtr = blockFrameArray.globalBlockFrame.globalTypeEntries+typeSearchResult.typeEntryIndex;
 		for (uint16_t i=0;i<globalTypeEntryPtr->numberOfMemberEntries;i++){
 			if (areIdentifierStringsEquivalent(
 					globalTypeEntryPtr->arrayOfMemberEntries[i].typeString,componentName)){
-				return &(globalTypeEntryPtr->arrayOfMemberEntries[i]);
+				return globalTypeEntryPtr->arrayOfMemberEntries+i;
 			}
 		}
 	} else {
-		struct BlockFrameTypeEntry* blockFrameTypeEntryPtr = 
-			&(blockFrameArray.entries[typeSearchResult.blockFrameEntryIndex]
-			.typeEntries[typeSearchResult.typeEntryIndex]);
+		struct BlockFrameTypeEntry* blockFrameTypeEntryPtr = blockFrameArray.entries[typeSearchResult.blockFrameEntryIndex].typeEntries+typeSearchResult.typeEntryIndex;
 		for (uint16_t i=0;i<blockFrameTypeEntryPtr->numberOfMemberEntries;i++){
 			if (areIdentifierStringsEquivalent(
 					blockFrameTypeEntryPtr->arrayOfMemberEntries[i].typeString,componentName)){
-				return &(blockFrameTypeEntryPtr->arrayOfMemberEntries[i]);
+				return blockFrameTypeEntryPtr->arrayOfMemberEntries+i;
 			}
 		}
 	}

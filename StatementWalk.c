@@ -280,25 +280,16 @@ int32_t functionStatementsWalk(
 				if (isSegmentOfStringTypeLike(sourceContainer.string,walkingIndex,endOfToken)){
 					// then the first statement is a declaration
 					int32_t indexOfEndOfDeclaration = findEndIndexForConvertType(walkingIndex);
-					// todo: add `auto`
 					bool usedRegister = false;
 					bool usedStatic = false;
 					if (specificStringEqualCheck(sourceContainer.string,walkingIndex,walkingIndex+9,"register ")){
-						if (usedRegister){
-							err_1101_("\'register\' keyword cannot be specified twice",walkingIndex);
-						}
 						usedRegister = true;
 						walkingIndex += 9;
-					}
-					if (specificStringEqualCheck(sourceContainer.string,walkingIndex,walkingIndex+7,"static ")){
-						if (usedStatic){
-							err_1101_("\'static\' keyword cannot be specified twice",walkingIndex);
-						}
+					} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,walkingIndex+7,"static ")){
 						usedStatic = true;
 						walkingIndex += 7;
-					}
-					if (usedStatic&usedRegister){
-						err_1101_("Cannot use 'register' and 'static' at the same time",walkingIndex);
+					} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,walkingIndex+5,"auto ")){
+						walkingIndex += 5;
 					}
 					if (sourceContainer.string[indexOfEndOfDeclaration]=='='){
 						int32_t indexOfStartOfInitializer = emptyIndexAdvance(indexOfEndOfDeclaration+1);
@@ -307,8 +298,10 @@ int32_t functionStatementsWalk(
 						walkingIndex=indexOfEndOfInitializer;
 					} else {
 						char* typeString = fullTypeParseAndAdd(walkingIndex,indexOfEndOfDeclaration,false);
-						addVariableToBlockFrame(typeString,walkingIndex,usedRegister,usedStatic);
-						if (usedStatic) addBlankStaticVariable(typeString);
+						if (doesThisTypeStringHaveAnIdentifierAtBeginning(typeString)){
+							addVariableToBlockFrame(typeString,walkingIndex,usedRegister,usedStatic);
+							if (usedStatic) addBlankStaticVariable(typeString);
+						}
 						cosmic_free(typeString);
 						walkingIndex=indexOfEndOfDeclaration;
 					}
@@ -636,21 +629,13 @@ while (true){
 				bool usedRegister = false;
 				bool usedStatic = false;
 				if (specificStringEqualCheck(sourceContainer.string,walkingIndex,walkingIndex+9,"register ")){
-					if (usedRegister){
-						err_1101_("\'register\' keyword cannot be specified twice",walkingIndex);
-					}
 					usedRegister = true;
 					walkingIndex += 9;
-				}
-				if (specificStringEqualCheck(sourceContainer.string,walkingIndex,walkingIndex+7,"static ")){
-					if (usedStatic){
-						err_1101_("\'static\' keyword cannot be specified twice",walkingIndex);
-					}
+				} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,walkingIndex+7,"static ")){
 					usedStatic = true;
 					walkingIndex += 7;
-				}
-				if (usedStatic&usedRegister){
-					err_1101_("Cannot use 'register' and 'static' at the same time",walkingIndex);
+				} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,walkingIndex+5,"auto ")){
+					walkingIndex += 5;
 				}
 				if (sourceContainer.string[indexOfEndOfDeclaration]=='='){
 					int32_t indexOfStartOfInitializer = emptyIndexAdvance(indexOfEndOfDeclaration+1);
@@ -659,8 +644,10 @@ while (true){
 					walkingIndex=indexOfEndOfInitializer;
 				} else {
 					char* typeString = fullTypeParseAndAdd(walkingIndex,indexOfEndOfDeclaration,false);
-					addVariableToBlockFrame(typeString,walkingIndex,usedRegister,usedStatic);
-					if (usedStatic) addBlankStaticVariable(typeString);
+					if (doesThisTypeStringHaveAnIdentifierAtBeginning(typeString)){
+						addVariableToBlockFrame(typeString,walkingIndex,usedRegister,usedStatic);
+						if (usedStatic) addBlankStaticVariable(typeString);
+					}
 					cosmic_free(typeString);
 					walkingIndex=indexOfEndOfDeclaration;
 				}
@@ -670,7 +657,6 @@ while (true){
 				expressionToAssemblyWithCast(parentInstructionBufferToInsertTo,"void",walkingIndex,endingSemicolon);
 				walkingIndex=endingSemicolon;
 			}
-			
 		}
 		if (stopAfterSingleExpression){
 			removeBlockFrame();
@@ -865,7 +851,7 @@ printInstructionBufferWithMessageAndNumber(&instructionBufferForFunction,typeStr
 						err_1101_("It seems that a variable was being declared at file scope,\n  but something went wrong when trying to figure out if it had an initalizer",gotoFailIndex);
 					}
 					int32_t indexOfSemicolon = endIndexForDeclaration;
-					uint8_t retValForAddingVariable;
+					uint8_t retValForAddingVariable = 0;
 					uint32_t labelID=++globalLabelID;
 					if (isInitializationBeingGiven){
 						indexOfSemicolon = findIndexOfTypicalStatementEnd(endIndexForDeclaration);
@@ -896,6 +882,10 @@ printInstructionBufferWithMessageAndNumber(&instructionBufferForFunction,typeStr
 						err_1101_("identifier collision at file scope for variable, a function was already declared with the same identifier",gotoFailIndex);
 					}
 				}
+			} else if (sourceContainer.string[endIndexForDeclaration]=='='){
+				err_1111_("An identifier is required for initialization",startIndexForDeclaration,endIndexForDeclaration);
+			} else if (sourceContainer.string[endIndexForDeclaration]!=';'){
+				err_1111_("It seems that a type declaration occured at file scope,\n  but something went wrong when trying to figure out if it had an initalizer",startIndexForDeclaration,endIndexForDeclaration);
 			}
 			cosmic_free(typeString);
 		} else {

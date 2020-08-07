@@ -2487,6 +2487,9 @@ void expressionToAssemblyWithInitializer(
 	}
 	int32_t initializerRoot=initializerMapRoot(startIndexForInitializer,endIndexForInitializer);
 	char* typeString = fullTypeParseAndAdd(startIndexForDeclaration,endIndexForDeclaration,false);
+	if (!doesThisTypeStringHaveAnIdentifierAtBeginning(typeString)){
+		err_1111_("An identifier is required for initialization",startIndexForDeclaration,endIndexForDeclaration);
+	}
 	char* typeStringNI = applyToTypeStringRemoveIdentifierToNew(typeString); // what about potentially having multiple identifiers?
 	char* identifier = applyToTypeStringGetIdentifierToNew(typeString);
 	cosmic_free(typeString);
