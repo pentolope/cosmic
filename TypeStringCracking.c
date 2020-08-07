@@ -52,35 +52,36 @@ char* crackStructUnion(char* string, int32_t start){
 
 // runs in place
 void crackArraysAndEnum(char* string){
-	for (int32_t i=0;string[i];i++){
-		if (isSectionOfStringEquivalent(string,i,"[ ]")){
-			string[i  ]='?';
-			string[i+1]=26;
-			string[i+2]=26;
+	int32_t i0;
+	int32_t i1;
+	for (i0=0;string[i0];i0++){
+		if (isSectionOfStringEquivalent(string,i0,"[ ]")){
+			string[i0  ]='?';
+			string[i0+1]=26;
+			string[i0+2]=26;
 		}
 	}
 	copyDownForInPlaceEdit(string);
-	for (int32_t i=0;string[i];i++){
-		if (string[i]=='['){
-			int32_t i1=getIndexOfMatchingEnclosement(string,i);
+	for (i0=0;string[i0];i0++){
+		if (string[i0]=='['){
+			i1=getIndexOfMatchingEnclosement(string,i0);
 			assert(i1!=-1); // type string corruption
-			
-			string[i   ]=26;
-			string[i+1 ]='#';
+			string[i0  ]=26;
+			string[i0+1]='#';
 			string[i1  ]=26;
 			string[i1-1]=26;
 		}
 	}
 	copyDownForInPlaceEdit(string);
-	for (int32_t i=0;string[i];i++){
-		if (isSectionOfStringEquivalent(string,i,"enum ")){
-			int32_t end=getIndexOfNthSpace(string+i,1);
+	for (i0=0;string[i0];i0++){
+		if (isSectionOfStringEquivalent(string,i0,"enum ")){
+			int32_t end=getIndexOfNthSpace(string+i0,1);
 			assert(end!=-1); // type string corruption
-			end+=i;
-			for (int32_t i1=i;i1<end;i1++) string[i1]=26;
-			string[i  ]='i';
-			string[i+1]='n';
-			string[i+2]='t';
+			end+=i0;
+			string[i0  ]='i';
+			string[i0+1]='n';
+			string[i0+2]='t';
+			for (i1=i0+3;i1<end;i1++) string[i1]=26;
 		}
 	}
 	copyDownForInPlaceEdit(string);
@@ -88,21 +89,24 @@ void crackArraysAndEnum(char* string){
 
 void strInPlaceReplaceForTypeCrack(char* string,const char* from,const char to){
 	int32_t fromLen=strlen(from);
-	for (int32_t i=0;string[i];i++){
-		if (string[i]==from[0]){ // this check reduces amount of function call overhead
-			if (isSectionOfStringEquivalent(string,i,from)){
-				for (int32_t i1=i;i1<i+fromLen;i1++) string[i1]=26;
-				string[i  ]=' ';
-				string[i+1]=to;
-				string[i+2]=' ';
-				copyDownForInPlaceEdit(string+i);
+	char cFrom=from[0];
+	for (int32_t i0=0;string[i0];i0++){
+		if (string[i0]==cFrom){ // this check reduces amount of function call overhead
+			if (isSectionOfStringEquivalent(string,i0,from)){
+				string[i0  ]=' ';
+				string[i0+1]=to;
+				string[i0+2]=' ';
+				int32_t i3=i0+fromLen;
+				for (int32_t i1=i0+3;i1<i3;i1++) string[i1]=26;
+				
+				copyDownForInPlaceEdit(string+i0);
 			}
 		}
 	}
 }
 
 void crackTypeNames(char* string){
-	const char* from[]={
+	static const char * const from[]={
 		/*z*/" unsigned long long ",
 		/*x*/" unsigned long ",
 		/*c*/" unsigned int ",
@@ -118,7 +122,7 @@ void crackTypeNames(char* string){
 		/*f*/" volatile ",
 		/*d*/" void "
 	};
-	const char to[]={'z','x','c','v','b','n','m','l','k','j','h','g','f','d',0};
+	static const char to[]={'z','x','c','v','b','n','m','l','k','j','h','g','f','d',0};
 	for (uint16_t i=0;to[i];i++){
 		strInPlaceReplaceForTypeCrack(string,from[i],to[i]);
 	}

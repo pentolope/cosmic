@@ -463,7 +463,7 @@ void finalOutputFromCompile(const char* filePath){
 	cosmic_free(cis_global_static_data.byteCode);
 }
 
-// if destroyAllCompilerInfo() is run after the preprocesser and compiler, then all global state effected by the preprocesser and compiler will be reset when it finishes
+// if destroyAllCompilerInfo() is run after the preprocesser and compiler, then nearly all global state effected by the preprocesser and compiler will be reset when it finishes
 void destroyAllCompilerInfo(){
 	for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalFunctionEntrySlots;i++){
 		struct GlobalFunctionEntry gfe=blockFrameArray.globalBlockFrame.globalFunctionEntries[i];
@@ -500,7 +500,7 @@ void destroyAllCompilerInfo(){
 	cosmic_free(initializerMap.entries);
 	cosmic_free(expressionTreeGlobalBuffer.expressionTreeNodes);
 	cosmic_free(globalTypedefEntries.entries);
-	cosmic_free(sourceContainer.string);
+	cosmic_free((char*)sourceContainer.string);
 	cosmic_free(sourceContainer.sourceChar);
 	globalInstructionBuffersOfFunctions.slots=NULL;
 	globalInstructionBuffersOfFunctions.numberOfSlotsTaken=0;

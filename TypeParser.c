@@ -6,18 +6,18 @@
 /*
 NOTES:
 
- - bitfields are not implemented at all. Attempting to use them could cause weird behaviour, because there is nothing checking for them.
+ - bitfields are not implemented at all. Attempting to use them could cause weird behaviour, because there is nothing checking for them. ----------working on it
  - "const" and "volatile" will appear directly before the thing that is declared const or volatile.
  - in some rare cases, if the type does not have an identifier and it's a very complex type, 
      it may not recognize the starting point correctly, 
      and soon after would throw an error when it sees that something is invalid.
- - I am unsure if the way the enum assigns values automatically is the way it should be done. As of now, it assigns values in increasing order (starting at 1) with a value that is not already taken.
-     Further, it only accepts base 10 numbers with no suffix
+ - The way the enum assigns values automatically is NOT the way it should be done. As of now, it assigns values in increasing order (starting at 1) with a value that is not already taken.
+     Further, it only accepts base 10 numbers with no suffix (it should allow constant expressions with values from enum items previously in the list)
  - I think everything is working, except for the things I just mentioned of course.
  - This file is to be included by "TypeConverter.c"
 
  TODO: 
- - write check to recursively apply "const" and "volatile" to struct and union members
+ - write check to recursively apply "const" and "volatile" to struct and union members (is this needed? I kinda don't think so because of how expressions handle types but maybe it could if a `const struct` had a `struct` in it)
  - write sanity checker for type strings
 */
 
@@ -26,7 +26,7 @@ NOTES:
 /*
 this (or the next 2) is probably the function that you are looking for if you are looking for a public-like function that deals with parsing types.
 returns a new string on the heap of the result, which is seperated by spaces (without an ending space).
-struct, enum, union will preface the name or a bracket (and the name may be followed by a bracket)
+struct, enum, union will preface the name (and the name may be followed by a bracket)
 "long int" does NOT become "int long", and other things of that sort (I got that working!)
 
 Remember, what comes out of here is not finished. It needs to have the structure declarations taken out and typedefs resolved by "breakDownTypeAndAdd()"
@@ -37,13 +37,13 @@ char* convertType(int32_t startIndex, int32_t endIndex);
 finds the endIndex for a C style declaration, primarily for convertType(). Does not include the brackets for function declarations
 doesn't check must about the type declaration to see it's validity
 */
-int32_t findEndIndexForConvertType(char *string, int32_t startIndex){
+int32_t findEndIndexForConvertType(int32_t startIndex){
 	bool wasCloseParenLast = false; // this isn't set to false for spaces and newlines when they are last
 	char c;
 	uint16_t enclosementLevel = 0; // unsigned is kinda important
 	int32_t i=startIndex;
-	while (string[i]!=0){
-		c = string[i];
+	const char* string = sourceContainer.string;
+	while ((c = string[i])!=0){
 		if (c=='{' & wasCloseParenLast){
 			if (enclosementLevel!=0){
 				break; // this causes the fail condition at the end of the function
@@ -68,10 +68,11 @@ int32_t findEndIndexForConvertType(char *string, int32_t startIndex){
 			wasCloseParenLast = false;
 		}
 		i++;
-	}	
-	printf("error when trying to find end for that type declaration\n"); // for an index, it is probably best to use the startIndex
-	exit(1);
+	}
+	err_1101_("Could not find end to the type declaration that started here",startIndex);
+	return 0; // unreachable
 }
+
 
 // doesn't check for validity of identifier (if it exists)
 // expects that the type string has had typedef expansion on it already
@@ -79,20 +80,16 @@ int32_t findEndIndexForConvertType(char *string, int32_t startIndex){
 bool doesThisTypeStringHaveAnIdentifierAtBeginning(const char* string){
 	int32_t indexOfSpace = getIndexOfFirstSpaceInString(string);
 	if (indexOfSpace==-1){
-		// not going to check for things that must have spaces in them
-		if (doStringsMatch(string,"char") || 
+		// not going to check for things that must have spaces in them. And all type strings with identifiers should have spaces.
+		assert(doStringsMatch(string,"char") || 
 			doStringsMatch(string,"short") ||
 			doStringsMatch(string,"int") ||
 			doStringsMatch(string,"long") ||
 			doStringsMatch(string,"float") ||
 			doStringsMatch(string,"double") ||
 			doStringsMatch(string,"void") ||
-			doStringsMatch(string,"_Bool")){
-			
-			return false;
-		}
-		printf("Internal Error: This type string has an identifier but no type. That is just wrong. [%s]\n",string);
-		exit(1);
+			doStringsMatch(string,"_Bool"));
+		return false;
 	} else {
 		return !(
 			isSectionOfStringEquivalent(string,0,"char ") ||
@@ -112,7 +109,8 @@ bool doesThisTypeStringHaveAnIdentifierAtBeginning(const char* string){
 			isSectionOfStringEquivalent(string,0,"volatile ") ||
 			isSectionOfStringEquivalent(string,0,"* ") ||
 			isSectionOfStringEquivalent(string,0,"[ ") ||
-			isSectionOfStringEquivalent(string,0,"( ")
+			isSectionOfStringEquivalent(string,0,"( ") ||
+			isSectionOfStringEquivalent(string,0,": ")
 			);
 	}
 }
@@ -167,6 +165,7 @@ char* giveNumberToSingleEnumEnumerator(char* string, int32_t indexOfEnumerator, 
 
 // the input string probably has cosmic_realloc() called on it, which is then returned
 char* giveNumbersToSingleEnumList(char* string, int32_t indexOfEnum){
+	Start:;
 	if (string[indexOfEnum]!='{'){
 		printf("giveNumbersToSingleEnumList() called wrong\n");
 		exit(1);
@@ -191,7 +190,7 @@ char* giveNumbersToSingleEnumList(char* string, int32_t indexOfEnum){
 				// the "string[i-1]" is to copy down the null terminator as well
 				string[i-2]=string[i];
 			}
-			return giveNumbersToSingleEnumList(string,indexOfEnum);
+			goto Start;
 		}
 	}
 	struct EnumEnumerator{
@@ -261,7 +260,7 @@ char* giveNumbersForAllEnumEnumerators(char* string){
 	int32_t startIndex = 6;
 	if (length>5 && specificStringEqualCheck(string,0,5,"enum ")){
 		for (int32_t i=7;i<length;i++){
-			if (string[i]=='{'){
+			if (string[i]==' '){
 				if (string[++i]!='{') break;
 				string = giveNumbersToSingleEnumList(string,i);
 				length = strlen(string);
@@ -365,16 +364,10 @@ int32_t advancedSourceFindSub(char* string, int32_t sourceStart, int32_t sourceE
 			while (string[i1]==' ' | string[i1]=='\n'){
 				++i1;didStringAdvance=true;
 			}
-			if (i0>sourceEnd | sourceContainer.string[i0]==0 | (didSourceAdvance&!didStringAdvance)){
-				return -1;
-			}
+			if (i0>sourceEnd | sourceContainer.string[i0]==0 | (didSourceAdvance&!didStringAdvance)) return -1;
 			assert(string[i1]!=0);
-			if (string[i1]!=sourceContainer.string[i0]){
-				return -1;
-			}
-			if (string[i1]==']'){
-				return i0;
-			}
+			if (string[i1]!=sourceContainer.string[i0]) return -1;
+			if (string[i1]==']') return i0;
 			++i0;++i1;
 		}
 	}
@@ -421,7 +414,7 @@ char* resolveConstantExpressionInTypeString(char* string,int32_t sourceStart,int
 						exit(1);
 					}
 					int16_t root=buildExpressionTreeToGlobalBufferAndReturnRootIndex(internalSourceStart,internalSourceEnd,true);
-					assert(root!=-1); // empty brackets should have already been check for
+					assert(root!=-1); // empty brackets should have already been checked for
 					uint32_t arrSize=expressionToConstantValue("unsigned long",root);
 					char numberBuffer[14] = {0};
 					snprintf(numberBuffer,13,"%lu",(unsigned long)arrSize);
@@ -447,12 +440,6 @@ char* resolveConstantExpressionInTypeString(char* string,int32_t sourceStart,int
 char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* stringIn, uint16_t* errorValue, int32_t sourceStart, int32_t sourceEnd){
 	*errorValue=0;
 	char* stringInternal = copyStringToHeapString(stringIn);
-	for (int32_t i=0;stringInternal[i];i++){
-		if (stringInternal[i]=='\"' | stringInternal[i]=='\''){
-			*errorValue=2;
-			return NULL;
-		}
-	}
 	if (isArrayBracketsInvalidOnTypeString(stringInternal)){
 		*errorValue=3;
 		return NULL;
@@ -468,22 +455,19 @@ char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* st
 	
 	uint16_t numberOfSegments = 1;
 	for (int32_t i=0;i<length;i++){
-		if (stringInternal[i]==' '){
-			numberOfSegments++;
-		}
+		if (stringInternal[i]==' ') numberOfSegments++;
 	}
-	struct SegmentOfTypeInTypeString *segments = cosmic_malloc(
-		numberOfSegments*sizeof(struct SegmentOfTypeInTypeString));
+	struct SegmentOfTypeInTypeString *segments = cosmic_malloc(numberOfSegments*sizeof(struct SegmentOfTypeInTypeString));
 	{
 		// there is a copy of this block later in this function
 		uint16_t walkingSegmentIndex = 0;
 		int32_t nextStartIndex = 0;
-		for (int32_t i=0;i<length;i++){
-			if (stringInternal[i]==' '){
+		for (int32_t i0=0;i0<length;i0++){
+			if (stringInternal[i0]==' '){
 				segments[walkingSegmentIndex  ].hasHadSwap = false;
 				segments[walkingSegmentIndex  ].startInString = nextStartIndex;
-				segments[walkingSegmentIndex++].endInString = i;
-				nextStartIndex = i+1;
+				segments[walkingSegmentIndex++].endInString = i0;
+				nextStartIndex = i0+1;
 			}
 		}
 		segments[walkingSegmentIndex].hasHadSwap = false;
@@ -496,19 +480,20 @@ char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* st
 	// This might cause some slight and silent problems when checking if types are identical, but I don't think it should be too bad
 	
 	for (uint16_t i=3;i<numberOfSegments;i++){
-		struct SegmentOfTypeInTypeString *offsetSegments = &(segments[i-3]);
-		if (!offsetSegments[0].hasHadSwap & 
-			!offsetSegments[1].hasHadSwap & 
-			!offsetSegments[2].hasHadSwap &
-			!offsetSegments[3].hasHadSwap){
+		struct SegmentOfTypeInTypeString *offsetSegments = segments+(i-3);
+		if (
+		!offsetSegments[0].hasHadSwap & 
+		!offsetSegments[1].hasHadSwap & 
+		!offsetSegments[2].hasHadSwap &
+		!offsetSegments[3].hasHadSwap){
 			
-			if ((specificStringEqualCheck(stringInternal,offsetSegments[3].startInString,offsetSegments[3].endInString,"int") &&
-				specificStringEqualCheck(stringInternal,offsetSegments[2].startInString,offsetSegments[2].endInString,"long") &&
-				specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"long") &&
-				(specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"unsigned") || 
-				specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"unsigned")))
-				){
-				
+			if ((
+			specificStringEqualCheck(stringInternal,offsetSegments[3].startInString,offsetSegments[3].endInString,"int") &&
+			specificStringEqualCheck(stringInternal,offsetSegments[2].startInString,offsetSegments[2].endInString,"long") &&
+			specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"long") && (
+			specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"signed") || 
+			specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"unsigned")))
+			){
 				offsetSegments[0].hasHadSwap = true;
 				offsetSegments[1].hasHadSwap = true;
 				offsetSegments[2].hasHadSwap = true;
@@ -524,155 +509,137 @@ char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* st
 	}
 	
 	for (uint16_t i=2;i<numberOfSegments;i++){
-		struct SegmentOfTypeInTypeString *offsetSegments = &(segments[i-2]);
-		if (!offsetSegments[0].hasHadSwap & 
-			!offsetSegments[1].hasHadSwap & 
-			!offsetSegments[2].hasHadSwap){
+		struct SegmentOfTypeInTypeString *offsetSegments = segments+(i-2);
+		if (
+		!offsetSegments[0].hasHadSwap & 
+		!offsetSegments[1].hasHadSwap & 
+		!offsetSegments[2].hasHadSwap){
 			
-			bool doSwap = false; // this is to help split up the logic so it isn't all in one crazy if expression
+			if ((
+			specificStringEqualCheck(stringInternal,offsetSegments[2].startInString,offsetSegments[2].endInString,"signed") ||
+			specificStringEqualCheck(stringInternal,offsetSegments[2].startInString,offsetSegments[2].endInString,"unsigned")) &&
+			specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"int") && (
+			specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"short") ||
+			specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"long"))
+			){
+			} else if ((
+			specificStringEqualCheck(stringInternal,offsetSegments[2].startInString,offsetSegments[2].endInString,"signed") ||
+			specificStringEqualCheck(stringInternal,offsetSegments[2].startInString,offsetSegments[2].endInString,"unsigned")) &&
+			specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"long") &&
+			specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"long")
+			){
+			} else if (
+			specificStringEqualCheck(stringInternal,offsetSegments[2].startInString,offsetSegments[2].endInString,"long") &&
+			specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"long") &&
+			specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"int")
+			){
+			} else continue;
 			
-			if ((specificStringEqualCheck(stringInternal,offsetSegments[2].startInString,offsetSegments[2].endInString,"signed") ||
-				specificStringEqualCheck(stringInternal,offsetSegments[2].startInString,offsetSegments[2].endInString,"unsigned")) &&
-				specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"int") &&
-				(specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"short") ||
-				specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"long"))
-				){
-				
-				doSwap = true;
-			} else if ((specificStringEqualCheck(stringInternal,offsetSegments[2].startInString,offsetSegments[2].endInString,"signed") ||
-				specificStringEqualCheck(stringInternal,offsetSegments[2].startInString,offsetSegments[2].endInString,"unsigned")) &&
-				specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"long") &&
-				specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"long")
-				){
-				
-				doSwap = true;
-			} else if (specificStringEqualCheck(stringInternal,offsetSegments[2].startInString,offsetSegments[2].endInString,"long") &&
-				specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"long") &&
-				specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"int")
-				){
-				
-				doSwap = true;
-			}
-			if (doSwap){
-				offsetSegments[0].hasHadSwap = true;
-				offsetSegments[1].hasHadSwap = true;
-				offsetSegments[2].hasHadSwap = true;
-				struct SegmentOfTypeInTypeString tempValue = offsetSegments[0];
-				offsetSegments[0] = offsetSegments[2];
-				offsetSegments[2] = tempValue;
-			}
+			offsetSegments[0].hasHadSwap = true;
+			offsetSegments[1].hasHadSwap = true;
+			offsetSegments[2].hasHadSwap = true;
+			struct SegmentOfTypeInTypeString tempValue = offsetSegments[0];
+			offsetSegments[0] = offsetSegments[2];
+			offsetSegments[2] = tempValue;
 		}
 	}
 	
 	for (uint16_t i=1;i<numberOfSegments;i++){
-		struct SegmentOfTypeInTypeString *offsetSegments = &(segments[i-1]);
-		if (!offsetSegments[0].hasHadSwap & !offsetSegments[1].hasHadSwap){
-			bool doSwap = false; // this is to help split up the logic so it isn't all in one crazy if expression
-			
-			if ((specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"signed") ||
-				specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"unsigned")) &&
-				(specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"char") ||
-				specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"short") ||
-				specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"int") ||
-				specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"long"))
-				){
-				
-				doSwap = true;
-			} else if (specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"int") &&
-				(specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"short") ||
-				specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"long"))
-				){
-				
-				doSwap = true;
-			} else if (specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"long") &&
-				specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"double")
-				){
-				
-				doSwap = true;
-			} else if (specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"long") &&
-				specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"long")
-				){
-				
+		struct SegmentOfTypeInTypeString *offsetSegments = segments+(i-1);
+		if (
+		!offsetSegments[0].hasHadSwap &
+		!offsetSegments[1].hasHadSwap){
+			if ((
+			specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"signed") ||
+			specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"unsigned")) && (
+			specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"char") ||
+			specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"short") ||
+			specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"int") ||
+			specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"long"))
+			){
+			} else if (
+			specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"int") && (
+			specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"short") ||
+			specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"long"))
+			){
+			} else if (
+			specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"long") &&
+			specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"double")
+			){
+			} else if (
+			specificStringEqualCheck(stringInternal,offsetSegments[1].startInString,offsetSegments[1].endInString,"long") &&
+			specificStringEqualCheck(stringInternal,offsetSegments[0].startInString,offsetSegments[0].endInString,"long")
+			){
 				// in this case, a swap isn't actually necessary, because they are the same word. However, for the future checks of validity, the segments should say it was swapped
 				offsetSegments[0].hasHadSwap = true;
 				offsetSegments[1].hasHadSwap = true;
-			}
+				continue;
+			} else continue;
 			
-			if (doSwap){
-				offsetSegments[0].hasHadSwap = true;
-				offsetSegments[1].hasHadSwap = true;
-				struct SegmentOfTypeInTypeString tempValue = offsetSegments[0];
-				offsetSegments[0] = offsetSegments[1];
-				offsetSegments[1] = tempValue;
-			}
+			offsetSegments[0].hasHadSwap = true;
+			offsetSegments[1].hasHadSwap = true;
+			struct SegmentOfTypeInTypeString tempValue = offsetSegments[0];
+			offsetSegments[0] = offsetSegments[1];
+			offsetSegments[1] = tempValue;
 		}
 	}
-	// reorder operations are now done, however it is time for a validity check on the order of type keywords
+	// reorder operations are now done. now a validity check on the order of type keywords is performed
 	for (uint16_t i=0;i<numberOfSegments;i++){
-		if (!segments[i].hasHadSwap &&
-			(specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"unsigned") ||
-			specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"signed") ||
-			specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"char") ||
-			specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"short") ||
-			specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"int") ||
-			specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"long") ||
-			specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"double") ||
-			specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"float"))
-			){
+		if (!segments[i].hasHadSwap && (
+		specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"unsigned") ||
+		specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"signed") ||
+		specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"char") ||
+		specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"short") ||
+		specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"int") ||
+		specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"long") ||
+		specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"double") ||
+		specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"float"))
+		){
 			
 			// then either this is a single type specifier, or something was out of order (and an error should be thrown).
-			bool isWrong = false; // using this to split up the logic so the if expressions are not super huge
 			int16_t offset_i = i-1;
 			// this for loop is to avoid having huge duplicated code for the if statement's expression. It loops twice.
 			for (uint8_t tempI=0;tempI<2;tempI++){
-				if (tempI==1){
-					offset_i = i+1;
-				}
-				bool isSafe = !((i==0 & tempI==0) | (i==(numberOfSegments-1) & tempI==1)); // this is to prevent out of bounds access
-				if (isSafe &&
-					(specificStringEqualCheck(stringInternal,segments[offset_i].startInString,segments[offset_i].endInString,"unsigned") ||
+				if (!((i==0 & tempI==0) | (i==(numberOfSegments-1) & tempI==1))){ // this is to prevent out of bounds access
+					if (
+					specificStringEqualCheck(stringInternal,segments[offset_i].startInString,segments[offset_i].endInString,"unsigned") ||
 					specificStringEqualCheck(stringInternal,segments[offset_i].startInString,segments[offset_i].endInString,"signed") ||
 					specificStringEqualCheck(stringInternal,segments[offset_i].startInString,segments[offset_i].endInString,"char") ||
 					specificStringEqualCheck(stringInternal,segments[offset_i].startInString,segments[offset_i].endInString,"short") ||
 					specificStringEqualCheck(stringInternal,segments[offset_i].startInString,segments[offset_i].endInString,"int") ||
 					specificStringEqualCheck(stringInternal,segments[offset_i].startInString,segments[offset_i].endInString,"long") ||
 					specificStringEqualCheck(stringInternal,segments[offset_i].startInString,segments[offset_i].endInString,"double") ||
-					specificStringEqualCheck(stringInternal,segments[offset_i].startInString,segments[offset_i].endInString,"float"))
+					specificStringEqualCheck(stringInternal,segments[offset_i].startInString,segments[offset_i].endInString,"float")
 					){
-					
-					isWrong = true;
+						*errorValue=1;
+						return NULL;
+					}
 				}
-			}
-			if (isWrong){
-				*errorValue=1;
-				return NULL;
+				offset_i = i+1; // this is set for the second iteration only
 			}
 		}
 	}
 	// now we know that everything is in the correct order and is valid.
 	// however, this is still some more to do.
 	{
-		// first, let's apply what has been done to a new string
+		// first, let's apply what has been done to a different string
 		char* tempString = cosmic_malloc(length+1);
 		int32_t walkingIndex = 0;
-		for (int32_t i=0;i<length;i++){
-			tempString[i]=' '; // set all to spaces so that placement is easy
-		}
+		for (int32_t i=0;i<length;i++) tempString[i]=' '; // set all to spaces so that placement is easy
+		
 		for (uint16_t segmentIndex=0;segmentIndex<numberOfSegments;segmentIndex++){
 			int32_t startAt = segments[segmentIndex].startInString;
 			int32_t endAt = segments[segmentIndex].endInString;
-			for (int32_t stringIndex=startAt;stringIndex<endAt;stringIndex++){
-				tempString[walkingIndex++]=stringInternal[stringIndex];
-			}
+			for (int32_t stringIndex=startAt;stringIndex<endAt;stringIndex++) tempString[walkingIndex++]=stringInternal[stringIndex];
+			
 			tempString[walkingIndex++]=' ';
 		}
 		// tempString doesn't need null termination
 		
 		// the following copies tempString to stringInternal
 		// the reason why is to help prevent heap fragmentation a little
-		for (int32_t i=0;i<length;i++){
-			stringInternal[i]=tempString[i];
-		}
+		for (int32_t i=0;i<length;i++) stringInternal[i]=tempString[i];
+		
 		cosmic_free(tempString);
 	}
 	// now let's normalize the representations, so that type equivalence can be checked easier
@@ -684,9 +651,7 @@ char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* st
 				{
 					uint16_t newNumberOfSegments = 1;
 					for (int32_t i0=0;i0<length;i0++){
-						if (stringInternal[i0]==' '){
-							newNumberOfSegments++;
-						}
+						if (stringInternal[i0]==' ') newNumberOfSegments++;
 					}
 					if (newNumberOfSegments!=numberOfSegments){
 						numberOfSegments = newNumberOfSegments;
@@ -757,8 +722,8 @@ char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* st
 			}
 			// check for unnessary "int" after other type keywords
 			if (i!=0 &&
-				specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"int") &&
-				(specificStringEqualCheck(stringInternal,segments[i-1].startInString,segments[i-1].endInString,"short") ||
+				specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"int") && (
+				specificStringEqualCheck(stringInternal,segments[i-1].startInString,segments[i-1].endInString,"short") ||
 				specificStringEqualCheck(stringInternal,segments[i-1].startInString,segments[i-1].endInString,"long"))
 				){
 				
@@ -773,8 +738,8 @@ char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* st
 			}
 			// check for unnessary "signed"
 			if (i+1<numberOfSegments &&
-				specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"signed") &&
-				(specificStringEqualCheck(stringInternal,segments[i+1].startInString,segments[i+1].endInString,"long") ||
+				specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"signed") && (
+				specificStringEqualCheck(stringInternal,segments[i+1].startInString,segments[i+1].endInString,"long") ||
 				specificStringEqualCheck(stringInternal,segments[i+1].startInString,segments[i+1].endInString,"int") ||
 				specificStringEqualCheck(stringInternal,segments[i+1].startInString,segments[i+1].endInString,"short"))
 				){
@@ -803,10 +768,9 @@ char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* st
 			}
 			// check for "volatile" or "const" at end of typestring or end of member or end of parameter and move it up
 			char tempC;
-			if (((i==numberOfSegments-1 & i!=0) |
-				(i+1<numberOfSegments && 
-				((tempC=stringInternal[segments[i+1].startInString]), (tempC==';' | tempC==',' | tempC==')')))) &&
-				(specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"volatile") ||
+			if (((i==numberOfSegments-1 & i!=0) | (i+1<numberOfSegments && 
+				((tempC=stringInternal[segments[i+1].startInString]), (tempC==';' | tempC==',' | tempC==')')))) && (
+				specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"volatile") ||
 				specificStringEqualCheck(stringInternal,segments[i].startInString,segments[i].endInString,"const"))
 				){
 				
@@ -839,7 +803,7 @@ char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* st
 							}
 						}
 						if (temp1==iTo){
-							printf("Internal Error: typeString corrupted (no open curly bracket or empty brackets while moving volatile)\n");
+							printf("Internal Error: typeString corrupted (no open curly bracket or empty brackets while moving volatile/const)\n");
 							exit(1);
 						}
 						continue;
@@ -850,33 +814,26 @@ char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* st
 					break;
 				}
 				++iTo;
-				// I'm doing this the lazy way, I don't want to write a better one right now
-				char* temp0=copyStringSegmentToHeap(stringInternal,0,segments[iTo].startInString);
-				char* temp1=copyStringSegmentToHeap(stringInternal,segments[iTo].startInString,segments[i].startInString-1);
-				char* temp2=copyStringSegmentToHeap(stringInternal,segments[i].endInString,strlen(stringInternal));
-				char* temp3;
-				if (isHandlingConst){
-					temp3=strMerge2(temp0,"const");
-				} else {
-					temp3=strMerge2(temp0,"volatile");
-				}
-				char* temp4=strMerge3(temp3," ",temp1);
-				char* newStringInternal=strMerge2(temp4,temp2);
-				cosmic_free(stringInternal);cosmic_free(temp0);cosmic_free(temp1);cosmic_free(temp2);cosmic_free(temp3);cosmic_free(temp4);
-				stringInternal=newStringInternal;
+				// I'm doing this the lazy-ish way, I don't want to write a better one right now
+				char* temp0 = copyStringSegmentToHeap(stringInternal,0,segments[iTo].startInString);
+				char* temp1 = copyStringSegmentToHeap(stringInternal,segments[iTo].startInString,segments[i].startInString-1);
+				char* temp2 = copyStringSegmentToHeap(stringInternal,segments[i].endInString,strlen(stringInternal));
+				char* temp3 = strMerge5(temp0,isHandlingConst?"const":"volatile"," ",temp1,temp2);
+				cosmic_free(stringInternal);cosmic_free(temp0);cosmic_free(temp1);cosmic_free(temp2);
+				stringInternal = temp3;
 				isSegmentRebuildNecessary = true;
 				continue;
 			}
 			i++;
 		}
 	}
-	// and nearly done with normalizing everything
+	cosmic_free(segments);
+	// and nearly done with normalizing everything, just need to:
 	// 1. add unique names to anonymous struct, enum, union. 
 	// 2. add values to any enum's enumerator-lists there may be
-	cosmic_free(segments);
 	stringInternal = giveNamesToAllAnonymous(stringInternal);
 	stringInternal = giveNumbersForAllEnumEnumerators(stringInternal);
-	// and done with normalizing everything
+	// finally done with normalizing everything
 	char* stringOut = copyStringToHeapString(stringInternal); // lets ensure a proper sized allocation area for this string
 	cosmic_free(stringInternal);
 	return stringOut;
@@ -889,9 +846,8 @@ struct TypeToken{
 	int32_t stringIndexStart;
 	int32_t stringIndexEnd;
 	int16_t enclosementMatch;
-	bool isNonSymbol;
-	bool doSkip;
 	bool isKeywordOrTypedefed;
+	bool isNonSymbol;
 	char firstCharacter;
 };
 
@@ -901,9 +857,6 @@ struct TypeTokenArray{
 	int16_t length;
 };
 
-bool isCharNonSymbolForTypeToken(char c){
-	return ((c>='0') & (c<='9')) | ((c>='A') & (c<='Z')) | ((c>='a') & (c<='z')) | (c=='_') | (c=='.'); // the . is for the ... for variadic arguments
-}
 
 void writeIndexToNextSlotInTypeTokenArray(struct TypeTokenArray typeTokenArray, int16_t index){
 	for (int16_t i=0;i<typeTokenArray.length;i++){
@@ -911,15 +864,14 @@ void writeIndexToNextSlotInTypeTokenArray(struct TypeTokenArray typeTokenArray, 
 			typeTokenArray.indexesForRearrangement[i] = index;
 			return;
 		} else if (typeTokenArray.indexesForRearrangement[i]==index){
-			printf("Type Parse Error: index:%d:got duped (%c)\n",index,typeTokenArray.typeTokens[index].firstCharacter);
-			exit(1);
+			err_1101_("(Internal) failure to parse type (ID:4)",typeTokenArray.typeTokens[index].stringIndexStart);
 		}
 	}
-	printf("Type parsing must have failed, because I ran out of slots\n");
-	exit(1);
+	err_1101_("(Internal) failure to parse type (ID:3)",typeTokenArray.typeTokens[index].stringIndexStart);
 }
 
 int16_t findStartForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundStart, int16_t boundEnd){
+	Start:;
 	bool doContainerStart = false;
 	bool doStartSkip = false;
 	if (typeTokenArray.typeTokens[boundStart].isKeywordOrTypedefed){
@@ -935,7 +887,8 @@ int16_t findStartForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t bou
 				doContainerStart = true;
 				doStartSkip = true;
 			} else if (isSectionOfStringEquivalent(sourceContainer.string,startIndexOfStartBound,"const")){
-				return findStartForTypeTokens(typeTokenArray,boundStart+1,boundEnd);
+				boundStart++;
+				goto Start;
 			}
 		} else if (lengthOfBoundStartToken==6){
 			if (isSectionOfStringEquivalent(sourceContainer.string,startIndexOfStartBound,"struct")){
@@ -944,7 +897,8 @@ int16_t findStartForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t bou
 			}
 		} else if (lengthOfBoundStartToken==8){
 			if (isSectionOfStringEquivalent(sourceContainer.string,startIndexOfStartBound,"volatile")){
-				return findStartForTypeTokens(typeTokenArray,boundStart+1,boundEnd);
+				boundStart++;
+				goto Start;
 			}
 		}
 	}
@@ -952,33 +906,28 @@ int16_t findStartForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t bou
 	if (doContainerStart){
 		// this is to ensure that the containerStart is done only when actually needed (and to detangle the logic)
 		if (boundStart+1>=boundEnd){
-			printf("Type parse error ID:1");
-			exit(1);
+			err_1101_("Invalid enclosing boundaries when analyzing struct/union/enum type declaration",typeTokenArray.typeTokens[boundEnd].stringIndexStart);
 		}
-		bool isOnFirstToken;
+		bool isNotOnFirstToken;
 		if (typeTokenArray.typeTokens[boundStart+1].firstCharacter=='{'){
 			doContainerStart = true;
-			isOnFirstToken = true;
+			isNotOnFirstToken = false;
 		} else if (boundStart+2>=boundEnd){
 			doContainerStart = false;
 		} else if (typeTokenArray.typeTokens[boundStart+2].firstCharacter=='{'){
 			doContainerStart = true;
-			isOnFirstToken = false;
+			isNotOnFirstToken = true;
 		} else {
 			doContainerStart = false;
 		}
 		if (doContainerStart){
 			// this is to ensure that the containerStart is done only when actually needed (and to detangle the logic)
-			int16_t checkThisIndex;
-			if (isOnFirstToken){
-				checkThisIndex = typeTokenArray.typeTokens[boundStart+1].enclosementMatch+1;
-			} else {
-				checkThisIndex = typeTokenArray.typeTokens[boundStart+2].enclosementMatch+1;
-			}
+			int16_t checkThisIndex = typeTokenArray.typeTokens[boundStart+1+isNotOnFirstToken].enclosementMatch+1;
 			if (checkThisIndex>=boundEnd){
 				return boundStart;
-			} else{
-				return findStartForTypeTokens(typeTokenArray,checkThisIndex,boundEnd);
+			} else {
+				boundStart=checkThisIndex;
+				goto Start;
 			}
 		} else {
 			/*
@@ -997,7 +946,7 @@ int16_t findStartForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t bou
 	}
 	/*
 	then this does not start on a container (struct, enum, union)
-	therefore, search for identifier
+	therefore, search for identifier or colon
 	*/
 	int16_t doStartAt;
 	if (doStartSkip){
@@ -1007,21 +956,22 @@ int16_t findStartForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t bou
 	}
 	for (int16_t i=doStartAt;i<boundEnd;i++){
 		struct TypeToken *thisTypeTokenPtr = typeTokenArray.typeTokens+i;
-		if ((thisTypeTokenPtr->firstCharacter=='[') | (thisTypeTokenPtr->firstCharacter=='{')){
+		char firstCharacter=thisTypeTokenPtr->firstCharacter;
+		if (firstCharacter=='[' | firstCharacter=='{'){
 			i = thisTypeTokenPtr->enclosementMatch;
-		} else if ((!thisTypeTokenPtr->isKeywordOrTypedefed) & (thisTypeTokenPtr->isNonSymbol)){
+		} else if (firstCharacter==':' | (!thisTypeTokenPtr->isKeywordOrTypedefed & thisTypeTokenPtr->isNonSymbol)){
 			return i;
 		}
 	}
 	/*
-	then this has no identifier
+	then this has no identifier or colon
 	therefore, find the most inclosed token that isn't an enclosement
 	*/
 	int16_t mostInclosedToken = boundStart;
 	int16_t amountOfEnclosementOnMostEnclosedToken = 0;
 	int16_t amountOfEnclosementOnThisToken = 0;
 	for (int16_t i=boundStart;i<boundEnd;i++){
-		struct TypeToken *thisTypeTokenPtr = &(typeTokenArray.typeTokens[i]);
+		struct TypeToken *thisTypeTokenPtr = typeTokenArray.typeTokens+i;
 		if (thisTypeTokenPtr->firstCharacter=='['){
 			int16_t prev=i;
 			i = thisTypeTokenPtr->enclosementMatch;
@@ -1033,7 +983,7 @@ int16_t findStartForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t bou
 		} else if (thisTypeTokenPtr->firstCharacter=='{'){
 			i = thisTypeTokenPtr->enclosementMatch;
 			if (i==boundEnd-1){
-				printf("Type Parser Warning: I\'m not sure if that is supposed to happen\n");
+				err_1101_("Could not find valid starting place for type parsing around here",thisTypeTokenPtr->stringIndexStart);
 			}
 		} else if (thisTypeTokenPtr->firstCharacter=='('){
 			amountOfEnclosementOnThisToken++;
@@ -1044,8 +994,7 @@ int16_t findStartForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t bou
 			amountOfEnclosementOnMostEnclosedToken = amountOfEnclosementOnThisToken;
 		}
 		if (amountOfEnclosementOnThisToken<0){
-			printf("Type parse error ID:8");
-			exit(1);
+			err_1101_("Invalid enclosing boundaries when looking for valid starting place for type parsing",thisTypeTokenPtr->stringIndexStart);
 		}
 	}
 	// if nothing is enclosed, then this defaults to the last valid token (because amountOfEnclosementOnMostEnclosedToken==0)
@@ -1080,32 +1029,22 @@ int16_t squareBracketHandlerForTypeTokens(struct TypeTokenArray typeTokenArray, 
 }
 
 void bracketHandlerForMainWalkForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundStart, int16_t bracketIndex){
-	bool isDescriptionOneAway = false;
 	if (bracketIndex-1<boundStart){
-		printf("Type parse error ID:5");
-		exit(1);
-	}
-	if (typeTokenArray.typeTokens[bracketIndex-1].isKeywordOrTypedefed){
-		isDescriptionOneAway = true;
-	}
-	if (!isDescriptionOneAway){
-		if (bracketIndex-2<boundStart){
-			printf("Type parse error ID:6");
-			exit(1);
-		}
-		if (!(typeTokenArray.typeTokens[bracketIndex-2].isKeywordOrTypedefed)){
-			printf("Type parse error ID:7");
-			exit(1);
-		}
+		goto Fail;
 	}
 	int16_t descriptorIndex;
-	if (isDescriptionOneAway){
+	if (typeTokenArray.typeTokens[bracketIndex-1].isKeywordOrTypedefed){
 		descriptorIndex = bracketIndex-1;
 	} else {
 		descriptorIndex = bracketIndex-2;
+		if (bracketIndex-2<boundStart){
+			goto Fail;
+		}
+		if (!typeTokenArray.typeTokens[bracketIndex-2].isKeywordOrTypedefed){
+			goto Fail;
+		}
 	}
 	uint8_t outID = 0;
-	
 	
 	int32_t startIndexInString = typeTokenArray.typeTokens[descriptorIndex].stringIndexStart;
 	int16_t lengthInString = typeTokenArray.typeTokens[descriptorIndex].stringIndexEnd-startIndexInString;
@@ -1123,14 +1062,16 @@ void bracketHandlerForMainWalkForTypeTokens(struct TypeTokenArray typeTokenArray
 		}
 	}
 	if (outID==0){
-		printf("Type parse error ID:8");
-		exit(1);
+		goto Fail;
 	}
 	if (outID!=1){
 		splitterStarterForTypeTokens(typeTokenArray,bracketIndex,';');
 	} else {
 		enumHandlerForTypeTokens(typeTokenArray,bracketIndex);
 	}
+	return;
+	Fail:
+	err_1101_("Invalid \'{\' in type, could not find appropriate matching keyword",typeTokenArray.typeTokens[bracketIndex].stringIndexStart);
 }
 
 void mainWalkForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundStart, int16_t boundEnd, int16_t externalStart, bool doExternalStart){
@@ -1139,13 +1080,10 @@ void mainWalkForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundSt
 		return;
 	}
 	if (boundStart+1>boundEnd){
-		printf("Type parse error ID:2\n");
-		exit(1);
+		err_1101_("(Internal) failure to parse type (ID:1)",typeTokenArray.typeTokens[boundStart].stringIndexStart);
 	}
-	bool hasParenStart = false;
 	bool hasParenEnd = false;
 	int16_t startIndex;
-	int16_t parenStartIndex;
 	if (doExternalStart){
 		startIndex = typeTokenArray.typeTokens[externalStart].enclosementMatch+1;
 	} else {
@@ -1153,9 +1091,10 @@ void mainWalkForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundSt
 	}
 	for (int16_t i=startIndex;i<boundEnd;i++){
 		char firstCharacter = typeTokenArray.typeTokens[i].firstCharacter;
-		if ((firstCharacter=='*') & (i!=startIndex)){
-			printf("Type parse error ID:3 (this is the condition to prevent incorrect asterisk)\n");
-			exit(1);
+		if (firstCharacter=='*' & i!=startIndex){
+			int32_t stringIndexStart = typeTokenArray.typeTokens[i].stringIndexStart;
+			int32_t stringIndexEnd = typeTokenArray.typeTokens[i].stringIndexEnd;
+			err_1111_("Unexpected \'*\' while parsing type",stringIndexStart,stringIndexEnd);
 		}
 		if (firstCharacter==')'){
 			hasParenEnd=true;
@@ -1172,6 +1111,26 @@ void mainWalkForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundSt
 			i = matchingIndex;
 		} else {
 			writeIndexToNextSlotInTypeTokenArray(typeTokenArray,i);
+			if (firstCharacter==':'){
+				struct TypeToken* typeTokenPtrToNumber = typeTokenArray.typeTokens+(i+1);
+				if ((i+2!=boundEnd | doExternalStart) || !(typeTokenPtrToNumber->firstCharacter>='0' & typeTokenPtrToNumber->firstCharacter<='9')){
+					// typeTokenPtrToNumber is not known to be valid at the point of giving this error, so we can't use it, so typeTokenArray.typeTokens[i].stringIndexEnd is used instead
+					err_1101_("Bitfield size must be a single positive integer",typeTokenArray.typeTokens[i].stringIndexEnd);
+				}
+				struct NumberParseResult numberParseResult;
+				parseNumber(&numberParseResult,sourceContainer.string,typeTokenPtrToNumber->stringIndexStart,typeTokenPtrToNumber->stringIndexEnd);
+				if (numberParseResult.errorCode!=0 | numberParseResult.typeOfNonDecimal==0){
+					err_1111_("Bitfield size must be a single positive integer",typeTokenPtrToNumber->stringIndexStart,typeTokenPtrToNumber->stringIndexEnd);
+				}
+				if (numberParseResult.valueUnion.value>16){
+					err_1111_("Bitfield size cannot be larger than 16 (\'int\' is 16 bits)",typeTokenPtrToNumber->stringIndexStart,typeTokenPtrToNumber->stringIndexEnd);
+				}
+				if (i!=startIndex & numberParseResult.valueUnion.value==0){
+					err_1111_("Bitfields of 0 size must have no identifier",typeTokenPtrToNumber->stringIndexStart,typeTokenPtrToNumber->stringIndexEnd);
+				}
+				writeIndexToNextSlotInTypeTokenArray(typeTokenArray,i+1);
+				break;
+			}
 		}
 	}
 	if (doExternalStart){
@@ -1179,6 +1138,8 @@ void mainWalkForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundSt
 	} else {
 		startIndex = startIndex-1;
 	}
+	bool hasParenStart = false;
+	int16_t parenStartIndex;
 	for (int16_t i=startIndex;i>=boundStart;i--){
 		char firstCharacter = typeTokenArray.typeTokens[i].firstCharacter;
 		if (firstCharacter=='('){
@@ -1193,6 +1154,10 @@ void mainWalkForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundSt
 		}
 		if (firstCharacter==']'){
 			i=squareBracketHandlerForTypeTokens(typeTokenArray,i);
+		} else if (firstCharacter==':') {
+			int32_t stringIndexStart = typeTokenArray.typeTokens[i].stringIndexStart;
+			int32_t stringIndexEnd = typeTokenArray.typeTokens[i].stringIndexEnd;
+			err_1111_("Unexpected \':\' while parsing type",stringIndexStart,stringIndexEnd);
 		} else {
 			writeIndexToNextSlotInTypeTokenArray(typeTokenArray,i);
 		}
@@ -1201,8 +1166,8 @@ void mainWalkForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundSt
 		if (hasParenStart & hasParenEnd){
 			mainWalkForTypeTokens(typeTokenArray,boundStart,boundEnd,parenStartIndex,true);
 		} else {
-			printf("Type parse error ID:4"); // this one should just never happen, regardless of input
-			exit(1);
+			// this error probably should never happen, regardless of input
+			err_1101_("(Internal) failure to parse type (ID:2)",typeTokenArray.typeTokens[boundStart].stringIndexStart);
 		}
 	}
 }
@@ -1218,7 +1183,7 @@ void splitterStarterForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t 
 				mainWalkForTypeTokens(typeTokenArray,previousStart,i,0,false);
 				previousStart = i+1;
 				writeIndexToNextSlotInTypeTokenArray(typeTokenArray,i);
-			} else if ((c=='(') | (c=='{')){
+			} else if (c=='(' | c=='{'){
 				i = typeTokenArray.typeTokens[i].enclosementMatch;
 			}
 		}
@@ -1229,103 +1194,32 @@ void splitterStarterForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t 
 	writeIndexToNextSlotInTypeTokenArray(typeTokenArray,boundEnd);
 }
 
-void keywordAndTypedefDetectInTypeTokens(struct TypeTokenArray typeTokenArray){
-	for (int16_t i=0;i<typeTokenArray.length;i++){
-		int32_t startIndex = typeTokenArray.typeTokens[i].stringIndexStart;
-		int32_t endIndex = typeTokenArray.typeTokens[i].stringIndexEnd;
-		int16_t lengthOfThisToken = endIndex-startIndex;
-		bool isKeyword = false;
-		if (lengthOfThisToken==1){
-			// do nothing, this is to consume the case because it is common for lengthOfThisToken==1
-		} else if (lengthOfThisToken==3){
-			if (isSectionOfStringEquivalent(sourceContainer.string,startIndex,"int") ||
-				isSectionOfStringEquivalent(sourceContainer.string,startIndex,"...")){ 
-				// the ... is for multiple arguments in a function
-				
-				isKeyword = true;
-			}
-		} else if (lengthOfThisToken==4){
-			if (isSectionOfStringEquivalent(sourceContainer.string,startIndex,"long") ||
-				isSectionOfStringEquivalent(sourceContainer.string,startIndex,"void") ||
-				isSectionOfStringEquivalent(sourceContainer.string,startIndex,"char")){
-					
-				isKeyword = true;
-			}
-			if (isSectionOfStringEquivalent(sourceContainer.string,startIndex,"enum")){
-				if (i+1>=typeTokenArray.length){
-					printf("keyword \'enum\' must have something after it\n");
-					exit(1);
-				}
-				isKeyword = true;
-			}
-		} else if (lengthOfThisToken==5){
-			if (isSectionOfStringEquivalent(sourceContainer.string,startIndex,"short") ||
-				isSectionOfStringEquivalent(sourceContainer.string,startIndex,"const") ||
-				isSectionOfStringEquivalent(sourceContainer.string,startIndex,"float") ||
-				isSectionOfStringEquivalent(sourceContainer.string,startIndex,"_Bool")){
-				
-				isKeyword = true;
-			}
-			if (isSectionOfStringEquivalent(sourceContainer.string,startIndex,"union")){
-				if (i+1>=typeTokenArray.length){
-					printf("keyword \'union\' must have something after it\n");
-					exit(1);
-				}
-				isKeyword = true;
-			}
-		} else if (lengthOfThisToken==6){
-			if (isSectionOfStringEquivalent(sourceContainer.string,startIndex,"signed") ||
-				isSectionOfStringEquivalent(sourceContainer.string,startIndex,"double")){
-				isKeyword = true;
-			}
-			if (isSectionOfStringEquivalent(sourceContainer.string,startIndex,"struct")){
-				if (i+1>=typeTokenArray.length){
-					printf("keyword \'struct\' must have something after it\n");
-					exit(1);
-				}
-				isKeyword = true;
-			}
-		} else if (lengthOfThisToken==8){
-			if (isSectionOfStringEquivalent(sourceContainer.string,startIndex,"volatile") ||
-				isSectionOfStringEquivalent(sourceContainer.string,startIndex,"unsigned")){
-				isKeyword = true;
-			}
-		}
-		bool isTypedefed = isSectionOfStringTypedefed(sourceContainer.string,startIndex,endIndex);
-		typeTokenArray.typeTokens[i].isKeywordOrTypedefed = isKeyword | isTypedefed;
-	}
-}
 
 int16_t specificEnclosementMatchTypeTokens(struct TypeTokenArray typeTokenArray, int16_t startIndex){
-	char startChar = typeTokenArray.typeTokens[startIndex].firstCharacter;
-	char endingEnclosements[]=")]}";
-	char startingEnclosements[]="([{";
+	const char startChar = typeTokenArray.typeTokens[startIndex].firstCharacter;
+	const char endingEnclosements[]=")]}";
 	uint8_t typeOfEnclosement;
-	if (startChar==startingEnclosements[0]){
+	if (startChar=='('){
 		typeOfEnclosement=0;
-	} else if (startChar==startingEnclosements[1]){
+	} else if (startChar=='['){
 		typeOfEnclosement=1;
-	} else if (startChar==startingEnclosements[2]){
+	} else if (startChar=='{'){
 		typeOfEnclosement=2;
 	} else {
-		printf("specificEnclosementMatchTypeTokens() called wrong\n");
-		exit(1);
+		assert(false);
 	}
 	int16_t i=startIndex+1;
 	char c;
 	while ((c=typeTokenArray.typeTokens[i].firstCharacter)!=endingEnclosements[typeOfEnclosement]){
-		if ((c==endingEnclosements[0]) |
-			(c==endingEnclosements[1]) |
-			(c==endingEnclosements[2]) |
-			(i+1>=typeTokenArray.length)){
-			
-			printf("While parsing type, got an enclosement error\n");
-			exit(1);
+		if (c==')' | c==']' | c=='}' | i+1>=typeTokenArray.length){
+			if (i+1>=typeTokenArray.length){
+				err_1101_("Expected this opening bracket to match a closing bracket, but none existed",typeTokenArray.typeTokens[startIndex].stringIndexStart);
+			} else {
+				err_11000("Expected this closing bracket to match",typeTokenArray.typeTokens[i].stringIndexStart);
+				err_1101_("Expected this opening bracket to match",typeTokenArray.typeTokens[startIndex].stringIndexStart);
+			}
 		}
-		if ((c==startingEnclosements[0]) |
-			(c==startingEnclosements[1]) |
-			(c==startingEnclosements[2])){
-			
+		if (c=='(' | c=='[' | c=='{'){
 			i = specificEnclosementMatchTypeTokens(typeTokenArray,i);
 		}
 		i++;
@@ -1335,100 +1229,190 @@ int16_t specificEnclosementMatchTypeTokens(struct TypeTokenArray typeTokenArray,
 	return i;
 }
 
-void enclosementMatchTypeTokens(struct TypeTokenArray typeTokenArray){
-	char endingEnclosements[]=")]}";
-	char startingEnclosements[]="([{";
-	for (int16_t i=0;i<typeTokenArray.length;i++){
-		typeTokenArray.typeTokens[i].enclosementMatch=0;
-	}
-	for (int16_t i=0;i<typeTokenArray.length;i++){
-		char c = typeTokenArray.typeTokens[i].firstCharacter;
-		if ((c==endingEnclosements[0]) |
-			(c==endingEnclosements[1]) |
-			(c==endingEnclosements[2])){
-			
-			printf("While parsing type, got an enclosement error\n");
-			exit(1);
+
+struct TypeTokenArray typeTokenizeForAnalysis(int32_t startIndex, int32_t endIndex){
+	bool terminatedAtCorrectIndex = false;
+	int16_t lengthCount = 0;
+	for (int32_t i=startIndex;i<endIndex;){
+		char c=sourceContainer.string[i];
+		if (!(c==' ' | c=='\n')){
+			if (++lengthCount>10000){
+				err_1111_("This type declaration is too large (>10000 tokens)",startIndex,endIndex);
+			}
+			if (c=='L'){
+				c=sourceContainer.string[i+1];
+			}
+			if (c=='\'' | c=='\"'){
+				err_1111_("String and charcter literals may not be in type declarations",i,getEndOfToken(i));
+			}
 		}
-		if ((c==startingEnclosements[0]) |
-			(c==startingEnclosements[1]) |
-			(c==startingEnclosements[2])){
-			
+		i = getEndOfToken(i);
+		terminatedAtCorrectIndex = i==endIndex;
+	}
+	if (!terminatedAtCorrectIndex){
+		// the endIndex is inside of a token. That's the calling function's problem, and it shouldn't happen
+		err_1101_("(Internal), cannot agree on end of token",endIndex);
+	}
+	struct TypeTokenArray typeTokenArray;
+	typeTokenArray.length = lengthCount;
+	typeTokenArray.indexesForRearrangement = cosmic_malloc(sizeof(int16_t)*(lengthCount+1));
+	for (int16_t i=0;i<lengthCount;i++) typeTokenArray.indexesForRearrangement[i]=-1;
+	typeTokenArray.indexesForRearrangement[lengthCount]=-1;
+	typeTokenArray.typeTokens = cosmic_malloc(sizeof(struct TypeToken)*lengthCount);
+	int32_t walkingIndex = 0;
+	for (int32_t i=startIndex;i<endIndex;){
+		int32_t tokenStart = i;
+		i = getEndOfToken(i);
+		char c=sourceContainer.string[tokenStart];
+		if (!(c==' ' | c=='\n')){
+			struct TypeToken* thisToken = typeTokenArray.typeTokens+(walkingIndex++);
+			thisToken->stringIndexStart = tokenStart;
+			thisToken->stringIndexEnd = i;
+			thisToken->enclosementMatch = -1;
+			thisToken->firstCharacter = c;
+			thisToken->isNonSymbol = (c>='0' & c<='9') | (c>='A' & c<='Z') | (c>='a' & c<='z') | c=='_' | (c=='.' & i-tokenStart==3); // the . is for the ... for variadic arguments
+			{
+			const char* p;
+			char buf[8];
+			switch (i-tokenStart){
+				case 8:
+				p = sourceContainer.string+tokenStart;
+				buf[0]=*(p++);
+				buf[1]=*(p++);
+				buf[2]=*(p++);
+				buf[3]=*(p++);
+				buf[4]=*(p++);
+				buf[5]=*(p++);
+				buf[6]=*(p++);
+				buf[7]=*(p++);
+				if (
+				(buf[0]=='u' & buf[1]=='n' & buf[2]=='s' & buf[3]=='i' & buf[4]=='g' & buf[5]=='n' & buf[6]=='e' & buf[7]=='d') | //unsigned
+				(buf[0]=='v' & buf[1]=='o' & buf[2]=='l' & buf[3]=='a' & buf[4]=='t' & buf[5]=='i' & buf[6]=='l' & buf[7]=='e')   //volatile
+				){
+					thisToken->isKeywordOrTypedefed = true;
+					continue;
+				}
+				if (
+				(buf[0]=='r' & buf[1]=='e' & buf[2]=='g' & buf[3]=='i' & buf[4]=='s' & buf[5]=='t' & buf[6]=='e' & buf[7]=='r')   //register
+				){
+					err_1111_("This keyword is not allowed here",tokenStart,i);
+				}
+				break;
+				case 6:
+				p = sourceContainer.string+tokenStart;
+				buf[0]=*(p++);
+				buf[1]=*(p++);
+				buf[2]=*(p++);
+				buf[3]=*(p++);
+				buf[4]=*(p++);
+				buf[5]=*(p++);
+				if (
+				(buf[0]=='s' & buf[1]=='i' & buf[2]=='g' & buf[3]=='n' & buf[4]=='e' & buf[5]=='d') | //signed
+				(buf[0]=='d' & buf[1]=='o' & buf[2]=='u' & buf[3]=='b' & buf[4]=='l' & buf[5]=='e')   //double
+				){
+					thisToken->isKeywordOrTypedefed = true;
+					continue;
+				}
+				if (
+				(buf[0]=='s' & buf[1]=='t' & buf[2]=='r' & buf[3]=='u' & buf[4]=='c' & buf[5]=='t')   //struct
+				){
+					if (walkingIndex>=lengthCount){
+						err_1111_("keyword \'struct\' cannot be at end of type declaration",tokenStart,i);
+					}
+					thisToken->isKeywordOrTypedefed = true;
+					continue;
+				}
+				if (
+				(buf[0]=='s' & buf[1]=='t' & buf[2]=='a' & buf[3]=='t' & buf[4]=='i' & buf[5]=='c') | //static
+				(buf[0]=='e' & buf[1]=='x' & buf[2]=='t' & buf[3]=='e' & buf[4]=='r' & buf[5]=='n') | //extern
+				(buf[0]=='i' & buf[1]=='n' & buf[2]=='l' & buf[3]=='i' & buf[4]=='n' & buf[5]=='e')   //inline
+				){
+					err_1111_("This keyword is not allowed here",tokenStart,i);
+				}
+				break;
+				case 5:
+				p = sourceContainer.string+tokenStart;
+				buf[0]=*(p++);
+				buf[1]=*(p++);
+				buf[2]=*(p++);
+				buf[3]=*(p++);
+				buf[4]=*(p++);
+				if (
+				(buf[0]=='s' & buf[1]=='h' & buf[2]=='o' & buf[3]=='r' & buf[4]=='t') | // short
+				(buf[0]=='_' & buf[1]=='B' & buf[2]=='o' & buf[3]=='o' & buf[4]=='l') | //_Bool
+				(buf[0]=='c' & buf[1]=='o' & buf[2]=='n' & buf[3]=='s' & buf[4]=='t') | //const
+				(buf[0]=='f' & buf[1]=='l' & buf[2]=='o' & buf[3]=='a' & buf[4]=='t')   //float
+				){
+					thisToken->isKeywordOrTypedefed = true;
+					continue;
+				}
+				if (
+				(buf[0]=='u' & buf[1]=='n' & buf[2]=='i' & buf[3]=='o' & buf[4]=='n')   //union
+				){
+					if (walkingIndex>=lengthCount){
+						err_1111_("keyword \'union\' cannot be at end of type declaration",tokenStart,i);
+					}
+					thisToken->isKeywordOrTypedefed = true;
+					continue;
+				}
+				break;
+				case 4:
+				p = sourceContainer.string+tokenStart;
+				buf[0]=*(p++);
+				buf[1]=*(p++);
+				buf[2]=*(p++);
+				buf[3]=*(p++);
+				if (
+				(buf[0]=='l' & buf[1]=='o' & buf[2]=='n' & buf[3]=='g') | //long
+				(buf[0]=='c' & buf[1]=='h' & buf[2]=='a' & buf[3]=='r') | //char
+				(buf[0]=='v' & buf[1]=='o' & buf[2]=='i' & buf[3]=='d')   //void
+				){
+					thisToken->isKeywordOrTypedefed = true;
+					continue;
+				}
+				if (
+				(buf[0]=='e' & buf[1]=='n' & buf[2]=='u' & buf[3]=='m')   //enum
+				){
+					if (walkingIndex>=lengthCount){
+						err_1111_("keyword \'enum\' cannot be at end of type declaration",tokenStart,i);
+					}
+					thisToken->isKeywordOrTypedefed = true;
+					continue;
+				}
+				if (
+				(buf[0]=='a' & buf[1]=='u' & buf[2]=='t' & buf[3]=='o')   //auto
+				){
+					err_1111_("This keyword is not allowed here",tokenStart,i);
+				}
+				break;
+				case 3:
+				p = sourceContainer.string+tokenStart;
+				if (
+				(p[0]=='i' & p[1]=='n' & p[2]=='t')   //int
+				){
+					thisToken->isKeywordOrTypedefed = true;
+					continue;
+				}
+			}
+			}
+			thisToken->isKeywordOrTypedefed = isSectionOfStringTypedefed(sourceContainer.string,tokenStart,i);
+		}
+	}
+	for (int16_t i=0;i<lengthCount;i++){
+		char c = typeTokenArray.typeTokens[i].firstCharacter;
+		if (c==')' | c==']' | c=='}'){
+			err_1101_("Expected this closing bracket to match an opening bracket, but none existed",typeTokenArray.typeTokens[i].stringIndexStart);
+		}
+		if (c=='(' | c=='[' | c=='{'){
 			i=specificEnclosementMatchTypeTokens(typeTokenArray,i);
 		}
 	}
+	return typeTokenArray;
 }
 
-struct TypeTokenArray typeTokenizeForAnalysis(int32_t startIndex, int32_t endIndex){
-	// This function has optimization potential (doing multiple cosmic_malloc()'s for the TypeToken* are not actually necessary)
-	struct TypeToken * typeTokensOfStringSegment_1 = cosmic_malloc(
-		sizeof(struct TypeToken)*(endIndex-startIndex));
-	for (int32_t i=startIndex;i<endIndex;i++){
-		struct TypeToken* thisToken = typeTokensOfStringSegment_1+(i-startIndex);
-		thisToken->stringIndexStart = i;
-		thisToken->stringIndexEnd = i+1;
-		thisToken->doSkip = false;
-		thisToken->enclosementMatch = 0;
-		char firstCharacter = sourceContainer.string[i];
-		thisToken->firstCharacter = firstCharacter;
-		thisToken->isNonSymbol = isCharNonSymbolForTypeToken(firstCharacter);
-	}
-	for (int32_t i=1;i<(endIndex-startIndex);i++){
-		if (typeTokensOfStringSegment_1[i-1].isNonSymbol && typeTokensOfStringSegment_1[i].isNonSymbol){
-			typeTokensOfStringSegment_1[i].doSkip = true;
-		}
-	}
-	int16_t walkingIndex=0;
-	for (int32_t i=0;i<(endIndex-startIndex);i++){
-		if (!typeTokensOfStringSegment_1[i].doSkip){
-			walkingIndex++;
-		}
-	}
-	int16_t part2Length = walkingIndex;
-	struct TypeToken* typeTokensOfStringSegment_2 = cosmic_malloc(
-		sizeof(struct TypeToken)*part2Length);
-	walkingIndex=0;
-	for (int32_t i=0;i<(endIndex-startIndex);i++){
-		if (typeTokensOfStringSegment_1[i].doSkip){
-			typeTokensOfStringSegment_2[walkingIndex-1].stringIndexEnd++;
-		} else {
-			typeTokensOfStringSegment_2[walkingIndex++]=typeTokensOfStringSegment_1[i];
-		}
-	}
-	cosmic_free(typeTokensOfStringSegment_1);
-	for (int16_t i=0;i<part2Length;i++){
-		typeTokensOfStringSegment_2[i].doSkip=typeTokensOfStringSegment_2[i].firstCharacter==' ' || typeTokensOfStringSegment_2[i].firstCharacter=='\n';
-	}
-	walkingIndex=0;
-	for (int16_t i=0;i<part2Length;i++){
-		if (!typeTokensOfStringSegment_2[i].doSkip){
-			walkingIndex++;
-		}
-	}
-	int16_t part3Length = walkingIndex;
-	struct TypeToken* typeTokensOfStringSegment_3 = cosmic_malloc(
-		sizeof(struct TypeToken)*part3Length);
-	walkingIndex=0;
-	for (int16_t i=0;i<part2Length;i++){
-		if (!typeTokensOfStringSegment_2[i].doSkip){
-			typeTokensOfStringSegment_3[walkingIndex++]=typeTokensOfStringSegment_2[i];
-		}
-	}
-	cosmic_free(typeTokensOfStringSegment_2);
-	struct TypeTokenArray returnVal;
-	returnVal.typeTokens = typeTokensOfStringSegment_3;
-	returnVal.length = part3Length;
-	returnVal.indexesForRearrangement = cosmic_malloc(sizeof(int16_t)*(part3Length+1));
-	for (int16_t i=0;i<(part3Length+1);i++){
-		returnVal.indexesForRearrangement[i]=-1;
-	}
-	return returnVal;
-}
 
 char* convertType(int32_t startIndex, int32_t endIndex){
 	struct TypeTokenArray typeTokenArray = typeTokenizeForAnalysis(startIndex,endIndex);
-	enclosementMatchTypeTokens(typeTokenArray);
-	keywordAndTypedefDetectInTypeTokens(typeTokenArray);
 	mainWalkForTypeTokens(typeTokenArray,0,typeTokenArray.length,0,false);
 	// now we generate the string
 	int16_t walkingIndex = 0;
@@ -1454,12 +1438,13 @@ char* convertType(int32_t startIndex, int32_t endIndex){
 	cosmic_free(typeTokenArray.typeTokens);
 	cosmic_free(typeTokenArray.indexesForRearrangement);
 	uint16_t errorValueForTypeNormalizer;
-	
+	//printf("\n1.`%s`\n",resultString);
 	char *normalizedResultString = checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(resultString,&errorValueForTypeNormalizer,startIndex,endIndex);
 	if (normalizedResultString==NULL){
 		if (errorValueForTypeNormalizer==1){
 			printInformativeMessageAtSourceContainerIndex(true,"type keywords cannot be out of proper order",startIndex,endIndex);
 		} else if (errorValueForTypeNormalizer==2){
+			// this case is now impossible to reach
 			printInformativeMessageAtSourceContainerIndex(true,"types cannot contain the character `\'` or `\"`",startIndex,endIndex);
 		} else if (errorValueForTypeNormalizer==3){
 			printInformativeMessageAtSourceContainerIndex(true,"types cannot contain nested array brackets",startIndex,endIndex);
@@ -1468,6 +1453,7 @@ char* convertType(int32_t startIndex, int32_t endIndex){
 		}
 		exit(1);
 	}
+	//printf("2.`%s`\n\n",normalizedResultString);
 	assert(errorValueForTypeNormalizer==0);
 	cosmic_free(resultString);
 	return normalizedResultString;

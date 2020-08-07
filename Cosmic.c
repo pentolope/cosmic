@@ -46,6 +46,7 @@ struct {
 } mainArg = {.doTypicalCompile=true};
 
 int main(int argc, char** argv){
+	checkArchitecture();
 	for (int argi=1;argi<argc;argi++){
 		const char* arg=argv[argi];
 		if (mainArg.expectOutNext){

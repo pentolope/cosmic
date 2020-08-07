@@ -16,11 +16,12 @@ void createSourceContainerString(){
 	}
 	sourceContainer.sourceChar = cosmic_realloc(sourceContainer.sourceChar,(length+1)*sizeof(SourceChar));
 	sourceContainer.allocationLength=length+1;
-	sourceContainer.string = cosmic_malloc(length+1);
+	char* newString = cosmic_malloc(length+1);
 	for (int32_t i=0;i<length;i++){
-		sourceContainer.string[i]=sourceContainer.sourceChar[i].c;
+		newString[i]=sourceContainer.sourceChar[i].c;
 	}
-	sourceContainer.string[length]=0;
+	newString[length]=0;
+	sourceContainer.string = newString;
 }
 
 // sourceStringLength is the current length of sourceContainer.sourceChar, terminated by a 0
@@ -1653,6 +1654,8 @@ char* stringifyStringForMacroWithFreeInput(char* inputString){
 			b^=1;
 			outputString[i1++]='\\';
 			outputString[i1++]=c;
+		} else if (c=='\n'){
+			outputString[i1++]=' ';
 		} else {
 			outputString[i1++]=c;
 		}
@@ -1959,7 +1962,34 @@ int32_t replaceMacrosInGeneratedPreprocessingTokens(){
 
 int32_t replaceMacrosUntilNextDirective(int32_t startCharacterInSourceString){
 	generatePreprocessTokensUntilStopPoint(startCharacterInSourceString,true);
-	return replaceMacrosInGeneratedPreprocessingTokens();
+	int32_t endPriorToReplace = getIndexInStringAtStartOfPreprocessingToken(findLengthOfPreprocessingTokens());
+	int32_t fullLength = findSourceContainerLength(endPriorToReplace);
+	int32_t lengthDiff = fullLength-endPriorToReplace;
+	int32_t ret;
+	if (lengthDiff>30 & endPriorToReplace-startCharacterInSourceString>30){
+		// the 30 is a heuristic number. 
+		// This method of using a temporary storage is never needed, but it provides a speed benifit if there is a
+		// sufficiently long length after the next directive and the distance is sufficiently long to the next directive
+		SourceChar* tempStorage = cosmic_malloc(lengthDiff*sizeof(SourceChar));
+		int32_t i;
+		for (i=endPriorToReplace;i<fullLength;i++){
+			tempStorage[i-endPriorToReplace]=sourceContainer.sourceChar[i];
+		}
+		sourceContainer.sourceChar[endPriorToReplace].c=0;
+		ret = replaceMacrosInGeneratedPreprocessingTokens();
+		int32_t endAfterReplace=ret-1;
+		assert(sourceContainer.sourceChar[endAfterReplace].c==0);
+		int32_t newFullLength = endAfterReplace+lengthDiff;
+		ensureSourceContainerLength(endAfterReplace,lengthDiff+1);
+		for (i=endAfterReplace;i<newFullLength;i++){
+			sourceContainer.sourceChar[i]=tempStorage[i-endAfterReplace];
+		}
+		sourceContainer.sourceChar[i].c=0;
+		cosmic_free(tempStorage);
+	} else {
+		ret = replaceMacrosInGeneratedPreprocessingTokens();
+	}
+	return ret;
 }
 
 int32_t replaceMacrosUntilNextNewline(int32_t startCharacterInSourceString){
@@ -2202,7 +2232,7 @@ bool processIfLikeDirectiveToBool(int32_t indexOfSpaceAfterDirective){
 	} else {
 		result=expressionToConstantValue("unsigned long",expRoot)!=0;
 	}
-	cosmic_free(sourceContainer.string);
+	cosmic_free((char*)sourceContainer.string);
 	sourceContainer.isStringForPreprocesser=false;
 	sourceContainer.string=NULL;
 	sourceContainer.stringOffset=0;
@@ -2247,7 +2277,6 @@ int32_t getIndexOfNextDirectiveThatEndsIfStatement(int32_t indexOfNewlineToStart
 
 // beginningFileName should have quotes around it
 void insertBeginningFileAndRunPreprocesser(const char *beginningFileName){
-	checkArchitecture();
 	initMacros();
 	insertFileIntoSourceContainer(beginningFileName,0);
 	int32_t walkingCharacterIndex=0;

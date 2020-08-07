@@ -192,7 +192,7 @@ typedef struct SourceChar{
 
 
 typedef struct SourceContainer{
-	char* string; // this is used for the compiler, and is allocated after the preprocesser is finshed
+	const char* string; // this is used for the compiler, and is allocated after the preprocesser is finshed
 	SourceChar *sourceChar;
 	int32_t allocationLength;
 	int32_t stringOffset; // if isStringForPreprocesser is true, this holds the offset for .string
@@ -424,6 +424,8 @@ struct TypedefEntries{
 	uint32_t numberOfAllocatedSlots;
 } globalTypedefEntries;
 
+void ensureNoIdentifierConflictForTypedef(const char*,int32_t);
+
 
 void expandGlobalTypedefEntries(){
 	uint32_t previousNumberOfSlots = globalTypedefEntries.numberOfAllocatedSlots;
@@ -438,7 +440,7 @@ void expandGlobalTypedefEntries(){
 
 // typeSpecifierToInsert should have an identifier at the start (and have typedefs inside itself already substituted in)
 // typeSpecifierToInsert is copied inside this function, so it manages it's own strings
-int32_t addTypedefEntry(const char* typeSpecifierToInsert){
+int32_t addTypedefEntry(const char* typeSpecifierToInsert, int32_t indexForError){
 	struct TypedefEntry typedefEntry;
 	typedefEntry.isThisSlotTaken = true;
 	typedefEntry.lengthOfIdentifier = getIndexOfFirstSpaceInString(typeSpecifierToInsert);
@@ -446,6 +448,7 @@ int32_t addTypedefEntry(const char* typeSpecifierToInsert){
 		printf("Typedef entry\'s typeSpecifierToInsert must have a space\n");
 		exit(1);
 	}
+	ensureNoIdentifierConflictForTypedef(typeSpecifierToInsert,indexForError);
 	typedefEntry.typeSpecifier = copyStringToHeapString(typeSpecifierToInsert);
 	do {
 		for (int32_t i=0;i<globalTypedefEntries.numberOfAllocatedSlots;i++){
@@ -458,8 +461,8 @@ int32_t addTypedefEntry(const char* typeSpecifierToInsert){
 	} while (true);
 }
 
-void removeTypedefEntry(const uint32_t indexOfTypedefEntry){
-	struct TypedefEntry* typedefEntryPtr = &(globalTypedefEntries.entries[indexOfTypedefEntry]);
+void removeTypedefEntry(const int32_t indexOfTypedefEntry){
+	struct TypedefEntry* typedefEntryPtr = globalTypedefEntries.entries+indexOfTypedefEntry;
 	assert(typedefEntryPtr->isThisSlotTaken);
 	typedefEntryPtr->isThisSlotTaken = false;
 	cosmic_free(typedefEntryPtr->typeSpecifier);
@@ -492,7 +495,7 @@ bool isSectionOfStringTypedefed(const char* string,const int32_t startIndex,cons
 	return -1 != indexOfTypedefEntryForSectionOfString(string,startIndex,endIndex);
 }
 
-// does not check for a space
+/*
 bool isSegmentOfStringTypeLike(const char* string,const int32_t startIndex,const int32_t endIndex){
 	return specificStringEqualCheck(string,startIndex,endIndex,"struct") ||
 		specificStringEqualCheck(string,startIndex,endIndex,"union") ||
@@ -515,6 +518,96 @@ bool isSegmentOfStringTypeLike(const char* string,const int32_t startIndex,const
 		specificStringEqualCheck(string,startIndex,endIndex,"float") ||
 		specificStringEqualCheck(string,startIndex,endIndex,"double") ||
 		isSectionOfStringTypedefed(string,startIndex,endIndex);
+}
+*/
+
+// does not check for a space
+// expects string to be valid in the range given
+bool isSegmentOfStringTypeLike(const char* string, const int32_t startIndex, const int32_t endIndex){
+	{
+	const char* p;
+	char buf[8];
+	switch (endIndex-startIndex){
+		case 8:
+		p = string+startIndex;
+		buf[0]=*(p++);
+		buf[1]=*(p++);
+		buf[2]=*(p++);
+		buf[3]=*(p++);
+		buf[4]=*(p++);
+		buf[5]=*(p++);
+		buf[6]=*(p++);
+		buf[7]=*(p++);
+		if (
+		(buf[0]=='u' & buf[1]=='n' & buf[2]=='s' & buf[3]=='i' & buf[4]=='g' & buf[5]=='n' & buf[6]=='e' & buf[7]=='d') | //unsigned
+		(buf[0]=='v' & buf[1]=='o' & buf[2]=='l' & buf[3]=='a' & buf[4]=='t' & buf[5]=='i' & buf[6]=='l' & buf[7]=='e') | //volatile
+		(buf[0]=='r' & buf[1]=='e' & buf[2]=='g' & buf[3]=='i' & buf[4]=='s' & buf[5]=='t' & buf[6]=='e' & buf[7]=='r')   //register
+		){
+			return true;
+		}
+		break;
+		case 6:
+		p = string+startIndex;
+		buf[0]=*(p++);
+		buf[1]=*(p++);
+		buf[2]=*(p++);
+		buf[3]=*(p++);
+		buf[4]=*(p++);
+		buf[5]=*(p++);
+		if (
+		(buf[0]=='s' & buf[1]=='i' & buf[2]=='g' & buf[3]=='n' & buf[4]=='e' & buf[5]=='d') | //signed
+		(buf[0]=='s' & buf[1]=='t' & buf[2]=='r' & buf[3]=='u' & buf[4]=='c' & buf[5]=='t') | //struct
+		(buf[0]=='d' & buf[1]=='o' & buf[2]=='u' & buf[3]=='b' & buf[4]=='l' & buf[5]=='e') | //double
+		(buf[0]=='s' & buf[1]=='t' & buf[2]=='a' & buf[3]=='t' & buf[4]=='i' & buf[5]=='c') | //static
+		(buf[0]=='e' & buf[1]=='x' & buf[2]=='t' & buf[3]=='e' & buf[4]=='r' & buf[5]=='n') | //extern
+		(buf[0]=='i' & buf[1]=='n' & buf[2]=='l' & buf[3]=='i' & buf[4]=='n' & buf[5]=='e')   //inline
+		){
+			return true;
+		}
+		break;
+		case 5:
+		p = string+startIndex;
+		buf[0]=*(p++);
+		buf[1]=*(p++);
+		buf[2]=*(p++);
+		buf[3]=*(p++);
+		buf[4]=*(p++);
+		if (
+		(buf[0]=='s' & buf[1]=='h' & buf[2]=='o' & buf[3]=='r' & buf[4]=='t') | // short
+		(buf[0]=='_' & buf[1]=='B' & buf[2]=='o' & buf[3]=='o' & buf[4]=='l') | //_Bool
+		(buf[0]=='u' & buf[1]=='n' & buf[2]=='i' & buf[3]=='o' & buf[4]=='n') | //union
+		(buf[0]=='c' & buf[1]=='o' & buf[2]=='n' & buf[3]=='s' & buf[4]=='t') | //const
+		(buf[0]=='f' & buf[1]=='l' & buf[2]=='o' & buf[3]=='a' & buf[4]=='t')   //float
+		){
+			return true;
+		}
+		break;
+		case 4:
+		p = string+startIndex;
+		buf[0]=*(p++);
+		buf[1]=*(p++);
+		buf[2]=*(p++);
+		buf[3]=*(p++);
+		if (
+		(buf[0]=='l' & buf[1]=='o' & buf[2]=='n' & buf[3]=='g') | //long
+		(buf[0]=='c' & buf[1]=='h' & buf[2]=='a' & buf[3]=='r') | //char
+		(buf[0]=='e' & buf[1]=='n' & buf[2]=='u' & buf[3]=='m') | //enum
+		(buf[0]=='v' & buf[1]=='o' & buf[2]=='i' & buf[3]=='d') | //void
+		(buf[0]=='a' & buf[1]=='u' & buf[2]=='t' & buf[3]=='o')   //auto
+		){
+			return true;
+		}
+		break;
+		case 3:
+		p = string+startIndex;
+		if (
+		(p[0]=='i' & p[1]=='n' & p[2]=='t')   //int
+		){
+			return true;
+		}
+	}
+	}
+	return isSectionOfStringTypedefed(string,startIndex,endIndex);
 }
 
 

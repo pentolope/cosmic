@@ -91,13 +91,12 @@ void* cosmic_malloc(size_t size){
 	alloc:
 	cosmic_alloc_global.current=localCurrent;
 	uint8_t isNotTaken=localCurrent->isNotTaken[i];
-	uint16_t e=8;
+	uint16_t e=7;
 	uint16_t v=1;
-	while (e--){
+	while (true){
 		if (isNotTaken&v) goto finish;
-		v*=2;
+		v*=2;e--;
 	}
-	assert(false); // this statement should not be reached
 	finish:
 	localCurrent->isNotTaken[i]^=v;
 	void* ret=(void*)((uint8_t*)&localCurrent->entries+sizeof(uint8_t[ALT_ALLOC_BLK_SIZE])*(uint32_t)((7-e)+i*8));

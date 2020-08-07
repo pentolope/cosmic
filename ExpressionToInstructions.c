@@ -205,6 +205,7 @@ void warnForTypeCastChangeQualifiersOrTypeStructure(
 	bool v1;
 	bool c2;
 	bool v2;
+	//printf("w:%d|`%s`|`%s`\n",hasHadPointer,typeString1,typeString2);
 	const char* typeString1NQ=stripQualifiersC(typeString1,&v1,&c1);
 	const char* typeString2NQ=stripQualifiersC(typeString2,&v2,&c2);
 	if (isForTypeCast&warnForQualifiers){
@@ -215,8 +216,10 @@ void warnForTypeCastChangeQualifiersOrTypeStructure(
 		if ( c1&!c2&hasHadPointer) printInformativeMessageForExpression(false,"A const qualifier is being removed in this type",thisNode);
 	}
 	if (doStringsMatch(typeString1NQ,typeString2NQ)) return;
-	bool isSU1=isTypeStringOfStructOrUnion(typeString1NQ);
-	bool isSU2=isTypeStringOfStructOrUnion(typeString2NQ);
+	if (doStringsMatch(typeString1NQ,"void")) return;
+	if (doStringsMatch(typeString2NQ,"void")) return;
+	const bool isSU1=isTypeStringOfStructOrUnion(typeString1NQ);
+	const bool isSU2=isTypeStringOfStructOrUnion(typeString2NQ);
 	if (hasHadPointer){
 		if (isSU1 & isSU2){
 			if (isForTypeCast) printInformativeMessageForExpression(false,"Pointers to differing structs or unions are being type casted here",thisNode);
@@ -227,11 +230,11 @@ void warnForTypeCastChangeQualifiersOrTypeStructure(
 		}
 	}
 	if (isSU1 | isSU2) return;
-	if (doStringsMatch(typeString1NQ,"void")) return;
-	if (doStringsMatch(typeString2NQ,"void")) return;
-	uint16_t tID1=getTypeIdForCast(typeString1NQ);
-	uint16_t tID2=getTypeIdForCast(typeString2NQ);
-	if (tID1==9 & tID2==9){
+	const uint16_t tID1=getTypeIdForCast(typeString1NQ);
+	const uint16_t tID2=getTypeIdForCast(typeString2NQ);
+	//printf("w:%d:%d;\n",tID1,tID2);
+	if ((tID1==9 | tID1==8) & (tID2==9 | tID2==8)){
+		//printf("w->\n");
 		warnForTypeCastChangeQualifiersOrTypeStructure(thisNode,typeString1NQ+2,typeString2NQ+2,true,isForTypeCast,warnForQualifiers);
 		return;
 	}
@@ -259,25 +262,25 @@ if typeStringTo is "void", then it is guaranteed to succeed and no warnings will
 void applyTypeCast(ExpressionTreeNode* thisNode,const char* typeStringTo_input, uint16_t warnState){
 	char* typeStringTo=applyToTypeStringBaseArrayDecayToNew(typeStringTo_input);
 	if (applyToTypeStringBaseArrayDecayToSelf(thisNode->post.typeString)){
-		assert(thisNode->post.isLValue); // how did an rvalue array exist at this stage?
+		assert(thisNode->post.isLValue); // how would an rvalue array exist at this stage?
 		thisNode->post.isLValue=false;
 	}
 	genTypeStringNQ(thisNode);
 	bool typeStringToHasVolatile;
 	bool typeStringToHasConst;
-	char* typeStringToNQ = stripQualifiers(typeStringTo,&typeStringToHasVolatile,&typeStringToHasConst);
 	char* typeStringFromNQ = thisNode->post.typeStringNQ;
-	bool wPtrToPtr = (warnState&0x0001)!=0;
-	bool wPtrToNonPtr = (warnState&0x0002)!=0;
-	bool wNonPtrToPtr = (warnState&0x0004)!=0;
-	bool wQualifierStructure = (warnState&0x0008)!=0;
+	const bool wPtrToPtr = (warnState&0x0001)!=0;
+	const bool wPtrToNonPtr = (warnState&0x0002)!=0;
+	const bool wNonPtrToPtr = (warnState&0x0004)!=0;
+	const bool wQualifierStructure = (warnState&0x0008)!=0;
 	bool sNonPtrToPtr=false;
 	bool sPtrToNonPtr=false;
 	bool sPtrToPtr=false;
 	uint16_t typeIdForFrom;
 	uint16_t typeIdForTo;
-	uint32_t* thisConstVal=&thisNode->post.constVal;
-	bool isFromVoid=doStringsMatch(typeStringFromNQ,"void");
+	uint32_t *const thisConstVal=&thisNode->post.constVal;
+	const bool isFromVoid=doStringsMatch(typeStringFromNQ,"void");
+	char* typeStringToNQ = stripQualifiers(typeStringTo,&typeStringToHasVolatile,&typeStringToHasConst);
 	if (doStringsMatch(typeStringToNQ,"void")){
 		if (isFromVoid){
 			cosmic_free(typeStringTo);
@@ -304,9 +307,7 @@ void applyTypeCast(ExpressionTreeNode* thisNode,const char* typeStringTo_input, 
 		printInformativeMessageForExpression(true,"casting from void to non-void is not allowed",thisNode);
 		exit(1);
 	}
-	if (isTypeStringOfStructOrUnion(typeStringFromNQ) ||
-		isTypeStringOfStructOrUnion(typeStringToNQ)) {
-		
+	if (isTypeStringOfStructOrUnion(typeStringFromNQ) || isTypeStringOfStructOrUnion(typeStringToNQ)) {
 		cosmic_free(typeStringTo);
 		printf("Internal Error: cast got struct or union\n");
 		exit(1);
@@ -329,13 +330,11 @@ void applyTypeCast(ExpressionTreeNode* thisNode,const char* typeStringTo_input, 
 	}
 	bool doLoad255=false;
 	if (doSymbolicConstantGenForExp){
+		assert(thisNode->ib.numberOfSlotsAllocated!=0);
 		InstructionSingle is_apply_0;
 		InstructionSingle is_apply_1;
-		InstructionSingle is_load255;
 		is_apply_0.id=I_NOP_;
 		is_apply_1.id=I_NOP_;
-		is_load255.id=I_SYCB;
-		is_load255.arg.B1.a_0=255;
 		if (typeIdForFrom==1){
 			if (typeIdForTo>=6) {
 				is_apply_1.id=I_SCZD;
@@ -413,8 +412,10 @@ void applyTypeCast(ExpressionTreeNode* thisNode,const char* typeStringTo_input, 
 				*thisConstVal=0xFFFF&(*thisConstVal);
 			}
 		}
-		assert(thisNode->ib.numberOfSlotsAllocated!=0);
 		if (is_apply_0.id!=I_NOP_) addInstruction(&thisNode->ib,is_apply_0);
+		InstructionSingle is_load255;
+		is_load255.id=I_SYCB;
+		is_load255.arg.B1.a_0=255;
 		if (doLoad255) addInstruction(&thisNode->ib,is_load255);
 		if (is_apply_1.id!=I_NOP_) addInstruction(&thisNode->ib,is_apply_1);
 	} else {
@@ -768,8 +769,8 @@ void applyAutoTypeConversion_Ternary(ExpressionTreeNode* thisNode){
 					exit(1);
 				}
 			} else {
-				struct IntegralTypePromoteResult itpr_r={0};
-				struct IntegralTypePromoteResult itpr_l={0};
+				struct IntegralTypePromoteResult itpr_r;
+				struct IntegralTypePromoteResult itpr_l;
 				itpr_r=getRankOfPromotedTypeString(rn->post.typeString);
 				itpr_l=getRankOfPromotedTypeString(ln->post.typeString);
 				assert(itpr_r.didSucceed&itpr_l.didSucceed); // Internal Error: both should succeed
@@ -1882,37 +1883,29 @@ void applyOperator(ExpressionTreeNode* thisNode){
 		break;
 		case 38:{
 			switch (operatorTypeID){
-				case 1:{
-					tripleMergeIB(ib,ibRight,ibLeft,&ib_mem_dword_write_n);
-				}
+				case 1:
+				tripleMergeIB(ib,ibRight,ibLeft,&ib_mem_dword_write_n);
 				break;
-				case 2:{
-					tripleMergeIB(ib,ibRight,ibLeft,&ib_mem_word_write_n);
-				}
+				case 2:
+				tripleMergeIB(ib,ibRight,ibLeft,&ib_mem_word_write_n);
 				break;
-				case 3:{
-					tripleMergeIB(ib,ibRight,ibLeft,&ib_mem_byte_write_n);
-				}
+				case 3:
+				tripleMergeIB(ib,ibRight,ibLeft,&ib_mem_byte_write_n);
 				break;
-				case 4:{
-					tripleMergeIB(ib,ibRight,ibLeft,&ib_mem_byte_write_n);
-				}
+				case 4:
+				tripleMergeIB(ib,ibRight,ibLeft,&ib_mem_byte_write_n);
 				break;
-				case 5:{
-					tripleMergeIB(ib,ibRight,ibLeft,&ib_mem_dword_write_v);
-				}
+				case 5:
+				tripleMergeIB(ib,ibRight,ibLeft,&ib_mem_dword_write_v);
 				break;
-				case 6:{
-					tripleMergeIB(ib,ibRight,ibLeft,&ib_mem_word_write_v);
-				}
+				case 6:
+				tripleMergeIB(ib,ibRight,ibLeft,&ib_mem_word_write_v);
 				break;
-				case 7:{
-					tripleMergeIB(ib,ibRight,ibLeft,&ib_mem_byte_write_v);
-				}
+				case 7:
+				tripleMergeIB(ib,ibRight,ibLeft,&ib_mem_byte_write_v);
 				break;
-				case 8:{
-					tripleMergeIB(ib,ibRight,ibLeft,&ib_mem_byte_write_v);
-				}
+				case 8:
+				tripleMergeIB(ib,ibRight,ibLeft,&ib_mem_byte_write_v);
 				break;
 				case 9:{
 					quadMergeIB(ib,ibRight,&ib_stack_dupe_dword,ibLeft,&ib_stack_swp_22);
@@ -1950,15 +1943,13 @@ void applyOperator(ExpressionTreeNode* thisNode){
 					addQuadVoidPop(ib);
 				}
 				break;
-				case 13:{
-					dualMergeIB(ib,ibRight,ibLeft);
-					addStructStackAssign(ib,extraVal,false);
-				}
+				case 13:
+				dualMergeIB(ib,ibRight,ibLeft);
+				addStructStackAssign(ib,extraVal,false);
 				break;
-				case 14:{
-					dualMergeIB(ib,ibRight,ibLeft);
-					addStructStackAssign(ib,extraVal,true);
-				}
+				case 14:
+				dualMergeIB(ib,ibRight,ibLeft);
+				addStructStackAssign(ib,extraVal,true);
 				break;
 				default:goto BadOperatorTypeID;
 			}
@@ -1967,51 +1958,41 @@ void applyOperator(ExpressionTreeNode* thisNode){
 		case 39:{
 			if (operatorTypeID!=5 & operatorTypeID!=10) dualMergeIB(ib,ibRight,ibLeft);
 			switch (operatorTypeID){
-				case 1:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32add,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
-				}
+				case 1:
+				insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32add,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
 				break;
-				case 2:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16add,&ib_mem_word_read_n,&ib_mem_word_write_n);
-				}
+				case 2:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16add,&ib_mem_word_read_n,&ib_mem_word_write_n);
 				break;
-				case 3:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16add,&ib_mem_sbyte_read_n,&ib_mem_byte_write_n);
-				}
+				case 3:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16add,&ib_mem_sbyte_read_n,&ib_mem_byte_write_n);
 				break;
-				case 4:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16add,&ib_mem_byte_read_n,&ib_mem_byte_write_n);
-				}
+				case 4:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16add,&ib_mem_byte_read_n,&ib_mem_byte_write_n);
 				break;
-				case 5:{
-					singleMergeIB(ib,ibRight);
-					insert_IB_load_dword(ib,extraVal);
-					dualMergeIB(ib,&ib_i_32mul,ibLeft);
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32add,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
-				}
+				case 5:
+				singleMergeIB(ib,ibRight);
+				insert_IB_load_dword(ib,extraVal);
+				dualMergeIB(ib,&ib_i_32mul,ibLeft);
+				insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32add,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
 				break;
-				case 6:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32add,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
-				}
+				case 6:
+				insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32add,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
 				break;
-				case 7:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16add,&ib_mem_word_read_v,&ib_mem_word_write_v);
-				}
+				case 7:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16add,&ib_mem_word_read_v,&ib_mem_word_write_v);
 				break;
-				case 8:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16add,&ib_mem_sbyte_read_v,&ib_mem_byte_write_v);
-				}
+				case 8:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16add,&ib_mem_sbyte_read_v,&ib_mem_byte_write_v);
 				break;
-				case 9:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16add,&ib_mem_byte_read_v,&ib_mem_byte_write_v);
-				}
+				case 9:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16add,&ib_mem_byte_read_v,&ib_mem_byte_write_v);
 				break;
-				case 10:{
-					singleMergeIB(ib,ibRight);
-					insert_IB_load_dword(ib,extraVal);
-					dualMergeIB(ib,&ib_i_32mul,ibLeft);
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32add,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
-				}
+				case 10:
+				singleMergeIB(ib,ibRight);
+				insert_IB_load_dword(ib,extraVal);
+				dualMergeIB(ib,&ib_i_32mul,ibLeft);
+				insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32add,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
 				break;
 				default:goto BadOperatorTypeID;
 			}
@@ -2020,51 +2001,41 @@ void applyOperator(ExpressionTreeNode* thisNode){
 		case 40:{
 			if (operatorTypeID!=5 & operatorTypeID!=10) dualMergeIB(ib,ibRight,ibLeft);
 			switch (operatorTypeID){
-				case 1:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32sub,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
-				}
+				case 1:
+				insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32sub,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
 				break;
-				case 2:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16sub,&ib_mem_word_read_n,&ib_mem_word_write_n);
-				}
+				case 2:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16sub,&ib_mem_word_read_n,&ib_mem_word_write_n);
 				break;
-				case 3:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16sub,&ib_mem_sbyte_read_n,&ib_mem_byte_write_n);
-				}
+				case 3:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16sub,&ib_mem_sbyte_read_n,&ib_mem_byte_write_n);
 				break;
-				case 4:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16sub,&ib_mem_byte_read_n,&ib_mem_byte_write_n);
-				}
+				case 4:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16sub,&ib_mem_byte_read_n,&ib_mem_byte_write_n);
 				break;
-				case 5:{
-					singleMergeIB(ib,ibRight);
-					insert_IB_load_dword(ib,extraVal);
-					dualMergeIB(ib,&ib_i_32mul,ibLeft);
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32sub,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
-				}
+				case 5:
+				singleMergeIB(ib,ibRight);
+				insert_IB_load_dword(ib,extraVal);
+				dualMergeIB(ib,&ib_i_32mul,ibLeft);
+				insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32sub,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
 				break;
-				case 6:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32sub,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
-				}
+				case 6:
+				insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32sub,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
 				break;
-				case 7:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16sub,&ib_mem_word_read_v,&ib_mem_word_write_v);
-				}
+				case 7:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16sub,&ib_mem_word_read_v,&ib_mem_word_write_v);
 				break;
-				case 8:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16sub,&ib_mem_sbyte_read_v,&ib_mem_byte_write_v);
-				}
+				case 8:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16sub,&ib_mem_sbyte_read_v,&ib_mem_byte_write_v);
 				break;
-				case 9:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16sub,&ib_mem_byte_read_v,&ib_mem_byte_write_v);
-				}
+				case 9:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16sub,&ib_mem_byte_read_v,&ib_mem_byte_write_v);
 				break;
-				case 10:{
-					singleMergeIB(ib,ibRight);
-					insert_IB_load_dword(ib,extraVal);
-					dualMergeIB(ib,&ib_i_32mul,ibLeft);
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32sub,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
-				}
+				case 10:
+				singleMergeIB(ib,ibRight);
+				insert_IB_load_dword(ib,extraVal);
+				dualMergeIB(ib,&ib_i_32mul,ibLeft);
+				insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_i_32sub,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
 				break;
 				default:goto BadOperatorTypeID;
 			}
@@ -2089,37 +2060,29 @@ void applyOperator(ExpressionTreeNode* thisNode){
 			SelfAssignStart:
 			dualMergeIB(ib,ibRight,ibLeft);
 			switch (operatorTypeID){
-				case 1:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,ib_core0,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
-				}
+				case 1:
+				insert_IB_apply_to_self_dword_rvalue_after(ib,ib_core0,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
 				break;
-				case 2:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,ib_core1,&ib_mem_word_read_n,&ib_mem_word_write_n);
-				}
+				case 2:
+				insert_IB_apply_to_self_word_rvalue_after(ib,ib_core1,&ib_mem_word_read_n,&ib_mem_word_write_n);
 				break;
-				case 3:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,ib_core1,&ib_mem_sbyte_read_n,&ib_mem_byte_write_n);
-				}
+				case 3:
+				insert_IB_apply_to_self_word_rvalue_after(ib,ib_core1,&ib_mem_sbyte_read_n,&ib_mem_byte_write_n);
 				break;
-				case 4:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,ib_core1,&ib_mem_byte_read_n,&ib_mem_byte_write_n);
-				}
+				case 4:
+				insert_IB_apply_to_self_word_rvalue_after(ib,ib_core1,&ib_mem_byte_read_n,&ib_mem_byte_write_n);
 				break;
-				case 5:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,ib_core0,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
-				}
+				case 5:
+				insert_IB_apply_to_self_dword_rvalue_after(ib,ib_core0,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
 				break;
-				case 6:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,ib_core1,&ib_mem_word_read_v,&ib_mem_word_write_v);
-				}
+				case 6:
+				insert_IB_apply_to_self_word_rvalue_after(ib,ib_core1,&ib_mem_word_read_v,&ib_mem_word_write_v);
 				break;
-				case 7:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,ib_core1,&ib_mem_sbyte_read_v,&ib_mem_byte_write_v);
-				}
+				case 7:
+				insert_IB_apply_to_self_word_rvalue_after(ib,ib_core1,&ib_mem_sbyte_read_v,&ib_mem_byte_write_v);
 				break;
-				case 8:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,ib_core1,&ib_mem_byte_read_v,&ib_mem_byte_write_v);
-				}
+				case 8:
+				insert_IB_apply_to_self_word_rvalue_after(ib,ib_core1,&ib_mem_byte_read_v,&ib_mem_byte_write_v);
 				break;
 				default:goto BadOperatorTypeID;
 			}
@@ -2128,55 +2091,42 @@ void applyOperator(ExpressionTreeNode* thisNode){
 		case 42:{
 			dualMergeIB(ib,ibRight,ibLeft);
 			switch (operatorTypeID){
-				case 1:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32div_s_s,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
-				}
+				case 1:
+				insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32div_s_s,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
 				break;
-				case 2:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16div_s_s,&ib_mem_word_read_n,&ib_mem_word_write_n);
-				}
+				case 2:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16div_s_s,&ib_mem_word_read_n,&ib_mem_word_write_n);
 				break;
-				case 3:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16div_s_s,&ib_mem_sbyte_read_n,&ib_mem_byte_write_n);
-				}
+				case 3:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16div_s_s,&ib_mem_sbyte_read_n,&ib_mem_byte_write_n);
 				break;
-				case 4:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32div_u_u,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
-				}
+				case 4:
+				insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32div_u_u,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
 				break;
-				case 5:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16div_u_u,&ib_mem_word_read_n,&ib_mem_word_write_n);
-				}
+				case 5:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16div_u_u,&ib_mem_word_read_n,&ib_mem_word_write_n);
 				break;
-				case 6:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16div_u_u,&ib_mem_byte_read_n,&ib_mem_byte_write_n);
-				}
+				case 6:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16div_u_u,&ib_mem_byte_read_n,&ib_mem_byte_write_n);
 				break;
-				case 7:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32div_s_s,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
-				}
+				case 7:
+				insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32div_s_s,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
 				break;
-				case 8:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16div_s_s,&ib_mem_word_read_v,&ib_mem_word_write_v);
-				}
+				case 8:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16div_s_s,&ib_mem_word_read_v,&ib_mem_word_write_v);
 				break;
-				case 9:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16div_s_s,&ib_mem_sbyte_read_v,&ib_mem_byte_write_v);
-				}
+				case 9:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16div_s_s,&ib_mem_sbyte_read_v,&ib_mem_byte_write_v);
 				break;
-				case 10:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32div_u_u,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
-				}
+				case 10:
+				insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32div_u_u,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
 				break;
-				case 11:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16div_u_u,&ib_mem_word_read_v,&ib_mem_word_write_v);
-				}
+				case 11:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16div_u_u,&ib_mem_word_read_v,&ib_mem_word_write_v);
 				break;
-				case 12:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16div_u_u,&ib_mem_byte_read_v,&ib_mem_byte_write_v);
-				}
+				case 12:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16div_u_u,&ib_mem_byte_read_v,&ib_mem_byte_write_v);
 				break;
-				
 				default:goto BadOperatorTypeID;
 			}
 		}
@@ -2184,53 +2134,42 @@ void applyOperator(ExpressionTreeNode* thisNode){
 		case 43:{
 			dualMergeIB(ib,ibRight,ibLeft);
 			switch (operatorTypeID){
-				case 1:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32mod_s_s,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
-				}
+				case 1:
+				insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32mod_s_s,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
 				break;
-				case 2:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16mod_s_s,&ib_mem_word_read_n,&ib_mem_word_write_n);
-				}
+				case 2:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16mod_s_s,&ib_mem_word_read_n,&ib_mem_word_write_n);
 				break;
-				case 3:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16mod_s_s,&ib_mem_sbyte_read_n,&ib_mem_byte_write_n);
-				}
+				case 3:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16mod_s_s,&ib_mem_sbyte_read_n,&ib_mem_byte_write_n);
 				break;
-				case 4:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32mod_u_u,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
-				}
+				case 4:
+				insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32mod_u_u,&ib_mem_dword_read_n,&ib_mem_dword_write_n);
 				break;
-				case 5:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16mod_u_u,&ib_mem_word_read_n,&ib_mem_word_write_n);
-				}
+				case 5:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16mod_u_u,&ib_mem_word_read_n,&ib_mem_word_write_n);
 				break;
-				case 6:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16mod_u_u,&ib_mem_byte_read_n,&ib_mem_byte_write_n);
-				}
+				case 6:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16mod_u_u,&ib_mem_byte_read_n,&ib_mem_byte_write_n);
 				break;
-				case 7:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32mod_s_s,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
-				}
+				case 7:
+				insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32mod_s_s,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
 				break;
-				case 8:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16mod_s_s,&ib_mem_word_read_v,&ib_mem_word_write_v);
-				}
+				case 8:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16mod_s_s,&ib_mem_word_read_v,&ib_mem_word_write_v);
 				break;
 				case 9:{
 					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16mod_s_s,&ib_mem_sbyte_read_v,&ib_mem_byte_write_v);
 				}
 				break;
-				case 10:{
-					insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32mod_u_u,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
-				}
+				case 10:
+				insert_IB_apply_to_self_dword_rvalue_after(ib,&ib_intrinsic_front_i_32mod_u_u,&ib_mem_dword_read_v,&ib_mem_dword_write_v);
 				break;
-				case 11:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16mod_u_u,&ib_mem_word_read_v,&ib_mem_word_write_v);
-				}
+				case 11:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16mod_u_u,&ib_mem_word_read_v,&ib_mem_word_write_v);
 				break;
-				case 12:{
-					insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16mod_u_u,&ib_mem_byte_read_v,&ib_mem_byte_write_v);
-				}
+				case 12:
+				insert_IB_apply_to_self_word_rvalue_after(ib,&ib_i_16mod_u_u,&ib_mem_byte_read_v,&ib_mem_byte_write_v);
 				break;
 				
 				default:goto BadOperatorTypeID;

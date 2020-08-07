@@ -40,11 +40,13 @@ struct BlockFrameArray{
 			typeOfType == 2 is enum		
 			*/
 			const char* name;
-			struct TypeMemberEntry *arrayOfMemberEntries;
+			struct TypeMemberEntry* arrayOfMemberEntries;
 			uint16_t numberOfMemberEntries; // should not be 0
 			uint32_t thisSizeof; // because types that are keywords are not resolved here and struct/union total sizes are always word alligned, this is the only value that is needed here
 		} *typeEntries; // typeEntries does not include typedef entries, those are seperate
 		
+		uint16_t numberOfTypedefEntryIndexes;
+		int32_t* typedefEntryIndexes;
 	} *entries;
 	uint32_t numberOfAllocatedSlots;
 	uint32_t numberOfValidSlots;
@@ -76,7 +78,7 @@ struct BlockFrameArray{
 			typeOfType == 2 is enum		
 			*/
 			const char* name;
-			struct TypeMemberEntry *arrayOfMemberEntries;
+			struct TypeMemberEntry* arrayOfMemberEntries;
 			uint16_t numberOfMemberEntries; // should not be 0
 			uint32_t thisSizeof; // because types that are keywords are not resolved here and struct/union total sizes are always word alligned, this is the only value that is needed here
 		} *globalTypeEntries;
@@ -115,7 +117,7 @@ uint32_t addBlockFrame(){
 		blockFrameArray.entries = cosmic_realloc(blockFrameArray.entries,blockFrameArray.numberOfAllocatedSlots*sizeof(struct BlockFrameEntry));
 	}
 	uint32_t thisBlockIndex = blockFrameArray.numberOfValidSlots++;
-	memZero(&(blockFrameArray.entries[thisBlockIndex]),sizeof(struct BlockFrameEntry));
+	memZero(blockFrameArray.entries+thisBlockIndex,sizeof(struct BlockFrameEntry));
 	return thisBlockIndex;
 }
 
@@ -141,25 +143,42 @@ void removeBlockFrame(){
 		}
 	}
 	uint32_t thisBlockIndex = --blockFrameArray.numberOfValidSlots;
-	struct BlockFrameEntry* blockFrameEntryPtr = &(blockFrameArray.entries[thisBlockIndex]);
-	if (blockFrameEntryPtr->numberOfAllocatedVariableEntries!=0){
-		for (uint32_t i=0;i<blockFrameEntryPtr->numberOfValidVariableEntries;i++){
+	struct BlockFrameEntry* blockFrameEntryPtr = blockFrameArray.entries+thisBlockIndex;
+	if (blockFrameEntryPtr->numberOfValidVariableEntries){
+		uint32_t numberOfValidVariableEntries = blockFrameEntryPtr->numberOfValidVariableEntries;
+		for (uint32_t i=0;i<numberOfValidVariableEntries;i++){
 			cosmic_free((char*)blockFrameEntryPtr->variableEntries[i].typeString);
 		}
 		cosmic_free(blockFrameEntryPtr->variableEntries);
 	}
 	if (blockFrameEntryPtr->numberOfTypeEntries!=0){
-		for (uint32_t i=0;i<blockFrameEntryPtr->numberOfTypeEntries;i++){
-			for (uint16_t j=0;j<blockFrameEntryPtr->typeEntries[i].numberOfMemberEntries;j++){
-				cosmic_free((char*)blockFrameEntryPtr->typeEntries[i].arrayOfMemberEntries[j].typeString);
+		uint32_t numberOfTypeEntries=blockFrameEntryPtr->numberOfTypeEntries;
+		for (uint32_t i=0;i<numberOfTypeEntries;i++){
+			struct BlockFrameTypeEntry* blockFrameTypeEntryPtr = blockFrameEntryPtr->typeEntries+i;
+			uint16_t numberOfMemberEntries=blockFrameTypeEntryPtr->numberOfMemberEntries;
+			for (uint16_t j=0;j<numberOfMemberEntries;j++){
+				cosmic_free((char*)blockFrameTypeEntryPtr->arrayOfMemberEntries[j].typeString);
 			}
-			cosmic_free(blockFrameEntryPtr->typeEntries[i].arrayOfMemberEntries);
-			cosmic_free((char*)blockFrameEntryPtr->typeEntries[i].name);
+			cosmic_free(blockFrameTypeEntryPtr->arrayOfMemberEntries);
+			cosmic_free((char*)blockFrameTypeEntryPtr->name);
 		}
 		cosmic_free(blockFrameEntryPtr->typeEntries);
 	}
+	if (blockFrameEntryPtr->numberOfTypedefEntryIndexes!=0){
+		for (uint16_t i=0;i<blockFrameEntryPtr->numberOfTypedefEntryIndexes;i++){
+			removeTypedefEntry(blockFrameEntryPtr->typedefEntryIndexes[i]);
+		}
+		cosmic_free(blockFrameEntryPtr->typedefEntryIndexes);
+	}
 }
 
+
+void addTypedefEntryToBlockFrame(int32_t index){
+	struct BlockFrameEntry* blockFrameEntryPtr=blockFrameArray.entries+(blockFrameArray.numberOfValidSlots-1);
+	uint16_t indexToInsertAt=blockFrameEntryPtr->numberOfTypedefEntryIndexes;
+	blockFrameEntryPtr->typedefEntryIndexes=cosmic_realloc(blockFrameEntryPtr->typedefEntryIndexes,++blockFrameEntryPtr->numberOfTypedefEntryIndexes*sizeof(int32_t));
+	blockFrameEntryPtr->typedefEntryIndexes[indexToInsertAt]=index;
+}
 
 
 // this next struct is used when searching for variables, functions, types, and type components through an identifier
@@ -213,13 +232,14 @@ however, even if searchGlobal==false, the "isGlobal" boolean will be true if the
 */
 void searchForIdentifier(struct IdentifierSearchResult *isr,const char* identifier, bool searchGlobal, bool searchLocal, bool searchVariables, bool searchTypes, bool searchFunctions){
 	if (searchLocal){
-		// the order BlockFrameEntries are searched in does matter (for block overriden identifiers), it should be from end to start
+		// the order BlockFrameEntries are searched in does matter (for block overridden identifiers), it should be from end to start
 		uint32_t i=blockFrameArray.numberOfValidSlots;
 		while (i--!=0){
-			struct BlockFrameEntry* tempBlockFrameEntryPtr = &(blockFrameArray.entries[i]);
+			struct BlockFrameEntry* tempBlockFrameEntryPtr = blockFrameArray.entries+i;
 			if (searchVariables){
-				for (uint32_t j=0;j<tempBlockFrameEntryPtr->numberOfValidVariableEntries;j++){
-					struct BlockFrameVariableEntry* tempBlockFrameVariableEntryPtr = &(tempBlockFrameEntryPtr->variableEntries[j]);
+				uint32_t numberOfValidVariableEntries = tempBlockFrameEntryPtr->numberOfValidVariableEntries;
+				for (uint32_t j=0;j<numberOfValidVariableEntries;j++){
+					struct BlockFrameVariableEntry* tempBlockFrameVariableEntryPtr = tempBlockFrameEntryPtr->variableEntries+j;
 					if (areIdentifierStringsEquivalent(tempBlockFrameVariableEntryPtr->typeString,identifier)){
 						if (tempBlockFrameVariableEntryPtr->staticLinkbackID==0){
 							isr->didExist = true;
@@ -230,7 +250,7 @@ void searchForIdentifier(struct IdentifierSearchResult *isr,const char* identifi
 							return;
 						} else {
 							for (uint32_t k=0;k<blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots;k++){
-								struct GlobalVariableEntry* tempGlobalVariableEntryPtr = &(blockFrameArray.globalBlockFrame.globalVariableEntries[k]);
+								struct GlobalVariableEntry* tempGlobalVariableEntryPtr = blockFrameArray.globalBlockFrame.globalVariableEntries+k;
 								if (tempGlobalVariableEntryPtr->staticLinkbackID==tempBlockFrameVariableEntryPtr->staticLinkbackID){
 									isr->didExist = true;
 									isr->typeOfResult = IdentifierSearchResultIsVariable;
@@ -246,12 +266,14 @@ void searchForIdentifier(struct IdentifierSearchResult *isr,const char* identifi
 				}
 			}
 			if (searchTypes){
-				for (uint32_t j=0;j<tempBlockFrameEntryPtr->numberOfTypeEntries;j++){
-					struct BlockFrameTypeEntry* tempBlockFrameTypeEntryPtr = &(tempBlockFrameEntryPtr->typeEntries[j]);
+				uint32_t numberOfTypeEntries=tempBlockFrameEntryPtr->numberOfTypeEntries;
+				for (uint32_t j=0;j<numberOfTypeEntries;j++){
+					struct BlockFrameTypeEntry* tempBlockFrameTypeEntryPtr = tempBlockFrameEntryPtr->typeEntries+j;
 					if (tempBlockFrameTypeEntryPtr->typeOfThis==2){
 						// enum component search
-						for (uint16_t k=0;k<tempBlockFrameTypeEntryPtr->numberOfMemberEntries;k++){
-							struct TypeMemberEntry* tempTypeMemberEntryPtr = &(tempBlockFrameTypeEntryPtr->arrayOfMemberEntries[k]);
+						uint16_t numberOfMemberEntries=tempBlockFrameTypeEntryPtr->numberOfMemberEntries;
+						for (uint16_t k=0;k<numberOfMemberEntries;k++){
+							struct TypeMemberEntry* tempTypeMemberEntryPtr = tempBlockFrameTypeEntryPtr->arrayOfMemberEntries+k;
 							if (areIdentifierStringsEquivalent(tempTypeMemberEntryPtr->typeString,identifier)){
 								isr->didExist = true;
 								isr->typeOfResult = IdentifierSearchResultIsTypeMember;
@@ -271,7 +293,7 @@ void searchForIdentifier(struct IdentifierSearchResult *isr,const char* identifi
 	if (searchGlobal){
 		if (searchVariables){
 			for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots;i++){
-				struct GlobalVariableEntry* tempGlobalVariableEntryPtr = &(blockFrameArray.globalBlockFrame.globalVariableEntries[i]);
+				struct GlobalVariableEntry* tempGlobalVariableEntryPtr = blockFrameArray.globalBlockFrame.globalVariableEntries+i;
 				if (tempGlobalVariableEntryPtr->staticLinkbackID==0 && areIdentifierStringsEquivalent(tempGlobalVariableEntryPtr->typeString,identifier)){
 					isr->didExist = true;
 					isr->typeOfResult = IdentifierSearchResultIsVariable;
@@ -283,11 +305,12 @@ void searchForIdentifier(struct IdentifierSearchResult *isr,const char* identifi
 		}
 		if (searchTypes){
 			for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalTypeEntrySlots;i++){
-				struct GlobalTypeEntry* tempGlobalTypeEntryPtr = &(blockFrameArray.globalBlockFrame.globalTypeEntries[i]);
+				struct GlobalTypeEntry* tempGlobalTypeEntryPtr = blockFrameArray.globalBlockFrame.globalTypeEntries+i;
 				if (tempGlobalTypeEntryPtr->typeOfThis==2){
 					// enum component search
-					for (uint16_t k=0;k<tempGlobalTypeEntryPtr->numberOfMemberEntries;k++){
-						struct TypeMemberEntry* tempTypeMemberEntryPtr = &(tempGlobalTypeEntryPtr->arrayOfMemberEntries[k]);
+					uint16_t numberOfMemberEntries=tempGlobalTypeEntryPtr->numberOfMemberEntries;
+					for (uint16_t k=0;k<numberOfMemberEntries;k++){
+						struct TypeMemberEntry* tempTypeMemberEntryPtr = tempGlobalTypeEntryPtr->arrayOfMemberEntries+k;
 						if (areIdentifierStringsEquivalent(tempTypeMemberEntryPtr->typeString,identifier)){
 							isr->didExist = true;
 							isr->typeOfResult = IdentifierSearchResultIsTypeMember;
@@ -302,7 +325,7 @@ void searchForIdentifier(struct IdentifierSearchResult *isr,const char* identifi
 		}
 		if (searchFunctions){
 			for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalFunctionEntrySlots;i++){
-				struct GlobalFunctionEntry* tempGlobalFunctionEntryPtr = &(blockFrameArray.globalBlockFrame.globalFunctionEntries[i]);
+				struct GlobalFunctionEntry* tempGlobalFunctionEntryPtr = blockFrameArray.globalBlockFrame.globalFunctionEntries+i;
 				if (areIdentifierStringsEquivalent(tempGlobalFunctionEntryPtr->typeString,identifier)){
 					isr->didExist = true;
 					isr->typeOfResult = IdentifierSearchResultIsFunction;
@@ -316,6 +339,12 @@ void searchForIdentifier(struct IdentifierSearchResult *isr,const char* identifi
 	return;
 }
 
+
+void ensureNoIdentifierConflictForTypedef(const char* typeSpecifier, int32_t indexForError){
+	struct IdentifierSearchResult isr;
+	searchForIdentifier(&isr,typeSpecifier,true,true,true,true,true);
+	if (isr.didExist) err_1101_("This typedef cannot be allowed, the suggested type name is already being used for an identifier",indexForError);
+}
 
 
 // inside the variableReference, isGlobal must not be true
@@ -460,7 +489,7 @@ uint8_t addGlobalFunction(
 	hasPreviousPrototype = isr.didExist;
 	if (isr.didExist){
 		indexOfPreviousPrototype = isr.reference.functionReference.functionEntryIndex;
-		struct GlobalFunctionEntry* globalFunctionEntryPtr = &(blockFrameArray.globalBlockFrame.globalFunctionEntries[indexOfPreviousPrototype]);
+		struct GlobalFunctionEntry* globalFunctionEntryPtr = blockFrameArray.globalBlockFrame.globalFunctionEntries+indexOfPreviousPrototype;
 		if (globalFunctionEntryPtr->usedStatic!=usedStatic |
 			globalFunctionEntryPtr->usedExtern!=usedExtern |
 			globalFunctionEntryPtr->usedInline!=usedInline){
@@ -535,7 +564,7 @@ uint8_t addGlobalFunction(
 			}
 			indexOfCurrentEntry = blockFrameArray.globalBlockFrame.numberOfValidGlobalFunctionEntrySlots++;
 		}
-		struct GlobalFunctionEntry* globalFunctionEntryPtr = &(blockFrameArray.globalBlockFrame.globalFunctionEntries[indexOfCurrentEntry]);
+		struct GlobalFunctionEntry* globalFunctionEntryPtr = blockFrameArray.globalBlockFrame.globalFunctionEntries+indexOfCurrentEntry;
 		globalFunctionEntryPtr->hasBeenDefined = isDefinitionBeingGiven;
 		if (isDefinitionBeingGiven & hasPreviousPrototype){
 			cosmic_free((char*)globalFunctionEntryPtr->typeString);
@@ -609,14 +638,14 @@ exit(1);
 	}
 	uint32_t thisSizeof = getSizeofForTypeString(typeString,false);
 	
-	struct BlockFrameEntry* blockFrameEntryPtr = &(blockFrameArray.entries[blockFrameArray.numberOfValidSlots-1]);
+	struct BlockFrameEntry* blockFrameEntryPtr = blockFrameArray.entries+(blockFrameArray.numberOfValidSlots-1);
 	if (blockFrameEntryPtr->numberOfValidVariableEntries>=blockFrameEntryPtr->numberOfAllocatedVariableEntries){
 		blockFrameEntryPtr->numberOfAllocatedVariableEntries += 10;
 		blockFrameEntryPtr->variableEntries = cosmic_realloc(
 			blockFrameEntryPtr->variableEntries,
 			blockFrameEntryPtr->numberOfAllocatedVariableEntries*sizeof(struct BlockFrameVariableEntry));
 	}
-	struct BlockFrameVariableEntry* blockFrameVariableEntryPtr = &(blockFrameEntryPtr->variableEntries[blockFrameEntryPtr->numberOfValidVariableEntries++]);
+	struct BlockFrameVariableEntry* blockFrameVariableEntryPtr = blockFrameEntryPtr->variableEntries+(blockFrameEntryPtr->numberOfValidVariableEntries++);
 	
 	blockFrameVariableEntryPtr->isRegister = isRegister;
 	blockFrameVariableEntryPtr->typeString = copyStringToHeapString(typeString);
@@ -676,9 +705,9 @@ void searchForType(struct TypeSearchResult* typeSearchResult,const char* name, u
 	uint32_t j=blockFrameArray.numberOfValidSlots;
 	while (j--!=0){
 		// the order BlockFrameEntries are searched in does matter (for later when inlining functions becomes a thing), it should be last to first
-		struct BlockFrameEntry* tempBlockFrameEntryPtr = &(blockFrameArray.entries[j]);
+		struct BlockFrameEntry* tempBlockFrameEntryPtr = blockFrameArray.entries+j;
 		for (uint32_t k=0;k<tempBlockFrameEntryPtr->numberOfTypeEntries;k++){
-			struct BlockFrameTypeEntry* tempBlockFrameTypeEntryPtr = &(tempBlockFrameEntryPtr->typeEntries[k]);
+			struct BlockFrameTypeEntry* tempBlockFrameTypeEntryPtr = tempBlockFrameEntryPtr->typeEntries+k;
 			if (tempBlockFrameTypeEntryPtr->typeOfThis==type && doStringsMatch(name,tempBlockFrameTypeEntryPtr->name)){
 				typeSearchResult->blockFrameEntryIndex = j;
 				typeSearchResult->typeEntryIndex = k;
@@ -689,7 +718,7 @@ void searchForType(struct TypeSearchResult* typeSearchResult,const char* name, u
 		}
 	}
 	for (j=0;j<blockFrameArray.globalBlockFrame.numberOfValidGlobalTypeEntrySlots;j++){
-		struct GlobalTypeEntry* tempGlobalTypeEntryPtr = &(blockFrameArray.globalBlockFrame.globalTypeEntries[j]);
+		struct GlobalTypeEntry* tempGlobalTypeEntryPtr = blockFrameArray.globalBlockFrame.globalTypeEntries+j;
 		if (tempGlobalTypeEntryPtr->typeOfThis==type && doStringsMatch(name,tempGlobalTypeEntryPtr->name)){
 			typeSearchResult->typeEntryIndex = j;
 			typeSearchResult->didExist = true;
@@ -782,48 +811,35 @@ char* resolveTypdefsInTypeString(char* typeString, bool* didAllocateNewString){
 		}
 		bool wasPreviousTypeIndicator = false;
 		for (uint16_t segNum = 0;segNum<numberOfSegments;segNum++){
-			int32_t startIndex;
-			int32_t endIndex;
+			int32_t startIndex = mainStart;
+			int32_t endIndex = lengthOfInput;
 			if (segNum!=0){
 				startIndex = getIndexOfNthSpace(typeString+mainStart,segNum-1)+1+mainStart;
-			} else {
-				startIndex = mainStart;
 			}
-			if (segNum+1==numberOfSegments){
-				endIndex = lengthOfInput;
-			} else {
+			if (segNum+1!=numberOfSegments){
 				endIndex = getIndexOfNthSpace(typeString+mainStart,segNum)+mainStart;
 			}
-			if (startIndex==-1 | endIndex==-1){
-				printf("Internal Error:typedef substitution segment error\n");
-				exit(1);
-			}
-			// startIndex and endIndex should never be -1 . Does it need to be checked?
 			if (
 			specificStringEqualCheck(typeString,startIndex,endIndex,"enum") || 
 			specificStringEqualCheck(typeString,startIndex,endIndex,"struct") || 
 			specificStringEqualCheck(typeString,startIndex,endIndex,"union")){
 				wasPreviousTypeIndicator = true;
 			} else if (!wasPreviousTypeIndicator){
-				int32_t typedefEntryIndex = indexOfTypedefEntryForSectionOfString(typeString,startIndex,endIndex);
+				const int32_t typedefEntryIndex = indexOfTypedefEntryForSectionOfString(typeString,startIndex,endIndex);
 				if (typedefEntryIndex!=-1){
-					struct TypedefEntry* typedefEntryPtr = &(globalTypedefEntries.entries[typedefEntryIndex]);
-					int32_t lengthOfTypedefSubstitution = strlen(typedefEntryPtr->typeSpecifier)-(typedefEntryPtr->lengthOfIdentifier+1);
-					int32_t lengthOfSegment = endIndex-startIndex;
-					int32_t lengthOfNewString = (lengthOfInput-lengthOfSegment)+lengthOfTypedefSubstitution;
-					int32_t indexToCopyEndOfOriginal = (endIndex-lengthOfSegment)+lengthOfTypedefSubstitution;
+					const struct TypedefEntry* typedefEntryPtr = globalTypedefEntries.entries+typedefEntryIndex;
+					const char* typeSpecifier=typedefEntryPtr->typeSpecifier;
+					const int32_t lengthOfTypedefSubstitution = strlen(typeSpecifier)-(typedefEntryPtr->lengthOfIdentifier+1);
+					const int32_t strEndTemp=startIndex+lengthOfTypedefSubstitution;
+					const int32_t strValTemp0=-startIndex+typedefEntryPtr->lengthOfIdentifier+1;
+					const int32_t strValTemp1=-lengthOfTypedefSubstitution+(endIndex-startIndex);
+					const int32_t lengthOfNewString = (lengthOfInput-(endIndex-startIndex))+lengthOfTypedefSubstitution;
 					char* newString = cosmic_malloc(lengthOfNewString+1);
-					for (int32_t i=0;i<lengthOfNewString;i++){
-						char c;
-						if (i<startIndex){
-							c = typeString[i];
-						} else if (i>=(startIndex+lengthOfTypedefSubstitution)){
-							c = typeString[i-lengthOfTypedefSubstitution+lengthOfSegment];
-						} else {
-							c = typedefEntryPtr->typeSpecifier[(i-startIndex)+typedefEntryPtr->lengthOfIdentifier+1];
-						}
-						newString[i]=c;
-					}
+					int32_t i=0;
+					for (;i<startIndex;i++) newString[i]=typeString[i];
+					for (;i<strEndTemp;i++) newString[i]=typeSpecifier[i+strValTemp0];
+					for (;i<lengthOfNewString;i++) newString[i]=typeString[i+strValTemp1];
+					
 					newString[lengthOfNewString]=0;
 					mainStart=startIndex+lengthOfTypedefSubstitution;
 					if (didFindOneYet) cosmic_free(typeString);
@@ -856,7 +872,7 @@ returns new string with all types broken down and added to blockFrameArray
 
 after this function completes, typedefs will already be substituted in
 */
-char* breakDownTypeAndAdd(char* typeString, bool addToGlobal){
+char* breakDownTypeAndAdd(const char* typeString, bool addToGlobal){
 	char* internalString = copyStringToHeapString(typeString);
 	int32_t length = strlen(internalString);
 	for (int32_t i=0;i<length;i++){
@@ -999,17 +1015,17 @@ char* breakDownTypeAndAdd(char* typeString, bool addToGlobal){
 					blockFrameArray.globalBlockFrame.globalTypeEntries = cosmic_realloc(blockFrameArray.globalBlockFrame.globalTypeEntries,
 							blockFrameArray.globalBlockFrame.numberOfAllocatedGlobalTypeEntrySlots*sizeof(struct GlobalTypeEntry));
 				}
-				struct GlobalTypeEntry* globalTypeEntryPtr = &(blockFrameArray.globalBlockFrame.globalTypeEntries[blockFrameArray.globalBlockFrame.numberOfValidGlobalTypeEntrySlots++]);
+				struct GlobalTypeEntry* globalTypeEntryPtr = blockFrameArray.globalBlockFrame.globalTypeEntries+(blockFrameArray.globalBlockFrame.numberOfValidGlobalTypeEntrySlots++);
 				globalTypeEntryPtr->name = name;
 				globalTypeEntryPtr->arrayOfMemberEntries = arrayOfMemberEntries;
 				globalTypeEntryPtr->numberOfMemberEntries = (uint16_t)numberOfSplitSegments;
 				globalTypeEntryPtr->thisSizeof = walkingOffset;
 				globalTypeEntryPtr->typeOfThis=typeOfThis;
 			} else {
-				struct BlockFrameEntry* blockFrameEntryPtr = &(blockFrameArray.entries[blockFrameArray.numberOfValidSlots-1]);
+				struct BlockFrameEntry* blockFrameEntryPtr = blockFrameArray.entries+(blockFrameArray.numberOfValidSlots-1);
 				blockFrameEntryPtr->numberOfTypeEntries++;
 				blockFrameEntryPtr->typeEntries = cosmic_realloc(blockFrameEntryPtr->typeEntries,blockFrameEntryPtr->numberOfTypeEntries*sizeof(struct BlockFrameTypeEntry));
-				struct BlockFrameTypeEntry* blockFrameTypeEntryPtr = &(blockFrameEntryPtr->typeEntries[blockFrameEntryPtr->numberOfTypeEntries-1]);
+				struct BlockFrameTypeEntry* blockFrameTypeEntryPtr = blockFrameEntryPtr->typeEntries+(blockFrameEntryPtr->numberOfTypeEntries-1);
 				blockFrameTypeEntryPtr->name = name;
 				blockFrameTypeEntryPtr->arrayOfMemberEntries = arrayOfMemberEntries;
 				blockFrameTypeEntryPtr->numberOfMemberEntries = (uint16_t)numberOfSplitSegments;
@@ -1042,8 +1058,7 @@ char* fullTypeParseAndAdd(int32_t startIndex,int32_t endIndex,bool addToGlobal){
 	return typeString_2;
 }
 
-
-void ensureNoNewDefinitions(char* typeString,int32_t startIndex,int32_t endIndex){
+void ensureNoNewDefinitions(const char* typeString,int32_t startIndex,int32_t endIndex){
 	for (uint32_t i=0;typeString[i];i++){
 		if (typeString[i]=='{'){
 			err_1111_("This type descriptor should not be defining a new type\n",startIndex,endIndex);

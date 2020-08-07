@@ -279,7 +279,8 @@ int32_t functionStatementsWalk(
 				endOfToken = getEndOfToken(walkingIndex);
 				if (isSegmentOfStringTypeLike(sourceContainer.string,walkingIndex,endOfToken)){
 					// then the first statement is a declaration
-					int32_t indexOfEndOfDeclaration = findEndIndexForConvertType(sourceContainer.string,walkingIndex);
+					int32_t indexOfEndOfDeclaration = findEndIndexForConvertType(walkingIndex);
+					// todo: add `auto`
 					bool usedRegister = false;
 					bool usedStatic = false;
 					if (specificStringEqualCheck(sourceContainer.string,walkingIndex,walkingIndex+9,"register ")){
@@ -597,7 +598,15 @@ while (true){
 			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"typedef")){
 			
-			err_1101_("typedef inside functions is not ready yet",walkingIndex);
+			int32_t startIndexForDeclaration = walkingIndex+8;
+			int32_t endIndexForDeclaration = findEndIndexForConvertType(startIndexForDeclaration);
+			if (sourceContainer.string[endIndexForDeclaration]!=';'){
+				err_1101_("expected \';\' after typedef entry",endIndexForDeclaration);
+			}
+			char* typeString = fullTypeParseAndAdd(startIndexForDeclaration,endIndexForDeclaration,false);
+			addTypedefEntryToBlockFrame(addTypedefEntry(typeString,startIndexForDeclaration));
+			cosmic_free(typeString);
+			walkingIndex=endIndexForDeclaration;
 			
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"goto")){
 			
@@ -623,7 +632,7 @@ while (true){
 			
 			if (isSegmentOfStringTypeLike(sourceContainer.string,walkingIndex,endOfToken)){
 				// then it is a declaration
-				int32_t indexOfEndOfDeclaration = findEndIndexForConvertType(sourceContainer.string,walkingIndex);
+				int32_t indexOfEndOfDeclaration = findEndIndexForConvertType(walkingIndex);
 				bool usedRegister = false;
 				bool usedStatic = false;
 				if (specificStringEqualCheck(sourceContainer.string,walkingIndex,walkingIndex+9,"register ")){
@@ -702,9 +711,9 @@ void fileScopeStatementsWalk(){
 		if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"typedef")){
 			// then this is a typedef entry
 			int32_t startIndexForDeclaration = walkingIndex+8;
-			int32_t endIndexForDeclaration = findEndIndexForConvertType(sourceContainer.string,startIndexForDeclaration);
+			int32_t endIndexForDeclaration = findEndIndexForConvertType(startIndexForDeclaration);
 			char* typeString = fullTypeParseAndAdd(startIndexForDeclaration,endIndexForDeclaration,true);
-			addTypedefEntry(typeString);
+			addTypedefEntry(typeString,startIndexForDeclaration);
 			cosmic_free(typeString);
 			walkingIndex=1+endIndexForDeclaration;
 			
@@ -752,7 +761,7 @@ void fileScopeStatementsWalk(){
 				hasExtern=externCount!=0;
 				hasInline=inlineCount!=0;
 			}
-			int32_t endIndexForDeclaration = findEndIndexForConvertType(sourceContainer.string,startIndexForDeclaration);
+			int32_t endIndexForDeclaration = findEndIndexForConvertType(startIndexForDeclaration);
 			char* typeString = fullTypeParseAndAdd(startIndexForDeclaration,endIndexForDeclaration,true);
 			int32_t gotoFailIndex=startIndexForDeclaration;
 			walkingIndex=1+endIndexForDeclaration;

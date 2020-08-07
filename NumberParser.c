@@ -7,8 +7,8 @@ struct NumberParseResult{
 	uint8_t typeOfDecimal;
 	/*
 	if typeOfDecimal==0 then the number is non-decimal (not a float,double,long double)
-	if typeOfDecimal==1 then the number is a float
-	if typeOfDecimal==2 then the number is a double
+	if typeOfDecimal==1 then the number is a float       (currently not implemented)
+	if typeOfDecimal==2 then the number is a double      (currently not implemented)
 	if typeOfDecimal==3 then the number is a long double (currently not implemented)
 	*/
 	uint8_t typeOfNonDecimal;
@@ -18,7 +18,7 @@ struct NumberParseResult{
 	if typeOfNonDecimal==2 then the number is a unsigned int
 	if typeOfNonDecimal==3 then the number is a signed long
 	if typeOfNonDecimal==4 then the number is a unsigned long
-	if typeOfNonDecimal==5 then the number is a signed long long (currently not implemented)
+	if typeOfNonDecimal==5 then the number is a signed long long   (currently not implemented)
 	if typeOfNonDecimal==6 then the number is a unsigned long long (currently not implemented)
 	*/
 	union {
@@ -179,9 +179,9 @@ void parseNumber(struct NumberParseResult* numberParseResult,const char* string,
 		for (int32_t i=startIndex;i<endWithoutSuffix;i++){
 			uint8_t digit = string[i];
 			if (digit>'9'){
-				if ((digit>='a') & (digit<='f')){
+				if (digit>='a' & digit<='f'){
 					digit=(digit-'a')+10;
-				} else if ((digit>='A') & (digit<='F')){
+				} else if (digit>='A' & digit<='F'){
 					digit=(digit-'A')+10;
 				} else {
 					numberParseResult->errorCode=3;
