@@ -35,11 +35,12 @@ bool doingSanityCheck = false;
 
 const InstructionInformation resetII = {.regIN={16,16,16,16,16,16,16,16,16},.regOUT={16,16,16,16,16}};
 
-void fillInstructionInformation(InstructionInformation* II, const InstructionBuffer* ib, uint32_t index){
+void fillInstructionInformation(InstructionInformation*const II, const InstructionBuffer*const ib, uint32_t index){
+	const InstructionSingle*const buffer = ib->buffer;
 	*II=resetII;
-	II->id=ib->buffer[index].id;
+	II->id=buffer[index].id;
 	AfterReset:;
-	InstructionSingle IS=ib->buffer[index];
+	const InstructionSingle IS=buffer[index];
 	switch (IS.id){
 		case I_SYRE:
 		case I_SYCB:
@@ -97,7 +98,7 @@ void fillInstructionInformation(InstructionInformation* II, const InstructionBuf
 		enum InstructionTypeID id;
 		do {
 			assert(index!=0);
-			id=ib->buffer[--index].id;
+			id=buffer[--index].id;
 		} while (id!=I_SYRB & id!=I_SYRW & id!=I_SYRD & id!=I_SYRQ);
 		}
 		goto AfterReset;
@@ -524,7 +525,7 @@ static inline bool doRegListsHaveCommon(const uint8_t* regList0,const uint8_t* r
 }
 
 // the return value indicates that the target instruction can be reordered to any position down to and including the index returned
-uint32_t findLowerReorderBoundry(const InstructionBuffer *ib,const uint32_t target){
+uint32_t findLowerReorderBoundry(const InstructionBuffer* ib,const uint32_t target){
 	InstructionInformation targetII;
 	InstructionInformation prevII;
 	fillInstructionInformation(&targetII,ib,target);
@@ -558,7 +559,7 @@ uint32_t findLowerReorderBoundry(const InstructionBuffer *ib,const uint32_t targ
 }
 
 // the return value indicates that the target instruction can be reordered to any position up to and including the index returned
-uint32_t findUpperReorderBoundry(const InstructionBuffer *ib,const uint32_t target){
+uint32_t findUpperReorderBoundry(const InstructionBuffer* ib,const uint32_t target){
 	uint32_t bound=target;
 	InstructionInformation targetII;
 	fillInstructionInformation(&targetII,ib,target);
@@ -614,7 +615,7 @@ returns true if it succeeded in getting the boundry
 the lower and upper bounds are inclusive
 the startInstruction should have the targetRegister in it's output and not it's input
 */
-bool findRegRenameBoundaryFromOrigin(const InstructionBuffer *ib, uint32_t startInstruction, uint8_t targetRegister, uint32_t* upperBound){
+bool findRegRenameBoundaryFromOrigin(const InstructionBuffer* ib, uint32_t startInstruction, uint8_t targetRegister, uint32_t* upperBound){
 	InstructionInformation II;
 	fillInstructionInformation(&II,ib,startInstruction);
 	if (!(doesRegListContain(II.regOUT,targetRegister) & !doesRegListContain(II.regIN,targetRegister))){
@@ -666,7 +667,7 @@ bool findRegRenameBoundaryFromOrigin(const InstructionBuffer *ib, uint32_t start
 
 
 
-uint32_t findLabelLocation(const InstructionBuffer *ib,const uint32_t labelNumber){
+uint32_t findLabelLocation(const InstructionBuffer* ib,const uint32_t labelNumber){
 	InstructionSingle* IS_i;
 	InstructionSingle* buffer=ib->buffer;
 	uint32_t i=ib->numberOfSlotsTaken;
@@ -715,7 +716,6 @@ void getRegOriginInfo(const InstructionBuffer* ib, struct RegOriginInfo* regOrig
 	do {
 		fillInstructionInformation(&II,ib,i);
 		if (II.isSymbolicInternal) continue;
-		//printf("%04X\n",i);
 		if (doesRegListContain(II.regOUT,targetRegister)){
 			if (doesRegListContain(II.regIN,targetRegister)){
 				regOriginInfo->didHitModification=true;
@@ -737,7 +737,6 @@ void getRegOriginInfo(const InstructionBuffer* ib, struct RegOriginInfo* regOrig
 
 #ifdef OPT_DEBUG_SANITY
 void sanityCheck(const InstructionBuffer* ib){
-	//printf("\n~Sanity Check~\n");
 	doingSanityCheck=true;
 	InstructionInformation II;
 	if (0!=ib->numberOfSlotsTaken){
@@ -756,14 +755,10 @@ void sanityCheck(const InstructionBuffer* ib){
 		regOriginInfo.targetLocation=i;
 		uint8_t ri=0;
 		uint8_t r=0;
-		//printf("%08X |", i);
-		//printSingleInstructionOptCode(ib->buffer[i]);
-		//printf("\n");
 		while ((r=II.regIN[ri++])!=16){
 			if (r!=0 & r!=1){
 				regOriginInfo.targetRegister=r;
 				getRegOriginInfo(ib,&regOriginInfo);
-				//printf("~%01X->%08X\n",regOriginInfo.targetRegister,regOriginInfo.originLocation);
 			}
 			if (r==15){
 				printf("{ Caught during sanity check }\n");
@@ -853,7 +848,6 @@ void sanityCheck(const InstructionBuffer* ib){
 		}
 	}
 	doingSanityCheck=false;
-	//printf("\n");
 }
 #endif
 
@@ -876,8 +870,7 @@ bool traceJumpLabel(const InstructionBuffer* ib,const uint32_t locationOfJump, u
 		regOriginInfo0.targetRegister=IS_jmp.arg.B3.a_0;
 		regOriginInfo1.targetRegister=IS_jmp.arg.B3.a_1;
 	} else {
-		printf("traceJumpLabel() called wrong (this can be removed later)\n");
-		exit(1);
+		assert(false); // called wrong
 	}
 	getRegOriginInfo(ib,&regOriginInfo0);
 	getRegOriginInfo(ib,&regOriginInfo1);
@@ -909,7 +902,7 @@ bool traceJumpLabel(const InstructionBuffer* ib,const uint32_t locationOfJump, u
 // should start at 0
 // if the end is reached, it returns numberOfSlotsTaken
 // does not bother to check JJMP
-uint32_t findNextJumpUsingLabel(const InstructionBuffer *ib, uint32_t labelNumber, uint32_t startAt){
+uint32_t findNextJumpUsingLabel(const InstructionBuffer* ib, uint32_t labelNumber, uint32_t startAt){
 	uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
 	InstructionSingle* buffer=ib->buffer;
 	uint32_t tempLabelNumber;
@@ -930,7 +923,7 @@ uint32_t findNextJumpUsingLabel(const InstructionBuffer *ib, uint32_t labelNumbe
 
 
 // indexOfFirstMention may safely be NULL. if it returns false, indexOfFirstMention is garenteed to be unmodified
-bool isRegMentionedAtOrAfterTarget(const InstructionBuffer *ib,const uint32_t target,const uint8_t reg, uint32_t* indexOfFirstMention){
+bool isRegMentionedAtOrAfterTarget(const InstructionBuffer* ib,const uint32_t target,const uint8_t reg, uint32_t* indexOfFirstMention){
 	uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
 	InstructionInformation II;
 	for (uint32_t i=target;i<numberOfSlotsTaken;i++){
@@ -948,7 +941,7 @@ bool isRegMentionedAtOrAfterTarget(const InstructionBuffer *ib,const uint32_t ta
 
 
 // indexOfFirstUsage may safely be NULL. if it returns false, indexOfFirstUsage is garenteed to be unmodified
-bool isValueInRegUsedAfterTarget(const InstructionBuffer *ib,const uint32_t target,const uint8_t reg, uint32_t* indexOfFirstUsage){
+bool isValueInRegUsedAfterTarget(const InstructionBuffer* ib,const uint32_t target,const uint8_t reg, uint32_t* indexOfFirstUsage){
 	uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
 	InstructionInformation II;
 	for (uint32_t i=target+1;i<numberOfSlotsTaken;i++){
@@ -967,7 +960,7 @@ bool isValueInRegUsedAfterTarget(const InstructionBuffer *ib,const uint32_t targ
 
 
 // does not check the start
-bool isValueInRegUsedAnywhereThroughoutRangeWithExtentionCheck(const InstructionBuffer *ib,const uint32_t start,const uint32_t end,const uint8_t reg){
+bool isValueInRegUsedAnywhereThroughoutRangeWithExtentionCheck(const InstructionBuffer* ib,const uint32_t start,const uint32_t end,const uint8_t reg){
 	uint32_t walk = start;
 	uint32_t numberOfSlotsTaken = ib->numberOfSlotsTaken;
 	InstructionInformation II;
@@ -987,7 +980,7 @@ bool isValueInRegUsedAnywhereThroughoutRangeWithExtentionCheck(const Instruction
 	return false;
 }
 
-bool wouldRegRenameViolateMultiOutputLaws(const InstructionBuffer *ib,const uint32_t start,const uint32_t end,const uint8_t regFrom,const uint8_t regTo){
+bool wouldRegRenameViolateMultiOutputLaws(const InstructionBuffer* ib,const uint32_t start,const uint32_t end,const uint8_t regFrom,const uint8_t regTo){
 	InstructionInformation II;
 	for (uint32_t i=start;i<=end;i++){
 		fillInstructionInformation(&II,ib,i);
@@ -1069,7 +1062,7 @@ regFrom should be used at the target
 the target does not need to be the origin
 if regTo==16, then this function will try to find an unused register (that is not the regFrom) and will set regRenameInfo->suggestedReg to the unused register
 */
-void getRegRenameInfo(const InstructionBuffer *ib, struct RegRenameInfo* regRenameInfo){
+void getRegRenameInfo(const InstructionBuffer* ib, struct RegRenameInfo* regRenameInfo){
 	struct RegOriginInfo regOriginInfo;
 	regOriginInfo.targetLocation=regRenameInfo->target;
 	regOriginInfo.targetRegister=regRenameInfo->regFrom;	
@@ -1226,26 +1219,22 @@ bool attemptRepeatedConstantOpt_sub3(struct RepeatedConstInfo* repeatedConstInfo
 	repeatedConstInfo.normalizedReg0[1]=repeatedConstInfo.II_0.regIN[1];
 	repeatedConstInfo.normalizedReg0[2]=repeatedConstInfo.II_0.regIN[2];
 	repeatedConstInfo.normalizedReg0[3]=repeatedConstInfo.II_0.regIN[3];
-	//printf("Phase 0\n");
 	if (
 	repeatedConstInfo.normalizedReg0[0]==repeatedConstInfo.normalizedReg0[1] |
 	repeatedConstInfo.normalizedReg0[2]==repeatedConstInfo.normalizedReg0[3] | 
 	repeatedConstInfo.normalizedReg0[0]==repeatedConstInfo.normalizedReg0[2] | 
 	repeatedConstInfo.normalizedReg0[1]==repeatedConstInfo.normalizedReg0[3])
 		return false; // no need to check, it will and should fail
-	//printf("Phase 1\n");
 	if (!(
 	attemptRepeatedConstantOpt_sub2(repeatedConstInfo.ib,repeatedConstInfo.indexBuff+0,repeatedConstInfo.i0,repeatedConstInfo.normalizedReg0[repeatedConstInfo.types[0]=0],0) ||
 	attemptRepeatedConstantOpt_sub2(repeatedConstInfo.ib,repeatedConstInfo.indexBuff+0,repeatedConstInfo.i0,repeatedConstInfo.normalizedReg0[repeatedConstInfo.types[0]=2],0)))
 		return false;
 	repeatedConstInfo.indexBuff[1]=repeatedConstInfo.indexBuff[0];
-	//printf("Phase 2\n");
 	for (uint8_t ri=0;ri<4;ri++){
 		uint8_t r=repeatedConstInfo.normalizedReg0[ri];
 		if ((r!=16 && !doesRegListContain(repeatedConstInfo.II_0.regOUT,r)) && isValueInRegUsedAfterTarget(repeatedConstInfo.ib,repeatedConstInfo.i0,r,NULL))
 			return false; // this is because we don't want to perform the optimization if the intermediate value is needed for something else
 	}
-	//printf("Phase 3\n");
 	if (repeatedConstInfo.types[0]!=0){
 		uint8_t r;
 		r=repeatedConstInfo.normalizedReg0[2];
@@ -1258,15 +1247,12 @@ bool attemptRepeatedConstantOpt_sub3(struct RepeatedConstInfo* repeatedConstInfo
 	if (
 	!(repeatedConstInfo.normalizedReg0[1]==16 || attemptRepeatedConstantOpt_sub2(repeatedConstInfo.ib,repeatedConstInfo.indexBuff+1,repeatedConstInfo.i0,repeatedConstInfo.normalizedReg0[1],1)))
 		return false;
-	//printf("Phase 4\n");
 	if (
 	repeatedConstInfo.indexBuff[1]!=repeatedConstInfo.indexBuff[0])
 		return false;
-	//printf("Phase 5\n");
 	if (
 	!getValueInRegisterIfTraceableToRawConstants(repeatedConstInfo.ib,repeatedConstInfo.i0-1,repeatedConstInfo.normalizedReg0[2],repeatedConstInfo.cvBuff+0))
 		return false;
-	//printf("Phase 6\n");
 	if (
 	!(repeatedConstInfo.normalizedReg0[3]==16 || 
 	 getValueInRegisterIfTraceableToRawConstants(repeatedConstInfo.ib,repeatedConstInfo.i0-1,repeatedConstInfo.normalizedReg0[3],repeatedConstInfo.cvBuff+1)))
@@ -1280,7 +1266,6 @@ bool attemptRepeatedConstantOpt_sub3(struct RepeatedConstInfo* repeatedConstInfo
 		repeatedConstInfo.normalizedReg1[1]=16;
 		repeatedConstInfo.normalizedReg1[2]=repeatedConstInfo.II_1.regIN[1];
 	}
-	//printf("Phase 7\n");
 	if (!(
 	getValueInRegisterIfTraceableToRawConstants(repeatedConstInfo.ib,repeatedConstInfo.indexBuff[0]-1,repeatedConstInfo.normalizedReg1[repeatedConstInfo.types[1]=0],repeatedConstInfo.cvBuff+2) ||
 	getValueInRegisterIfTraceableToRawConstants(repeatedConstInfo.ib,repeatedConstInfo.indexBuff[0]-1,repeatedConstInfo.normalizedReg1[repeatedConstInfo.types[1]=2],repeatedConstInfo.cvBuff+2)))
@@ -1294,13 +1279,11 @@ bool attemptRepeatedConstantOpt_sub3(struct RepeatedConstInfo* repeatedConstInfo
 		repeatedConstInfo.normalizedReg1[3]=repeatedConstInfo.normalizedReg1[1];
 		repeatedConstInfo.normalizedReg1[1]=r;
 	}
-	//printf("Phase 8\n");
 	if (
 	!(repeatedConstInfo.normalizedReg1[1]==16 || 
 	 getValueInRegisterIfTraceableToRawConstants(repeatedConstInfo.ib,repeatedConstInfo.indexBuff[0]-1,repeatedConstInfo.normalizedReg1[1],repeatedConstInfo.cvBuff+3)))
 		return false;
 	
-	//printf("Phase 9\n");
 	*repeatedConstInfoPtr=repeatedConstInfo;
 	return true;
 }

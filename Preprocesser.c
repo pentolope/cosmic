@@ -7,23 +7,6 @@
 char* loadFileContentsAsSourceCode(const char* filePath);
 
 
-// used after the preprocesser is done so that the compiler can just manage a string
-// will also trim the allocation of sourceContainer.sourceChar to only what it is using
-void createSourceContainerString(){
-	int32_t length=0;
-	while (sourceContainer.sourceChar[length].c!=0){
-		++length;
-	}
-	sourceContainer.sourceChar = cosmic_realloc(sourceContainer.sourceChar,(length+1)*sizeof(SourceChar));
-	sourceContainer.allocationLength=length+1;
-	char* newString = cosmic_malloc(length+1);
-	for (int32_t i=0;i<length;i++){
-		newString[i]=sourceContainer.sourceChar[i].c;
-	}
-	newString[length]=0;
-	sourceContainer.string = newString;
-}
-
 // sourceStringLength is the current length of sourceContainer.sourceChar, terminated by a 0
 void ensureSourceContainerLength(int32_t sourceStringLength, int32_t lengthIncrease){
 	if (sourceContainer.allocationLength<=sourceStringLength+lengthIncrease+1){
@@ -49,7 +32,7 @@ int32_t findSourceContainerLength(int32_t i){
 will shift everything that is currently there over.
 this is used when inserting the first source file and for any include directives
 */
-void insertArrayToSourceContainer(SourceChar* arrayOfSourceChar, int32_t index){
+void insertArrayToSourceContainer(SourceChar*const arrayOfSourceChar,const int32_t index){
 	int32_t inputStringLength = 0;
 	while (arrayOfSourceChar[inputStringLength].c) inputStringLength++;
 	
@@ -98,7 +81,7 @@ the range [indexToStart,indexToEnd) will be removed and replaced by string
 the source location populated from indexToStart
 */
 
-void replaceAreaOfSourceContainer(char* string, int32_t indexToStart, int32_t indexToEnd){
+void replaceAreaOfSourceContainer(const char*const string,const int32_t indexToStart,const int32_t indexToEnd){
 	int32_t lengthOfString = strlen(string);
 	SourceChar sourceCharForLocation = sourceContainer.sourceChar[indexToStart];
 	{
@@ -170,7 +153,7 @@ void replaceAreaOfSourceContainer(char* string, int32_t indexToStart, int32_t in
 /*
 fills gaps of character 26 in by pulling all other characters down and setting the resulting empty space at end with 0
 */
-void pullDownSourceChar(SourceChar* sourceChar){
+void pullDownSourceChar(SourceChar*const sourceChar){
 	int32_t destinationIndex=0;
 	int32_t sourceIndex=0;
 	for (sourceIndex=0;sourceChar[sourceIndex].c;sourceIndex++){
@@ -186,7 +169,7 @@ void pullDownSourceChar(SourceChar* sourceChar){
 }
 
 // given index of `'` or `"` it will give the index of the ending `'` or `"` respectively
-int32_t literalSkipSourceChar(SourceChar *sourceChar, int32_t start){
+int32_t literalSkipSourceChar(SourceChar*const sourceChar, int32_t start){
 	if (sourceChar[start].c=='\''){
 		start++;
 		while (sourceChar[start].c!='\''){
@@ -225,7 +208,7 @@ int32_t literalSkipSourceChar(SourceChar *sourceChar, int32_t start){
 given index of the asterisk in the start of a block comment, get index of the backslash that is at the end of the comment. set all characters of comment with ' '
 assumes start index is valid
 */
-int32_t commentBlockSetAndSkip(SourceChar *sourceChar, int32_t index){
+int32_t commentBlockSetAndSkip(SourceChar*const sourceChar, int32_t index){
 	sourceChar[index-1].c=' ';
 	sourceChar[index].c = ' ';
 	index+=2;
@@ -247,7 +230,7 @@ int32_t commentBlockSetAndSkip(SourceChar *sourceChar, int32_t index){
 given index of second slash in line comment start, get index of next newline. set all characters of comment with ' '
 assumes start index is valid
 */
-int32_t commentLineSetAndSkip(SourceChar *sourceChar, int32_t index){
+int32_t commentLineSetAndSkip(SourceChar*const sourceChar, int32_t index){
 	sourceChar[index-1].c=' ';
 	sourceChar[index].c = ' ';
 	while (sourceChar[index].c!='\n'){
@@ -264,7 +247,7 @@ int32_t commentLineSetAndSkip(SourceChar *sourceChar, int32_t index){
 /*
 replaces comments with spaces
 */
-void commentStripSourceChar(SourceChar *sourceChar){
+void commentStripSourceChar(SourceChar*const sourceChar){
 	if (sourceChar[0].c!=0){
 		for (int32_t i=1;sourceChar[i].c;i++){
 			if (sourceChar[i].c=='\'' | sourceChar[i].c=='\"'){
@@ -278,7 +261,7 @@ void commentStripSourceChar(SourceChar *sourceChar){
 	}
 }
 
-void initialStripSourceChar(SourceChar *sourceChar){
+void initialStripSourceChar(SourceChar*const sourceChar){
 	bool didSetOne=false;
 	int32_t i;
 	for (i=0;sourceChar[i].c;i++){
@@ -316,7 +299,7 @@ also changes the sequence "\n# " -> "\n#" (for proper preprocesser directive sup
 expects that character and string literals have not been converted to their true form (such as turning 
 into a newline).
 */
-void superStripSourceChar(SourceChar *sourceChar, int32_t startLocation){
+void superStripSourceChar(SourceChar*const sourceChar, int32_t startLocation){
 	int32_t i;
 	bool didSetOne;
 	if (startLocation<=0){
@@ -385,7 +368,7 @@ void superStripSourceChar(SourceChar *sourceChar, int32_t startLocation){
 }
 
 // expects that the sourceChar has repeated spaces eliminated
-void adjacentStringConcatInSourceChar(SourceChar *sourceChar){
+void adjacentStringConcatInSourceChar(SourceChar*const sourceChar){
 	int32_t i=0;
 	if (sourceChar[0].c=='\'' | sourceChar[0].c=='\"'){ // this is to ensure that the following loop does not access outside the array bounds
 		printf("A string literal shouldn't be at the first character\n");
@@ -1193,51 +1176,86 @@ void printInformativeMessageAtSourceContainerIndex(bool isError,const char* mess
 		}
 		
 	}
-	if (numSkipFor1>ERR_MSG_LEN | numSkipFor2>ERR_MSG_LEN){
-		printf("Internal Error: printing source location failed\n");
-		exit(1);
+	for (uint8_t i=0;i<ERR_MSG_LEN*2;i++){
+		if (tempString1[i]=='\t') tempString1[i]=' ';
+		if (tempString2[i]=='\t') tempString2[i]=' ';
 	}
+	for (uint16_t i=0;i<ERR_MSG_LEN*2;i++){
+		if (tempString1[i]!=' '){
+			if (i!=0){
+				if (i<=numSkipFor1) numSkipFor1+=i;
+				else numSkipFor1=0;
+				for (uint16_t u=i;u<ERR_MSG_LEN*2+1;u++){
+					tempString1[u-i]=tempString1[u];
+				}
+			}
+			break;
+		}
+	}
+	for (uint16_t i=0;i<ERR_MSG_LEN*2;i++){
+		if (tempString2[i]!=' '){
+			if (i!=0){
+				if (i<=numSkipFor2) numSkipFor2+=i;
+				else numSkipFor2=0;
+				for (uint16_t u=i;u<ERR_MSG_LEN*2+1;u++){
+					tempString2[u-i]=tempString2[u];
+				}
+			}
+			break;
+		}
+	}
+	if (numSkipFor1>ERR_MSG_LEN) numSkipFor1=ERR_MSG_LEN;
+	if (numSkipFor2>ERR_MSG_LEN) numSkipFor2=ERR_MSG_LEN;
 	arrowString1[ERR_MSG_LEN-numSkipFor1]='^';
 	arrowString2[ERR_MSG_LEN-numSkipFor2]='^';
-	for (uint8_t i=0;i<ERR_MSG_LEN*2;i++){
-		if (tempString1[i]=='\t'){
-			tempString1[i]=' ';
-		}
-		if (tempString2[i]=='\t'){
-			tempString2[i]=' ';
-		}
-	}
+	tempString1[ERR_MSG_LEN*2]   =0;
+	tempString1[ERR_MSG_LEN*2-1] =0;
+	tempString2[ERR_MSG_LEN*2]   =0;
+	tempString2[ERR_MSG_LEN*2-1] =0;
+	normalizeInformativePrintStringEnd(tempString1);
+	normalizeInformativePrintStringEnd(tempString2);
 	if (indexEnd!=0){
 		uint16_t distance;
 		{
 			int32_t distanceTemp=indexEnd-indexStart;
+			distanceTemp+=distanceTemp==0; // is now 1 if it was 0
 			if (distanceTemp>=0 & distanceTemp<ERR_MSG_LEN*2){
 				distance=distanceTemp-1;
 			} else {
-				distance=ERR_MSG_LEN; // might be ERR_MSG_LEN*2
+				distance=ERR_MSG_LEN-1;
 			}
 		}
 		uint16_t offset=1+(ERR_MSG_LEN-numSkipFor1);
-		for (uint16_t i=0;i<distance;i++){
-			uint16_t iFinal=i+offset;
-			if (iFinal>=ERR_MSG_LEN*2){
-				break;
+		uint16_t endPoint=offset+distance;
+		if (endPoint>=strlen(tempString1)) endPoint=strlen(tempString1);
+		
+		// depends on short circuit &&
+		while ((endPoint-1>offset & endPoint!=0) && tempString1[endPoint-1]==' ') endPoint--;
+		for (uint16_t i=offset;i<endPoint;i++){
+			arrowString1[i]='~';
+		}
+		bool isNearlyCharSameInRange=true;
+		uint16_t bonusLength=0;
+		for (uint16_t i=offset;i<endPoint;i++){
+			if (tempString1[i]!=tempString2[i+bonusLength]){
+				
+				// depends on || sequence point
+				if (i+bonusLength>=ERR_MSG_LEN*2 || tempString2[i-- + bonusLength++]!=' '){
+					isNearlyCharSameInRange=false;
+					break;
+				}
 			}
-			arrowString1[iFinal]='~';
+		}
+		if (isNearlyCharSameInRange){
+			// depends on short circuit &&
+			while ((endPoint+bonusLength>offset & bonusLength>0) && tempString2[endPoint+bonusLength-1]==' ') bonusLength--;
+			for (uint16_t i=offset;i<endPoint+bonusLength;i++){
+				arrowString2[i]='~';
+			}
 		}
 	}
-	tempString1[ERR_MSG_LEN*2]=0;
-	tempString2[ERR_MSG_LEN*2]=0;
 	arrowString1[ERR_MSG_LEN*2]=0;
 	arrowString2[ERR_MSG_LEN*2]=0;
-	for (uint8_t i=0;i<ERR_MSG_LEN*2;i++){
-		if (tempString1[i]=='\t'){
-			tempString1[i]=' ';
-		}
-		if (tempString2[i]=='\t'){
-			tempString2[i]=' ';
-		}
-	}
 	for (uint8_t i=0;i<ERR_MSG_LEN*2;i++){
 		if (tempString1[i]!=' ' | tempString2[i]!=' '){
 			if (i!=0){
@@ -1292,7 +1310,7 @@ void printInformativeMessageAtSourceContainerIndex(bool isError,const char* mess
 
 
 
-bool doesStringMatchUntilParen(char* string1, char* string2){
+bool doesStringMatchUntilParen(const char* string1, const char* string2){
 	int32_t indexOfParen1=-1;
 	int32_t indexOfParen2=-1;
 	int32_t i;
@@ -1325,39 +1343,27 @@ bool doesStringMatchUntilParen(char* string1, char* string2){
 }
 
 
-struct Macro{
+typedef struct {
 	char *definition; // if null, then this Macro is not a usable macro, instead it is an empty slot for a macro to be placed at
 	char *result; // if null (and the above is not null), this macro is defined but has no result (will be expanded to nothing)
 	bool isOverriddenToNotExpand; // used for macro suppression, which enables this program to achieve the desired output from the preprocesser
-};
-typedef struct Macro Macro;
+} Macro;
 
-struct MacroListing{
+struct {
 	int16_t numberOfAllocatedSlotsInArray;
 	Macro *macros;
-};
-typedef struct MacroListing MacroListing;
-MacroListing macroListing;
+} macroListing;
 
-struct PreDefinedMacros{
-	const char *dateDefinition;
+struct {
 	const char *dateResult;
-	const char *timeDefinition;
 	const char *timeResult;
-	const char *fileDefinition;
-	const char *lineDefinition;
 	int16_t dateMacroIndex;
 	int16_t timeMacroIndex;
 	int16_t fileMacroIndex;
 	int16_t lineMacroIndex;
-};
-typedef struct PreDefinedMacros PreDefinedMacros;
-PreDefinedMacros preDefinedMacros;
+} preDefinedMacros;
 
 
-bool doesMacroHaveReplacement(int16_t macroIndex){
-	return macroListing.macros[macroIndex].result==NULL;
-}
 
 bool isMacroComplex(int16_t macroIndex){
 	Macro thisMacro=macroListing.macros[macroIndex];
@@ -1369,26 +1375,18 @@ bool isMacroComplex(int16_t macroIndex){
 }
 
 void removeMacro(int16_t macroIndex){
-	Macro* this=macroListing.macros+macroIndex;
-	char* definition=this->definition;
-	if (doStringsMatch(definition,preDefinedMacros.dateDefinition) |
-		doStringsMatch(definition,preDefinedMacros.timeDefinition) |
-		doStringsMatch(definition,preDefinedMacros.fileDefinition) |
-		doStringsMatch(definition,preDefinedMacros.lineDefinition)
-		){
-		
-		printInformativeMessageAtSourceContainerIndex(false,"Removing or redefining a standard macro is not allowed",-1,0);
-	} else {
-		cosmic_free(definition);
-		this->definition=NULL;
-		if (doesMacroHaveReplacement(macroIndex)){
-			cosmic_free(this->result);
-			this->result=NULL;
-		}
+	if (macroIndex<4){
+		printInformativeMessageAtSourceContainerIndex(false,"Attempting to remove or redefine a standard macro is not allowed and will be ignored",-1,0);
+		return;
 	}
+	Macro* this=macroListing.macros+macroIndex;
+	cosmic_free(this->definition);
+	cosmic_free(this->result);
+	this->definition=NULL;
+	this->result=NULL;
 }
 
-int16_t insertMacroIntoEmptySlot(Macro macroToPlace){
+bool insertMacroIntoEmptySlot(Macro macroToPlace){
 	macroToPlace.isOverriddenToNotExpand=false;
 	if (macroToPlace.definition==NULL){
 		printf("Internal Error:null macro cannot be inserted in definition list\n");
@@ -1396,7 +1394,23 @@ int16_t insertMacroIntoEmptySlot(Macro macroToPlace){
 	}
 	bool isInputComplex=false;
 	for (int16_t i=0;macroToPlace.definition[i];i++){
-		if (macroToPlace.definition[i]=='(') isInputComplex=true;
+		if (macroToPlace.definition[i]=='(') {
+			isInputComplex=true;
+			break;
+		}
+	}
+	if (isInputComplex){
+		if (doesStringMatchUntilParen("defined(" ,macroToPlace.definition)) return true;
+		if (doesStringMatchUntilParen("__DATE__(",macroToPlace.definition)) return true;
+		if (doesStringMatchUntilParen("__TIME__(",macroToPlace.definition)) return true;
+		if (doesStringMatchUntilParen("__FILE__(",macroToPlace.definition)) return true;
+		if (doesStringMatchUntilParen("__LINE__(",macroToPlace.definition)) return true;
+	} else {
+		if (doStringsMatch("defined" ,macroToPlace.definition)) return true;
+		if (doStringsMatch("__DATE__",macroToPlace.definition)) return true;
+		if (doStringsMatch("__TIME__",macroToPlace.definition)) return true;
+		if (doStringsMatch("__FILE__",macroToPlace.definition)) return true;
+		if (doStringsMatch("__LINE__",macroToPlace.definition)) return true;
 	}
 	for (int16_t i=0;i<macroListing.numberOfAllocatedSlotsInArray;i++){
 		char* i_def=macroListing.macros[i].definition;
@@ -1415,10 +1429,11 @@ int16_t insertMacroIntoEmptySlot(Macro macroToPlace){
 	if (macroToPlace.result==NULL){
 		macroToPlace.result = cosmic_calloc(1,1);
 	}
+	RetryPlacement:;
 	for (int16_t i=0;i<macroListing.numberOfAllocatedSlotsInArray;i++){
 		if (macroListing.macros[i].definition==NULL){
 			macroListing.macros[i]=macroToPlace;
-			return i;
+			return false;
 		}
 	}
 	if (macroListing.numberOfAllocatedSlotsInArray<=30000){
@@ -1428,7 +1443,7 @@ int16_t insertMacroIntoEmptySlot(Macro macroToPlace){
 		for (int16_t i=macroListing.numberOfAllocatedSlotsInArray-20;i<macroListing.numberOfAllocatedSlotsInArray;i++){
 			macroListing.macros[i]=nullMacro;
 		}
-		return insertMacroIntoEmptySlot(macroToPlace);
+		goto RetryPlacement;
 	} else {
 		printf("Internal Error: too many macros\n");
 		exit(1);
@@ -1456,37 +1471,39 @@ void initMacros(){
 	struct tm *tm = localtime(&t);
 	char[64] str;
 	asctime(s,64,"%c",tm);
-	*/
-	/*
+	
 	then some string formating on str
 	also, asctime() contains some important return information
-	copyStringToHeapString() can copy strings
 	*/
 	preDefinedMacros.dateResult = copyStringToHeapString("\"Jan 10 2020\"");
 	preDefinedMacros.timeResult = copyStringToHeapString("\"00:00:00\"");
 	
-	preDefinedMacros.dateDefinition = "__DATE__";
-	preDefinedMacros.timeDefinition = "__TIME__";
-	preDefinedMacros.fileDefinition = "__FILE__";
-	preDefinedMacros.lineDefinition = "__LINE__";
 	// __STDC__ and __STDC_VERSION__ are not done for right now
+	
+	macroListing.numberOfAllocatedSlotsInArray=4;
+	macroListing.macros = cosmic_malloc(macroListing.numberOfAllocatedSlotsInArray*sizeof(Macro));
+	
 	Macro tempMacro={0};
 	
-	tempMacro.definition = copyStringToHeapString(preDefinedMacros.dateDefinition);
+	tempMacro.definition = copyStringToHeapString("__DATE__");
 	tempMacro.result = copyStringToHeapString(preDefinedMacros.dateResult);
-	preDefinedMacros.dateMacroIndex = insertMacroIntoEmptySlot(tempMacro);
+	preDefinedMacros.dateMacroIndex = 0;
+	macroListing.macros[0]=tempMacro;
 	
-	tempMacro.definition = copyStringToHeapString(preDefinedMacros.timeDefinition);
+	tempMacro.definition = copyStringToHeapString("__TIME__");
 	tempMacro.result = copyStringToHeapString(preDefinedMacros.timeResult);
-	preDefinedMacros.timeMacroIndex = insertMacroIntoEmptySlot(tempMacro);
+	preDefinedMacros.timeMacroIndex = 1;
+	macroListing.macros[1]=tempMacro;
 	
-	tempMacro.definition = copyStringToHeapString(preDefinedMacros.fileDefinition);
+	tempMacro.definition = copyStringToHeapString("__FILE__");
 	tempMacro.result = copystrWithQuotes("FileMacroError");
-	preDefinedMacros.fileMacroIndex = insertMacroIntoEmptySlot(tempMacro);
+	preDefinedMacros.fileMacroIndex = 2;
+	macroListing.macros[2]=tempMacro;
 	
-	tempMacro.definition = copyStringToHeapString(preDefinedMacros.lineDefinition);
+	tempMacro.definition = copyStringToHeapString("__LINE__");
 	tempMacro.result = copyStringToHeapString("0");
-	preDefinedMacros.lineMacroIndex = insertMacroIntoEmptySlot(tempMacro);
+	preDefinedMacros.lineMacroIndex = 3;
+	macroListing.macros[3]=tempMacro;
 }
 
 
@@ -1526,7 +1543,18 @@ bool doesMacroMatchStringRange(int32_t stringStartIndex, int32_t stringEndIndex,
 // if stringStartIndex is unknown, a -1 may be used, in which case the stringStartIndex will be calculated
 int16_t searchForMatchingMacro(int32_t preprocessTokenIndex,int32_t stringStartIndex){
 	if (stringStartIndex==-1) stringStartIndex = getIndexInStringAtStartOfPreprocessingToken(preprocessTokenIndex);
-	int32_t stringEndIndex = stringStartIndex+preprocessTokens.preprocessTokens[preprocessTokenIndex].length;
+	const char firstCharacter = sourceContainer.sourceChar[stringStartIndex].c;
+	const int32_t stringEndIndex = stringStartIndex+preprocessTokens.preprocessTokens[preprocessTokenIndex].length;
+	/*
+	if (!isLetter(firstCharacter)){
+		printf("Skipping:`");
+		for (int32_t i=stringStartIndex;i<stringEndIndex;i++){
+			printf("%c",sourceContainer.sourceChar[i].c);
+		}
+		printf("`\n");
+		return -1;
+	}
+	*/
 	// test predefined macros
 	if (stringEndIndex-stringStartIndex==8){
 		bool isTime=true;
@@ -1535,10 +1563,10 @@ int16_t searchForMatchingMacro(int32_t preprocessTokenIndex,int32_t stringStartI
 		bool isLine=true;
 		for (uint8_t i=0;i<8;i++){
 			char c = sourceContainer.sourceChar[stringStartIndex+i].c;
-			if (c!=preDefinedMacros.timeDefinition[i]) isTime=false;
-			if (c!=preDefinedMacros.dateDefinition[i]) isDate=false;
-			if (c!=preDefinedMacros.fileDefinition[i]) isFile=false;
-			if (c!=preDefinedMacros.lineDefinition[i]) isLine=false;
+			if (c!="__TIME__"[i]) isTime=false;
+			if (c!="__DATE__"[i]) isDate=false;
+			if (c!="__FILE__"[i]) isFile=false;
+			if (c!="__LINE__"[i]) isLine=false;
 		}
 		if (isTime | isDate){
 			printInformativeMessageAtSourceContainerIndex(false,"This standard macro is not supported... yet",stringStartIndex,stringEndIndex);
@@ -1563,14 +1591,15 @@ int16_t searchForMatchingMacro(int32_t preprocessTokenIndex,int32_t stringStartI
 		}
 	}
 	// test all macros
-	char firstCharacter = sourceContainer.sourceChar[stringStartIndex].c;
 	for (int16_t i=0;i<macroListing.numberOfAllocatedSlotsInArray;i++){
-		Macro* macroPtr = &(macroListing.macros[i]);
-		if ((macroPtr->definition!=NULL) & (macroPtr->result!=NULL)){
+		Macro* macroPtr = macroListing.macros+i;
+		if (macroPtr->definition!=NULL & macroPtr->result!=NULL){
 			if (macroPtr->definition[0]!=firstCharacter) continue; // no need to check farther
 			if (doesMacroMatchStringRange(stringStartIndex,stringEndIndex,i)){
 				if (macroPtr->isOverriddenToNotExpand){
-					preprocessTokens.preprocessTokens[preprocessTokenIndex].catagory=10;// if a token does not expand because the macro has been suppressed, then suppress the token
+					// if a token does not expand because the macro has been suppressed, 
+					// then suppress the token, and tell the calling function that there was not a macro
+					preprocessTokens.preprocessTokens[preprocessTokenIndex].catagory=10;
 					return -1;
 				} else {
 					return i;
@@ -1646,9 +1675,8 @@ char* stringifyStringForMacroWithFreeInput(char* inputString){
 			outputString[i1++]='\\';
 			outputString[i1++]='\\';
 			char t=inputString[i0++];
-			if (t=='\'' | t=='\"'){
-				outputString[i1++]='\\';
-			}
+			if (t=='\'' | t=='\"') outputString[i1++]='\\';
+			
 			outputString[i1++]=t;
 		} else if (c=='\'' | c=='\"') {
 			b^=1;
@@ -1733,11 +1761,11 @@ PreprocessTokenWithContents* macroComplexReplaceSubFunction(int16_t macroIndex, 
 	int32_t i;
 	for (i=0;i<128;i++) macroArgument[i].name=NULL;
 	
-	bool needsArgumentsBeforePrescan = stringedArgumentsBeforePrescan!=NULL;
+	const bool needsArgumentsBeforePrescan = stringedArgumentsBeforePrescan!=NULL;
 	assert(!(!needsArgumentsBeforePrescan && doesMacroUseStringedArguments(macroIndex)));
-	// assert ensure that if that macro needed stringedArgumentsBeforePrescan that it has it
+	// assert is to ensure that if that macro needed stringedArgumentsBeforePrescan that it has it
 	
-	Macro thisMacro = macroListing.macros[macroIndex];
+	const Macro thisMacro = macroListing.macros[macroIndex];
 	PreprocessTokenWithContents* resultOfExpansion = convertStringToHeapPreprocessTokenWithContents(thisMacro.result);
 	int16_t expectedArgumentCount=1;
 	for (i=0;thisMacro.definition[i];i++){
@@ -1825,13 +1853,12 @@ PreprocessTokenWithContents* macroComplexReplaceSubFunction(int16_t macroIndex, 
 	}
 	// replacing done.
 	for (int16_t argumentNumber=0;argumentNumber<expectedArgumentCount;argumentNumber++){
-		cosmic_free(macroArgument[argumentNumber].name);
-		cosmic_free(macroArgument[argumentNumber].replacementAfterPrescan);// the contents of these should not be free-ed because of how they are copied
-	}
-	if (needsArgumentsBeforePrescan){
-		for (int16_t argumentNumber=0;argumentNumber<expectedArgumentCount;argumentNumber++){
-			cosmic_free(macroArgument[argumentNumber].nameWithHash);
-			freePreprocessTokenWithContents(macroArgument[argumentNumber].replacementBeforePrescan);// these need to be free-ed
+		struct MacroArgument thisMacroArgument = macroArgument[argumentNumber];
+		cosmic_free(thisMacroArgument.name);
+		cosmic_free(thisMacroArgument.replacementAfterPrescan);// the contents of these should not be free-ed because of how they are copied
+		if (needsArgumentsBeforePrescan){
+			cosmic_free(thisMacroArgument.nameWithHash);
+			freePreprocessTokenWithContents(thisMacroArgument.replacementBeforePrescan);// these need to be free-ed
 		}
 	}
 	return resultOfExpansion;
@@ -1839,7 +1866,7 @@ PreprocessTokenWithContents* macroComplexReplaceSubFunction(int16_t macroIndex, 
 
 
 
-void macroScanBounded(int32_t startPreprocessToken);
+void macroScanBounded(int32_t);
 
 
 // returns token index it ended on
@@ -1854,8 +1881,7 @@ int32_t macroComplexReplace(int32_t startPreprocessToken, int16_t macroIndex){
 	int32_t tempIndexOfMatchingParenthese = getIndexOfMatchingParenthesePreprocessingToken(openParentheseTokenIndex);
 	int32_t tokenAfterOpeningParenthese = openParentheseTokenIndex+1;
 	if (tokenAfterOpeningParenthese==tempIndexOfMatchingParenthese){
-		printf("for a macro with arguments, you cannot have the argument parentheses be like this: \"()\", it must be like this if the argument is to be a space: \"( )\"\n");
-		exit(1);
+		err_1101_("For a macro with arguments, you cannot have the argument parentheses be like this: \"()\", it must be like this if the argument is to be a space: \"( )\"",getIndexInStringAtStartOfPreprocessingToken(openParentheseTokenIndex));
 	}
 	if (doesMacroUseStringedArguments(macroIndex)){
 		stringedArgumentsBeforePrescan = copySegmentOfSourceContainerToHeapString(
@@ -1881,6 +1907,7 @@ int32_t macroComplexReplace(int32_t startPreprocessToken, int16_t macroIndex){
 	removeBoundsInPreprocessingTokens(startPreprocessToken);
 	return endingTokenIndexWithoutBounds;
 }
+
 
 // returns token index it ended on
 int32_t macroSimpleReplace(int32_t startPreprocessToken, int16_t macroIndex){
@@ -1917,8 +1944,8 @@ void macroScanBounded(int32_t startPreprocessToken){
 				}
 				endBound = getIndexOfEndingBoundFromStartBound(startPreprocessToken);
 			}
-		} else if (currentCatagory==0){
-			assert(false); // unbounded exit during bounded scan
+		} else {
+			assert(currentCatagory!=0); // unbounded exit during bounded scan
 		}
 		currentCatagory = preprocessTokens.preprocessTokens[++preprocessTokenIndex].catagory;
 	}
@@ -1968,7 +1995,7 @@ int32_t replaceMacrosUntilNextDirective(int32_t startCharacterInSourceString){
 	int32_t ret;
 	if (lengthDiff>30 & endPriorToReplace-startCharacterInSourceString>30){
 		// the 30 is a heuristic number. 
-		// This method of using a temporary storage is never needed, but it provides a speed benifit if there is a
+		// This method of using a temporary storage is never needed, but it provides a speed benefit if there is a
 		// sufficiently long length after the next directive and the distance is sufficiently long to the next directive
 		SourceChar* tempStorage = cosmic_malloc(lengthDiff*sizeof(SourceChar));
 		int32_t i;
@@ -2028,7 +2055,7 @@ int32_t findNextNewlineInSourceContainer(int32_t startIndex){
 }
 
 
-typedef struct DirectiveTypeAndArgumentIndex{
+typedef struct {
 	uint8_t directiveType;
 	int32_t indexOfSpace;
 } DirectiveTypeAndArgumentIndex;
@@ -2045,9 +2072,7 @@ DirectiveTypeAndArgumentIndex determineDirectiveType(int32_t characterIndexOfHas
 		int32_t indexInSourceContainer = i+characterIndexOfHash+1;
 		char c=sourceContainer.sourceChar[indexInSourceContainer].c;
 		assert(c!=0);
-		if (i>=20){
-			goto BadDirective;
-		}
+		if (i>=20) goto BadDirective;
 		if (c==' ' | c=='\n') stopCopy=true;
 		else buffer[i]=c;
 		i++;
@@ -2277,217 +2302,233 @@ int32_t getIndexOfNextDirectiveThatEndsIfStatement(int32_t indexOfNewlineToStart
 
 // beginningFileName should have quotes around it
 void insertBeginningFileAndRunPreprocesser(const char *beginningFileName){
-	initMacros();
-	insertFileIntoSourceContainer(beginningFileName,0);
-	int32_t walkingCharacterIndex=0;
-	int32_t indexOfNewlineThatEndsDirective;
-	int32_t tempIndex;
-	int16_t ifLevelsDeep=0;
-	DirectiveTypeAndArgumentIndex directiveTypeAndArgumentIndex;
-	DirectiveTypeAndArgumentIndex temporaryDirectiveType;
-	while (1){
-		int32_t charIndexReturn = replaceMacrosUntilNextDirective(walkingCharacterIndex);
-		if (sourceContainer.sourceChar[charIndexReturn-1].c==0) break; // this indicates the end of input was reached
-		char charAtIndexReturn = sourceContainer.sourceChar[charIndexReturn].c;
-		if (charAtIndexReturn=='#'){
-			// handle directive
-			directiveTypeAndArgumentIndex = determineDirectiveType(charIndexReturn);
-			if (directiveTypeAndArgumentIndex.directiveType==1){ // if
-				++ifLevelsDeep;
-				if (processIfLikeDirectiveToBool(directiveTypeAndArgumentIndex.indexOfSpace)){
+	{
+		initMacros();
+		insertFileIntoSourceContainer(beginningFileName,0);
+		int32_t walkingCharacterIndex=0;
+		int32_t indexOfNewlineThatEndsDirective;
+		int32_t tempIndex;
+		int16_t ifLevelsDeep=0;
+		DirectiveTypeAndArgumentIndex directiveTypeAndArgumentIndex;
+		DirectiveTypeAndArgumentIndex temporaryDirectiveType;
+		while (true){
+			int32_t charIndexReturn = replaceMacrosUntilNextDirective(walkingCharacterIndex);
+			if (sourceContainer.sourceChar[charIndexReturn-1].c==0) break; // this indicates the end of input was reached
+			char charAtIndexReturn = sourceContainer.sourceChar[charIndexReturn].c;
+			if (charAtIndexReturn=='#'){
+				// handle directive
+				directiveTypeAndArgumentIndex = determineDirectiveType(charIndexReturn);
+				if (directiveTypeAndArgumentIndex.directiveType==1){ // if
+					++ifLevelsDeep;
+					if (processIfLikeDirectiveToBool(directiveTypeAndArgumentIndex.indexOfSpace)){
+						indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn);
+					} else {
+						indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn)-1;
+						bool continueSearch=true;
+						while (continueSearch){
+							indexOfNewlineThatEndsDirective = getIndexOfNextDirectiveThatEndsIfStatement(
+										findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1))-1;
+							
+							temporaryDirectiveType = determineDirectiveType(indexOfNewlineThatEndsDirective+1);
+							if (temporaryDirectiveType.directiveType==2){
+								indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
+								continueSearch=false;
+								--ifLevelsDeep;
+							} else if (temporaryDirectiveType.directiveType==3){
+								indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
+								if (processIfLikeDirectiveToBool(temporaryDirectiveType.indexOfSpace)){
+									continueSearch=false;
+								}
+							} else if (temporaryDirectiveType.directiveType==10){
+								indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
+								continueSearch=false;
+							} else {
+								assert(false);
+							}
+						}
+					}
+				} else if (directiveTypeAndArgumentIndex.directiveType==2){ // endif
+					if (ifLevelsDeep==0){
+						printInformativeMessageAtSourceContainerIndex(
+							true,"encountered directive \"#endif\" when there is currently no open if directives",charIndexReturn,0);
+						exit(1);
+					}
 					indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn);
+					--ifLevelsDeep;
+				} else if (directiveTypeAndArgumentIndex.directiveType==3){ // elif
+					if (ifLevelsDeep==0){
+						printInformativeMessageAtSourceContainerIndex(
+							true,"encountered directive \"#elif\" when there is currently no open if directives",charIndexReturn,0);
+						exit(1);
+					}
+					// if this is encountered in this way, we need to scan for next matching #endif directive and null to there
+					// #elif will be treated similiar to #else in this context
+					tempIndex = charIndexReturn;
+					bool continueSearch=true;
+					while (continueSearch){
+						tempIndex = getIndexOfNextDirectiveThatEndsIfStatement(findNextNewlineInSourceContainer(tempIndex));
+						temporaryDirectiveType = determineDirectiveType(tempIndex);
+						if (temporaryDirectiveType.directiveType==2){
+							indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(tempIndex);
+							continueSearch=false;
+							--ifLevelsDeep;
+						}
+					}
+				} else if (directiveTypeAndArgumentIndex.directiveType==4){ // ifdef
+					indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn);
+					++ifLevelsDeep;
+					if (!isMacroDefined(directiveTypeAndArgumentIndex.indexOfSpace+1,indexOfNewlineThatEndsDirective)){
+						indexOfNewlineThatEndsDirective = indexOfNewlineThatEndsDirective-1;
+						bool continueSearch=true;
+						while (continueSearch){
+							indexOfNewlineThatEndsDirective = getIndexOfNextDirectiveThatEndsIfStatement(
+										findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1))-1;
+							
+							temporaryDirectiveType = determineDirectiveType(indexOfNewlineThatEndsDirective+1);
+							if (temporaryDirectiveType.directiveType==2){
+								indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
+								continueSearch=false;
+								--ifLevelsDeep;
+							} else if (temporaryDirectiveType.directiveType==3){
+								indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
+								if (processIfLikeDirectiveToBool(temporaryDirectiveType.indexOfSpace)){
+									continueSearch=false;
+								}
+							} else if (temporaryDirectiveType.directiveType==10){
+								indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
+								continueSearch=false;
+							} else {
+								assert(false);
+							}
+						}
+					}
+				} else if (directiveTypeAndArgumentIndex.directiveType==5){ // ifndef
+					indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn);
+					++ifLevelsDeep;
+					if (isMacroDefined(directiveTypeAndArgumentIndex.indexOfSpace+1,indexOfNewlineThatEndsDirective)){
+						indexOfNewlineThatEndsDirective = indexOfNewlineThatEndsDirective-1;
+						bool continueSearch=true;
+						while (continueSearch){
+							indexOfNewlineThatEndsDirective = getIndexOfNextDirectiveThatEndsIfStatement(
+										findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1))-1;
+							
+							temporaryDirectiveType = determineDirectiveType(indexOfNewlineThatEndsDirective+1);
+							if (temporaryDirectiveType.directiveType==2){
+								indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
+								continueSearch=false;
+								--ifLevelsDeep;
+							} else if (temporaryDirectiveType.directiveType==3){
+								indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
+								if (processIfLikeDirectiveToBool(temporaryDirectiveType.indexOfSpace)){
+									continueSearch=false;
+								}
+							} else if (temporaryDirectiveType.directiveType==10){
+								indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
+								continueSearch=false;
+							} else {
+								assert(false);
+							}
+						}
+					}
+				} else if (directiveTypeAndArgumentIndex.directiveType==6){ // include
+					indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn);
+					char* tempFileName = copySegmentOfSourceContainerToHeapString(directiveTypeAndArgumentIndex.indexOfSpace+1,indexOfNewlineThatEndsDirective);
+					insertFileIntoSourceContainer(tempFileName,indexOfNewlineThatEndsDirective+1);
+					cosmic_free(tempFileName);
+				} else if (directiveTypeAndArgumentIndex.directiveType==7){ // define
+					indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn);
+					
+					Macro tempMacro = formatDefineInSourceContainer(directiveTypeAndArgumentIndex.indexOfSpace,indexOfNewlineThatEndsDirective);
+					
+					if (insertMacroIntoEmptySlot(tempMacro)){
+						printInformativeMessageAtSourceContainerIndex(false,"Attempting to remove or redefine a standard macro is not allowed and will be ignored",directiveTypeAndArgumentIndex.indexOfSpace,0);
+					}
+				} else if (directiveTypeAndArgumentIndex.directiveType==8){ // pragma
+					printInformativeMessageAtSourceContainerIndex(
+						false,"\"#pragma\" directive ignored",charIndexReturn,0);
+					exit(1);
+					// this just should clear this area taken up by the directive, because it is ignored for now
+					indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn);
+				} else if (directiveTypeAndArgumentIndex.directiveType==9){ // undef
+					indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn);
+					// should not exit if the macro is already not defined. probably not even a warning
+					generatePreprocessTokensUntilStopPoint(directiveTypeAndArgumentIndex.indexOfSpace+1,false);
+					if (preprocessTokens.preprocessTokens[0].catagory!=4){
+						printInformativeMessageAtSourceContainerIndex(
+							true,"That doesn\'t seem like a macro",directiveTypeAndArgumentIndex.indexOfSpace+1,0);
+						exit(1);
+					}
+					int16_t macroIndex = searchForMatchingMacro(0,-1);
+					if (macroIndex!=-1) removeMacro(macroIndex);
+				} else if (directiveTypeAndArgumentIndex.directiveType==10){ // else
+					indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn);
+					// will clear the area to the matching #endif
+					// the reason why this just clears this area is because 
+					//   this part of the code is only run when the area after the #else to the matching #endif should be skipped over
+					tempIndex = charIndexReturn;
+					bool continueSearch=true;
+					while (continueSearch){
+						tempIndex = getIndexOfNextDirectiveThatEndsIfStatement(findNextNewlineInSourceContainer(tempIndex));
+						temporaryDirectiveType = determineDirectiveType(tempIndex);
+						if (temporaryDirectiveType.directiveType==2){
+							indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(tempIndex);
+							continueSearch=false;
+							--ifLevelsDeep;
+						} else if (temporaryDirectiveType.directiveType==3){
+							printInformativeMessageAtSourceContainerIndex(
+								true,"encountered directive \"#elif\" when scan scanning on same nesting level for the end of an \"#else\" directive. That is not allowed.",charIndexReturn,0);
+							exit(1);
+						} else if (temporaryDirectiveType.directiveType==10){
+							printInformativeMessageAtSourceContainerIndex(
+								true,"encountered directive \"#else\" when scan scanning on same nesting level for the end of an \"#else\" directive. That is not allowed.",charIndexReturn,0);
+							exit(1);
+						}
+					}
 				} else {
-					indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn)-1;
-					bool continueSearch=true;
-					while (continueSearch){
-						indexOfNewlineThatEndsDirective = getIndexOfNextDirectiveThatEndsIfStatement(
-									findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1))-1;
-						
-						temporaryDirectiveType = determineDirectiveType(indexOfNewlineThatEndsDirective+1);
-						if (temporaryDirectiveType.directiveType==2){
-							indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
-							continueSearch=false;
-							--ifLevelsDeep;
-						} else if (temporaryDirectiveType.directiveType==3){
-							indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
-							if (processIfLikeDirectiveToBool(temporaryDirectiveType.indexOfSpace)){
-								continueSearch=false;
-							}
-						} else if (temporaryDirectiveType.directiveType==10){
-							indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
-							continueSearch=false;
-						} else {
-							assert(false);
-						}
-					}
+					assert(false);
 				}
-			} else if (directiveTypeAndArgumentIndex.directiveType==2){ // endif
-				if (ifLevelsDeep==0){
-					printInformativeMessageAtSourceContainerIndex(
-						true,"encountered directive \"#endif\" when there is currently no open if directives",charIndexReturn,0);
-					exit(1);
+				// this essentially clears the area taken up by the directive (and any area that should be cleared with it)
+				for (int32_t i=charIndexReturn;i<indexOfNewlineThatEndsDirective;i++){
+					sourceContainer.sourceChar[i].c=' ';
 				}
-				indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn);
-				--ifLevelsDeep;
-			} else if (directiveTypeAndArgumentIndex.directiveType==3){ // elif
-				if (ifLevelsDeep==0){
-					printInformativeMessageAtSourceContainerIndex(
-						true,"encountered directive \"#elif\" when there is currently no open if directives",charIndexReturn,0);
-					exit(1);
-				}
-				// if this is encountered in this way, we need to scan for next matching #endif directive and null to there
-				// #elif will be treated similiar to #else in this context
-				tempIndex = charIndexReturn;
-				bool continueSearch=true;
-				while (continueSearch){
-					tempIndex = getIndexOfNextDirectiveThatEndsIfStatement(findNextNewlineInSourceContainer(tempIndex));
-					temporaryDirectiveType = determineDirectiveType(tempIndex);
-					if (temporaryDirectiveType.directiveType==2){
-						indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(tempIndex);
-						continueSearch=false;
-						--ifLevelsDeep;
-					}
-				}
-			} else if (directiveTypeAndArgumentIndex.directiveType==4){ // ifdef
-				indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn);
-				++ifLevelsDeep;
-				if (!isMacroDefined(directiveTypeAndArgumentIndex.indexOfSpace+1,indexOfNewlineThatEndsDirective)){
-					indexOfNewlineThatEndsDirective = indexOfNewlineThatEndsDirective-1;
-					bool continueSearch=true;
-					while (continueSearch){
-						indexOfNewlineThatEndsDirective = getIndexOfNextDirectiveThatEndsIfStatement(
-									findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1))-1;
-						
-						temporaryDirectiveType = determineDirectiveType(indexOfNewlineThatEndsDirective+1);
-						if (temporaryDirectiveType.directiveType==2){
-							indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
-							continueSearch=false;
-							--ifLevelsDeep;
-						} else if (temporaryDirectiveType.directiveType==3){
-							indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
-							if (processIfLikeDirectiveToBool(temporaryDirectiveType.indexOfSpace)){
-								continueSearch=false;
-							}
-						} else if (temporaryDirectiveType.directiveType==10){
-							indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
-							continueSearch=false;
-						} else {
-							assert(false);
-						}
-					}
-				}
-			} else if (directiveTypeAndArgumentIndex.directiveType==5){ // ifndef
-				indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn);
-				++ifLevelsDeep;
-				if (isMacroDefined(directiveTypeAndArgumentIndex.indexOfSpace+1,indexOfNewlineThatEndsDirective)){
-					indexOfNewlineThatEndsDirective = indexOfNewlineThatEndsDirective-1;
-					bool continueSearch=true;
-					while (continueSearch){
-						indexOfNewlineThatEndsDirective = getIndexOfNextDirectiveThatEndsIfStatement(
-									findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1))-1;
-						
-						temporaryDirectiveType = determineDirectiveType(indexOfNewlineThatEndsDirective+1);
-						if (temporaryDirectiveType.directiveType==2){
-							indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
-							continueSearch=false;
-							--ifLevelsDeep;
-						} else if (temporaryDirectiveType.directiveType==3){
-							indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
-							if (processIfLikeDirectiveToBool(temporaryDirectiveType.indexOfSpace)){
-								continueSearch=false;
-							}
-						} else if (temporaryDirectiveType.directiveType==10){
-							indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(indexOfNewlineThatEndsDirective+1);
-							continueSearch=false;
-						} else {
-							assert(false);
-						}
-					}
-				}
-			} else if (directiveTypeAndArgumentIndex.directiveType==6){ // include
-				indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn);
-				char* tempFileName = copySegmentOfSourceContainerToHeapString(directiveTypeAndArgumentIndex.indexOfSpace+1,indexOfNewlineThatEndsDirective);
-				insertFileIntoSourceContainer(tempFileName,indexOfNewlineThatEndsDirective+1);
-				cosmic_free(tempFileName);
-			} else if (directiveTypeAndArgumentIndex.directiveType==7){ // define
-				indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn);
-				
-				Macro tempMacro = formatDefineInSourceContainer(directiveTypeAndArgumentIndex.indexOfSpace,indexOfNewlineThatEndsDirective);
-				
-				insertMacroIntoEmptySlot(tempMacro);
-			} else if (directiveTypeAndArgumentIndex.directiveType==8){ // pragma
-				printInformativeMessageAtSourceContainerIndex(
-					false,"\"#pragma\" directive ignored",charIndexReturn,0);
-				exit(1);
-				// this just should clear this area taken up by the directive, because it is ignored for now
-				indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn);
-			} else if (directiveTypeAndArgumentIndex.directiveType==9){ // undef
-				indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn);
-				// should not exit if the macro is already not defined. probably not even a warning
-				generatePreprocessTokensUntilStopPoint(directiveTypeAndArgumentIndex.indexOfSpace+1,false);
-				if (preprocessTokens.preprocessTokens[0].catagory!=4){
-					printInformativeMessageAtSourceContainerIndex(
-						true,"That doesn\'t seem like a macro",directiveTypeAndArgumentIndex.indexOfSpace+1,0);
-					exit(1);
-				}
-				int16_t macroIndex = searchForMatchingMacro(0,-1);
-				if (macroIndex!=-1) removeMacro(macroIndex);
-			} else if (directiveTypeAndArgumentIndex.directiveType==10){ // else
-				indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(charIndexReturn);
-				// will clear the area to the matching #endif
-				// the reason why this just clears this area is because 
-				//   this part of the code is only run when the area after the #else to the matching #endif should be skipped over
-				tempIndex = charIndexReturn;
-				bool continueSearch=true;
-				while (continueSearch){
-					tempIndex = getIndexOfNextDirectiveThatEndsIfStatement(findNextNewlineInSourceContainer(tempIndex));
-					temporaryDirectiveType = determineDirectiveType(tempIndex);
-					if (temporaryDirectiveType.directiveType==2){
-						indexOfNewlineThatEndsDirective = findNextNewlineInSourceContainer(tempIndex);
-						continueSearch=false;
-						--ifLevelsDeep;
-					} else if (temporaryDirectiveType.directiveType==3){
-						printInformativeMessageAtSourceContainerIndex(
-							true,"encountered directive \"#elif\" when scan scanning on same nesting level for the end of an \"#else\" directive. That is not allowed.",charIndexReturn,0);
-						exit(1);
-					} else if (temporaryDirectiveType.directiveType==10){
-						printInformativeMessageAtSourceContainerIndex(
-							true,"encountered directive \"#else\" when scan scanning on same nesting level for the end of an \"#else\" directive. That is not allowed.",charIndexReturn,0);
-						exit(1);
-					}
-				}
+				walkingCharacterIndex = indexOfNewlineThatEndsDirective; // the functions that use this should start on the previous newline to ensure everything is caught correctly
 			} else {
-				assert(false);
+				assert(false); // preprocesser macro replacement ended in wrong spot
 			}
-			// this essentially clears the area taken up by the directive (and any area that should be cleared with it)
-			for (int32_t i=charIndexReturn;i<indexOfNewlineThatEndsDirective;i++){
-				sourceContainer.sourceChar[i].c=' ';
-			}
-			walkingCharacterIndex = indexOfNewlineThatEndsDirective; // the functions that use this should start on the previous newline to ensure everything is caught correctly
-		} else {
-			assert(false); // preprocesser macro replacement ended in wrong spot
 		}
 	}
-	// these are at end of everything, and are needed for the compiler
-	superStripSourceChar(sourceContainer.sourceChar,0);
-	adjacentStringConcatInSourceChar(sourceContainer.sourceChar);
-	if (preprocessTokens.allocationLength!=0){ // probably always true, I'm not sure at the moment
-		preprocessTokens.allocationLength=0;
-		cosmic_free(preprocessTokens.preprocessTokens); // it is not needed anymore
-		preprocessTokens.preprocessTokens=NULL;
+	{
+		// these are at end of everything, and are needed for the compiler
+		superStripSourceChar(sourceContainer.sourceChar,0);
+		adjacentStringConcatInSourceChar(sourceContainer.sourceChar);
+		if (preprocessTokens.allocationLength!=0){ // probably always true, I'm not sure at the moment
+			preprocessTokens.allocationLength=0;
+			cosmic_free(preprocessTokens.preprocessTokens); // it is not needed anymore
+			preprocessTokens.preprocessTokens=NULL;
+		}
+		// destroy all macros now, they are not needed any more
+		for (int16_t i=0;i<macroListing.numberOfAllocatedSlotsInArray;i++){
+			char*const t0=macroListing.macros[i].definition;
+			char*const t1=macroListing.macros[i].result;
+			cosmic_free(t0);
+			cosmic_free(t1);
+		}
+		cosmic_free((char*)preDefinedMacros.dateResult);
+		cosmic_free((char*)preDefinedMacros.timeResult);
+		cosmic_free(macroListing.macros);
+		macroListing.macros=NULL;
+		
+		// create the source container string so the compiler can just manage a string
+		const int32_t length=findSourceContainerLength(0);
+		sourceContainer.sourceChar = cosmic_realloc(sourceContainer.sourceChar,(length+1)*sizeof(SourceChar));
+		sourceContainer.allocationLength=length+1;
+		char*const newString = cosmic_malloc(length+1);
+		for (int32_t i=0;i<length;i++){
+			newString[i]=sourceContainer.sourceChar[i].c;
+		}
+		newString[length]=0;
+		sourceContainer.string = newString;
 	}
-	// destroy all macros now, they are not needed any more
-	for (int16_t i=0;i<macroListing.numberOfAllocatedSlotsInArray;i++){
-		char* t0=macroListing.macros[i].definition;
-		char* t1=macroListing.macros[i].result;
-		if (t0!=NULL) cosmic_free(t0);
-		if (t1!=NULL) cosmic_free(t1);
-	}
-	cosmic_free(macroListing.macros);
-	cosmic_free((char*)preDefinedMacros.dateResult);
-	cosmic_free((char*)preDefinedMacros.timeResult);
-	
-	createSourceContainerString(); // so the compiler can just manage a string
 }
 
 

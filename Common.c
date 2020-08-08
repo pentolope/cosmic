@@ -23,7 +23,7 @@
 //#define FORCE_EXP_BUFFER_NULL
 
 
-#define ERR_MSG_LEN 60 // controls the length of error messages
+#define ERR_MSG_LEN 62 // controls the length of error messages
 
 
 //#define STATEMENT_DEBUG
@@ -217,7 +217,7 @@ struct BinContainer{
 };
 
 
-bool doStringsMatch(const char* string1,const char* string2){
+bool doStringsMatch(const char*const string1,const char*const string2){
 	int32_t i=0;
 	char c1;
 	char c2;
@@ -249,7 +249,7 @@ void genAllBinContainerMatch(struct BinContainer bc0,struct BinContainer bc1){
 	}
 }
 
-char* copyStringToHeapString(const char* string){
+char* copyStringToHeapString(const char*const string){
 	int32_t length = strlen(string);
 	char* newString = cosmic_malloc(length+1);
 	for (int32_t i=0;i<length;i++){
@@ -259,7 +259,7 @@ char* copyStringToHeapString(const char* string){
 	return newString;
 }
 
-char* copyStringSegmentToHeap(const char* string,const int32_t start,const int32_t end){
+char* copyStringSegmentToHeap(const char*const string,const int32_t start,const int32_t end){
 	int32_t length = end-start;
 	char* newString = cosmic_malloc(length+1);
 	for (int32_t i=0;i<length;i++){
@@ -269,7 +269,7 @@ char* copyStringSegmentToHeap(const char* string,const int32_t start,const int32
 	return newString;
 }
 
-bool isStringLengthLargerThan(const char* string,const int32_t startIndex,const int32_t amount){
+bool isStringLengthLargerThan(const char*const string,const int32_t startIndex,const int32_t amount){
 	int32_t amountLeft = amount;
 	for (int32_t i=startIndex;string[i];i++){
 		if (amountLeft==0){
@@ -280,7 +280,7 @@ bool isStringLengthLargerThan(const char* string,const int32_t startIndex,const 
 	return amountLeft==0;
 }
 
-bool specificStringEqualCheck(const char* stringLarge,const int32_t startInStringLarge,const int32_t endInStringLarge,const char* subStringToCheck){
+bool specificStringEqualCheck(const char*const stringLarge,const int32_t startInStringLarge,const int32_t endInStringLarge,const char*const subStringToCheck){
 	int32_t lengthOfSubString = strlen(subStringToCheck);
 	if (endInStringLarge-startInStringLarge!=lengthOfSubString || 
 			!isStringLengthLargerThan(stringLarge,startInStringLarge,lengthOfSubString-1)){
@@ -305,7 +305,7 @@ static inline bool isDigit(const char c){
 	return c>47 & c<58;
 }
 
-bool isSectionOfStringEquivalent(const char* string1,const int32_t startIndexForString1,const char* string2){
+bool isSectionOfStringEquivalent(const char*const string1,const int32_t startIndexForString1,const char*const string2){
 	for (int32_t i=0;string2[i];i++){
 		char c = string1[i+startIndexForString1];
 		if (c==0 | c!=string2[i]){
@@ -315,7 +315,7 @@ bool isSectionOfStringEquivalent(const char* string1,const int32_t startIndexFor
 	return true;
 }
 
-bool isSegmentAnywhereInString(const char* stringSearchIn,const char* stringSearchFor){
+bool isSegmentAnywhereInString(const char*const stringSearchIn,const char*const stringSearchFor){
 	int32_t lengthIn = strlen(stringSearchIn);
 	int32_t lengthFor = strlen(stringSearchFor);
 	if (lengthFor>lengthIn){
@@ -332,7 +332,7 @@ bool isSegmentAnywhereInString(const char* stringSearchIn,const char* stringSear
 
 // returns -1 if that space number doesn't exist
 // the first space is n==0
-int32_t getIndexOfNthSpace(const char* string, uint16_t n){
+int32_t getIndexOfNthSpace(const char*const string, uint16_t n){
 	uint16_t walkingN = 0;
 	for (int32_t i=0;string[i];i++){
 		if (string[i]==' '){
@@ -346,14 +346,14 @@ int32_t getIndexOfNthSpace(const char* string, uint16_t n){
 	return -1;
 }
 
-int32_t getIndexOfFirstSpaceInString(const char* string){
+int32_t getIndexOfFirstSpaceInString(const char*const string){
 	return getIndexOfNthSpace(string,0);
 }
 
-char* strMerge2(const char* s0,const char* s1){
-	uint32_t l0 = strlen(s0);
-	uint32_t l1 = strlen(s1);
-	char* sf = cosmic_malloc(l0+l1+1);
+char* strMerge2(const char*const s0,const char*const s1){
+	const uint32_t l0 = strlen(s0);
+	const uint32_t l1 = strlen(s1);
+	char*const sf = cosmic_malloc(l0+l1+1);
 	uint32_t w=0;
 	uint32_t i;
 	for (i=0;i<l0;) sf[w++]=s0[i++];
@@ -362,11 +362,11 @@ char* strMerge2(const char* s0,const char* s1){
 	return sf;
 }
 
-char* strMerge3(const char* s0,const char* s1,const char* s2){
-	uint32_t l0 = strlen(s0);
-	uint32_t l1 = strlen(s1);
-	uint32_t l2 = strlen(s2);
-	char* sf = cosmic_malloc(l0+l1+l2+1);
+char* strMerge3(const char*const s0,const char*const s1,const char*const s2){
+	const uint32_t l0 = strlen(s0);
+	const uint32_t l1 = strlen(s1);
+	const uint32_t l2 = strlen(s2);
+	char*const sf = cosmic_malloc(l0+l1+l2+1);
 	uint32_t w=0;
 	uint32_t i;
 	for (i=0;i<l0;) sf[w++]=s0[i++];
@@ -376,12 +376,12 @@ char* strMerge3(const char* s0,const char* s1,const char* s2){
 	return sf;
 }
 
-char* strMerge4(const char* s0,const char* s1,const char* s2,const char* s3){
-	uint32_t l0 = strlen(s0);
-	uint32_t l1 = strlen(s1);
-	uint32_t l2 = strlen(s2);
-	uint32_t l3 = strlen(s3);
-	char* sf = cosmic_malloc(l0+l1+l2+l3+1);
+char* strMerge4(const char*const s0,const char*const s1,const char*const s2,const char*const s3){
+	const uint32_t l0 = strlen(s0);
+	const uint32_t l1 = strlen(s1);
+	const uint32_t l2 = strlen(s2);
+	const uint32_t l3 = strlen(s3);
+	char*const sf = cosmic_malloc(l0+l1+l2+l3+1);
 	uint32_t w=0;
 	uint32_t i;
 	for (i=0;i<l0;) sf[w++]=s0[i++];
@@ -392,13 +392,13 @@ char* strMerge4(const char* s0,const char* s1,const char* s2,const char* s3){
 	return sf;
 }
 
-char* strMerge5(const char* s0,const char* s1,const char* s2,const char* s3,const char* s4){
-	uint32_t l0 = strlen(s0);
-	uint32_t l1 = strlen(s1);
-	uint32_t l2 = strlen(s2);
-	uint32_t l3 = strlen(s3);
-	uint32_t l4 = strlen(s4);
-	char* sf = cosmic_malloc(l0+l1+l2+l3+l4+1);
+char* strMerge5(const char*const s0,const char*const s1,const char*const s2,const char*const s3,const char*const s4){
+	const uint32_t l0 = strlen(s0);
+	const uint32_t l1 = strlen(s1);
+	const uint32_t l2 = strlen(s2);
+	const uint32_t l3 = strlen(s3);
+	const uint32_t l4 = strlen(s4);
+	char*const sf = cosmic_malloc(l0+l1+l2+l3+l4+1);
 	uint32_t w=0;
 	uint32_t i;
 	for (i=0;i<l0;) sf[w++]=s0[i++];
@@ -495,35 +495,10 @@ bool isSectionOfStringTypedefed(const char* string,const int32_t startIndex,cons
 	return -1 != indexOfTypedefEntryForSectionOfString(string,startIndex,endIndex);
 }
 
-/*
-bool isSegmentOfStringTypeLike(const char* string,const int32_t startIndex,const int32_t endIndex){
-	return specificStringEqualCheck(string,startIndex,endIndex,"struct") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"union") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"enum") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"unsigned") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"signed") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"_Bool") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"char") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"short") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"int") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"long") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"void") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"const") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"volatile") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"inline") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"static") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"extern") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"auto") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"register") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"float") ||
-		specificStringEqualCheck(string,startIndex,endIndex,"double") ||
-		isSectionOfStringTypedefed(string,startIndex,endIndex);
-}
-*/
 
 // does not check for a space
 // expects string to be valid in the range given
-bool isSegmentOfStringTypeLike(const char* string, const int32_t startIndex, const int32_t endIndex){
+bool isSegmentOfStringTypeLike(const char*const string, const int32_t startIndex, const int32_t endIndex){
 	{
 	const char* p;
 	char buf[8];

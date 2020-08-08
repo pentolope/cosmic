@@ -854,12 +854,15 @@ struct TypeToken{
 struct TypeTokenArray{
 	struct TypeToken* typeTokens;
 	int16_t* indexesForRearrangement;
-	int16_t length;
+	int16_t tokenLength;
+	int16_t indexLength; // indexLength is the allocation length of indexesForRearrangement, but indexesForRearrangement may be terminated earlier by a -1
 };
 
+struct TypeTokenArray typeTokenArray; // only one is needed at any time, so it is global
 
-void writeIndexToNextSlotInTypeTokenArray(struct TypeTokenArray typeTokenArray, int16_t index){
-	for (int16_t i=0;i<typeTokenArray.length;i++){
+
+void writeIndexToNextSlotInTypeTokenArray(int16_t index){
+	for (int16_t i=0;i<typeTokenArray.indexLength;i++){
 		if (typeTokenArray.indexesForRearrangement[i]==-1){
 			typeTokenArray.indexesForRearrangement[i] = index;
 			return;
@@ -870,7 +873,7 @@ void writeIndexToNextSlotInTypeTokenArray(struct TypeTokenArray typeTokenArray, 
 	err_1101_("(Internal) failure to parse type (ID:3)",typeTokenArray.typeTokens[index].stringIndexStart);
 }
 
-int16_t findStartForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundStart, int16_t boundEnd){
+int16_t findStartForTypeTokens(int16_t boundStart, int16_t boundEnd){
 	Start:;
 	bool doContainerStart = false;
 	bool doStartSkip = false;
@@ -948,13 +951,7 @@ int16_t findStartForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t bou
 	then this does not start on a container (struct, enum, union)
 	therefore, search for identifier or colon
 	*/
-	int16_t doStartAt;
-	if (doStartSkip){
-		doStartAt = boundStart+2;
-	} else {
-		doStartAt = boundStart;
-	}
-	for (int16_t i=doStartAt;i<boundEnd;i++){
+	for (int16_t i=boundStart+doStartSkip*2;i<boundEnd;i++){
 		struct TypeToken *thisTypeTokenPtr = typeTokenArray.typeTokens+i;
 		char firstCharacter=thisTypeTokenPtr->firstCharacter;
 		if (firstCharacter=='[' | firstCharacter=='{'){
@@ -1001,17 +998,17 @@ int16_t findStartForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t bou
 	return mostInclosedToken;
 }
 
-void mainWalkForTypeTokens(struct TypeTokenArray, int16_t, int16_t, int16_t, bool);
-void splitterStarterForTypeTokens(struct TypeTokenArray, int16_t, char);
+void mainWalkForTypeTokens(int16_t, int16_t, int16_t, bool);
+void splitterStarterForTypeTokens(int16_t, char);
 
-void enumHandlerForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t bracketIndex){
+void enumHandlerForTypeTokens(int16_t bracketIndex){
 	int16_t endBracketIndex = typeTokenArray.typeTokens[bracketIndex].enclosementMatch;
 	for (int16_t i=bracketIndex;i<=endBracketIndex;i++){
-		writeIndexToNextSlotInTypeTokenArray(typeTokenArray,i);
+		writeIndexToNextSlotInTypeTokenArray(i);
 	}
 }
 
-int16_t squareBracketHandlerForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t squareBracketIndex0){
+int16_t squareBracketHandlerForTypeTokens(int16_t squareBracketIndex0){
 	int16_t squareBracketIndex1=typeTokenArray.typeTokens[squareBracketIndex0].enclosementMatch;
 	int16_t squareBracketIndex2;
 	int16_t squareBracketIndex3;
@@ -1023,12 +1020,12 @@ int16_t squareBracketHandlerForTypeTokens(struct TypeTokenArray typeTokenArray, 
 		squareBracketIndex3=squareBracketIndex0;
 	}
 	for (int16_t i=squareBracketIndex2;i<=squareBracketIndex3;i++){
-		writeIndexToNextSlotInTypeTokenArray(typeTokenArray,i);
+		writeIndexToNextSlotInTypeTokenArray(i);
 	}
 	return squareBracketIndex1;
 }
 
-void bracketHandlerForMainWalkForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundStart, int16_t bracketIndex){
+void bracketHandlerForMainWalkForTypeTokens(int16_t boundStart, int16_t bracketIndex){
 	if (bracketIndex-1<boundStart){
 		goto Fail;
 	}
@@ -1065,18 +1062,18 @@ void bracketHandlerForMainWalkForTypeTokens(struct TypeTokenArray typeTokenArray
 		goto Fail;
 	}
 	if (outID!=1){
-		splitterStarterForTypeTokens(typeTokenArray,bracketIndex,';');
+		splitterStarterForTypeTokens(bracketIndex,';');
 	} else {
-		enumHandlerForTypeTokens(typeTokenArray,bracketIndex);
+		enumHandlerForTypeTokens(bracketIndex);
 	}
 	return;
 	Fail:
 	err_1101_("Invalid \'{\' in type, could not find appropriate matching keyword",typeTokenArray.typeTokens[bracketIndex].stringIndexStart);
 }
 
-void mainWalkForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundStart, int16_t boundEnd, int16_t externalStart, bool doExternalStart){
+void mainWalkForTypeTokens(int16_t boundStart, int16_t boundEnd, int16_t externalStart, bool doExternalStart){
 	if (boundStart+1==boundEnd){
-		writeIndexToNextSlotInTypeTokenArray(typeTokenArray,boundStart);
+		writeIndexToNextSlotInTypeTokenArray(boundStart);
 		return;
 	}
 	if (boundStart+1>boundEnd){
@@ -1087,7 +1084,7 @@ void mainWalkForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundSt
 	if (doExternalStart){
 		startIndex = typeTokenArray.typeTokens[externalStart].enclosementMatch+1;
 	} else {
-		startIndex = findStartForTypeTokens(typeTokenArray,boundStart,boundEnd);
+		startIndex = findStartForTypeTokens(boundStart,boundEnd);
 	}
 	for (int16_t i=startIndex;i<boundEnd;i++){
 		char firstCharacter = typeTokenArray.typeTokens[i].firstCharacter;
@@ -1101,16 +1098,16 @@ void mainWalkForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundSt
 			break;
 		}
 		if (firstCharacter=='['){
-			i=squareBracketHandlerForTypeTokens(typeTokenArray,i);
+			i=squareBracketHandlerForTypeTokens(i);
 		} else if (firstCharacter=='('){
-			splitterStarterForTypeTokens(typeTokenArray,i,',');
+			splitterStarterForTypeTokens(i,',');
 			i = typeTokenArray.typeTokens[i].enclosementMatch;
 		} else if (firstCharacter=='{'){
 			int16_t matchingIndex = typeTokenArray.typeTokens[i].enclosementMatch;
-			bracketHandlerForMainWalkForTypeTokens(typeTokenArray,boundStart,i);
+			bracketHandlerForMainWalkForTypeTokens(boundStart,i);
 			i = matchingIndex;
 		} else {
-			writeIndexToNextSlotInTypeTokenArray(typeTokenArray,i);
+			writeIndexToNextSlotInTypeTokenArray(i);
 			if (firstCharacter==':'){
 				struct TypeToken* typeTokenPtrToNumber = typeTokenArray.typeTokens+(i+1);
 				if ((i+2!=boundEnd | doExternalStart) || !(typeTokenPtrToNumber->firstCharacter>='0' & typeTokenPtrToNumber->firstCharacter<='9')){
@@ -1128,7 +1125,7 @@ void mainWalkForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundSt
 				if (i!=startIndex & numberParseResult.valueUnion.value==0){
 					err_1111_("Bitfields of 0 size must have no identifier",typeTokenPtrToNumber->stringIndexStart,typeTokenPtrToNumber->stringIndexEnd);
 				}
-				writeIndexToNextSlotInTypeTokenArray(typeTokenArray,i+1);
+				writeIndexToNextSlotInTypeTokenArray(i+1);
 				break;
 			}
 		}
@@ -1149,22 +1146,22 @@ void mainWalkForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundSt
 		}
 		if (firstCharacter=='}'){
 			int16_t matchingIndex = typeTokenArray.typeTokens[i].enclosementMatch;
-			mainWalkForTypeTokens(typeTokenArray,boundStart,i+1,0,false);
+			mainWalkForTypeTokens(boundStart,i+1,0,false);
 			break;
 		}
 		if (firstCharacter==']'){
-			i=squareBracketHandlerForTypeTokens(typeTokenArray,i);
+			i=squareBracketHandlerForTypeTokens(i);
 		} else if (firstCharacter==':') {
 			int32_t stringIndexStart = typeTokenArray.typeTokens[i].stringIndexStart;
 			int32_t stringIndexEnd = typeTokenArray.typeTokens[i].stringIndexEnd;
 			err_1111_("Unexpected \':\' while parsing type",stringIndexStart,stringIndexEnd);
 		} else {
-			writeIndexToNextSlotInTypeTokenArray(typeTokenArray,i);
+			writeIndexToNextSlotInTypeTokenArray(i);
 		}
 	}
 	if (hasParenStart | hasParenEnd){
 		if (hasParenStart & hasParenEnd){
-			mainWalkForTypeTokens(typeTokenArray,boundStart,boundEnd,parenStartIndex,true);
+			mainWalkForTypeTokens(boundStart,boundEnd,parenStartIndex,true);
 		} else {
 			// this error probably should never happen, regardless of input
 			err_1101_("(Internal) failure to parse type (ID:2)",typeTokenArray.typeTokens[boundStart].stringIndexStart);
@@ -1172,30 +1169,30 @@ void mainWalkForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundSt
 	}
 }
 
-void splitterStarterForTypeTokens(struct TypeTokenArray typeTokenArray, int16_t boundStart, char splittingChar){
+void splitterStarterForTypeTokens(int16_t boundStart, char splittingChar){
 	int16_t boundEnd = typeTokenArray.typeTokens[boundStart].enclosementMatch;
 	int16_t previousStart = boundStart+1;
-	writeIndexToNextSlotInTypeTokenArray(typeTokenArray,boundStart);
+	writeIndexToNextSlotInTypeTokenArray(boundStart);
 	if (previousStart!=boundEnd){
 		for (int16_t i=boundStart+1;i<boundEnd;i++){
 			char c = typeTokenArray.typeTokens[i].firstCharacter;
 			if (c == splittingChar){
-				mainWalkForTypeTokens(typeTokenArray,previousStart,i,0,false);
+				mainWalkForTypeTokens(previousStart,i,0,false);
 				previousStart = i+1;
-				writeIndexToNextSlotInTypeTokenArray(typeTokenArray,i);
+				writeIndexToNextSlotInTypeTokenArray(i);
 			} else if (c=='(' | c=='{'){
 				i = typeTokenArray.typeTokens[i].enclosementMatch;
 			}
 		}
 		if (splittingChar==','){
-			mainWalkForTypeTokens(typeTokenArray,previousStart,boundEnd,0,false);
+			mainWalkForTypeTokens(previousStart,boundEnd,0,false);
 		}
 	}
-	writeIndexToNextSlotInTypeTokenArray(typeTokenArray,boundEnd);
+	writeIndexToNextSlotInTypeTokenArray(boundEnd);
 }
 
 
-int16_t specificEnclosementMatchTypeTokens(struct TypeTokenArray typeTokenArray, int16_t startIndex){
+int16_t specificEnclosementMatchTypeTokens(int16_t startIndex){
 	const char startChar = typeTokenArray.typeTokens[startIndex].firstCharacter;
 	const char endingEnclosements[]=")]}";
 	uint8_t typeOfEnclosement;
@@ -1211,8 +1208,8 @@ int16_t specificEnclosementMatchTypeTokens(struct TypeTokenArray typeTokenArray,
 	int16_t i=startIndex+1;
 	char c;
 	while ((c=typeTokenArray.typeTokens[i].firstCharacter)!=endingEnclosements[typeOfEnclosement]){
-		if (c==')' | c==']' | c=='}' | i+1>=typeTokenArray.length){
-			if (i+1>=typeTokenArray.length){
+		if (c==')' | c==']' | c=='}' | i+1>=typeTokenArray.tokenLength){
+			if (i+1>=typeTokenArray.tokenLength){
 				err_1101_("Expected this opening bracket to match a closing bracket, but none existed",typeTokenArray.typeTokens[startIndex].stringIndexStart);
 			} else {
 				err_11000("Expected this closing bracket to match",typeTokenArray.typeTokens[i].stringIndexStart);
@@ -1220,7 +1217,7 @@ int16_t specificEnclosementMatchTypeTokens(struct TypeTokenArray typeTokenArray,
 			}
 		}
 		if (c=='(' | c=='[' | c=='{'){
-			i = specificEnclosementMatchTypeTokens(typeTokenArray,i);
+			i = specificEnclosementMatchTypeTokens(i);
 		}
 		i++;
 	}
@@ -1230,7 +1227,7 @@ int16_t specificEnclosementMatchTypeTokens(struct TypeTokenArray typeTokenArray,
 }
 
 
-struct TypeTokenArray typeTokenizeForAnalysis(int32_t startIndex, int32_t endIndex){
+void typeTokenizeForAnalysis(int32_t startIndex, int32_t endIndex){
 	bool terminatedAtCorrectIndex = false;
 	int16_t lengthCount = 0;
 	for (int32_t i=startIndex;i<endIndex;){
@@ -1253,12 +1250,15 @@ struct TypeTokenArray typeTokenizeForAnalysis(int32_t startIndex, int32_t endInd
 		// the endIndex is inside of a token. That's the calling function's problem, and it shouldn't happen
 		err_1101_("(Internal), cannot agree on end of token",endIndex);
 	}
-	struct TypeTokenArray typeTokenArray;
-	typeTokenArray.length = lengthCount;
-	typeTokenArray.indexesForRearrangement = cosmic_malloc(sizeof(int16_t)*(lengthCount+1));
-	for (int16_t i=0;i<lengthCount;i++) typeTokenArray.indexesForRearrangement[i]=-1;
-	typeTokenArray.indexesForRearrangement[lengthCount]=-1;
+	if (lengthCount==0){
+		err_1111_("Expected type declaration here",startIndex,endIndex);
+	}
+	typeTokenArray.tokenLength = lengthCount;
+	typeTokenArray.indexLength = lengthCount;
 	typeTokenArray.typeTokens = cosmic_malloc(sizeof(struct TypeToken)*lengthCount);
+	typeTokenArray.indexesForRearrangement = cosmic_malloc(sizeof(int16_t)*lengthCount);
+	for (int16_t i=0;i<lengthCount;i++) typeTokenArray.indexesForRearrangement[i]=-1;
+	
 	int32_t walkingIndex = 0;
 	for (int32_t i=startIndex;i<endIndex;){
 		int32_t tokenStart = i;
@@ -1404,23 +1404,22 @@ struct TypeTokenArray typeTokenizeForAnalysis(int32_t startIndex, int32_t endInd
 			err_1101_("Expected this closing bracket to match an opening bracket, but none existed",typeTokenArray.typeTokens[i].stringIndexStart);
 		}
 		if (c=='(' | c=='[' | c=='{'){
-			i=specificEnclosementMatchTypeTokens(typeTokenArray,i);
+			i=specificEnclosementMatchTypeTokens(i);
 		}
 	}
-	return typeTokenArray;
 }
 
 
 char* convertType(int32_t startIndex, int32_t endIndex){
-	struct TypeTokenArray typeTokenArray = typeTokenizeForAnalysis(startIndex,endIndex);
-	mainWalkForTypeTokens(typeTokenArray,0,typeTokenArray.length,0,false);
+	typeTokenizeForAnalysis(startIndex,endIndex);
+	mainWalkForTypeTokens(0,typeTokenArray.tokenLength,0,false);
 	// now we generate the string
 	int16_t walkingIndex = 0;
 	int32_t walkingCount = 0;
 	while (typeTokenArray.indexesForRearrangement[walkingIndex]!=-1){
 		struct TypeToken* thisTypeTokenPtr = typeTokenArray.typeTokens+typeTokenArray.indexesForRearrangement[walkingIndex];
 		walkingCount += (thisTypeTokenPtr->stringIndexEnd-thisTypeTokenPtr->stringIndexStart)+1;
-		walkingIndex++;
+		if (++walkingIndex==typeTokenArray.indexLength) break;
 	}
 	char *resultString = cosmic_malloc(walkingCount);
 	int32_t endIndexForReturnString = walkingCount-1;
@@ -1432,7 +1431,7 @@ char* convertType(int32_t startIndex, int32_t endIndex){
 			resultString[walkingCount++]=sourceContainer.string[i];
 		}
 		resultString[walkingCount++]=' ';
-		walkingIndex++;
+		if (++walkingIndex==typeTokenArray.indexLength) break;
 	}
 	resultString[endIndexForReturnString]=0;
 	cosmic_free(typeTokenArray.typeTokens);

@@ -33,6 +33,66 @@ struct {
 } cosmic_alloc_global;
 
 
+#if 0
+struct {
+	struct Heap_Track_Item{size_t p;size_t s;}* items;
+	size_t len;
+	size_t alen;
+	size_t max;
+	size_t size;
+} heap_track;
+
+void heap_track_update(){
+	heap_track.size=0;
+	for (size_t i=0;i<heap_track.len;i++){
+		heap_track.size+=heap_track.items[i].s;
+	}
+	if (heap_track.size>heap_track.max) heap_track.max=heap_track.size;
+	//printf("%lu\n",(unsigned long)heap_track.size);
+}
+
+void heap_track_add(size_t p,size_t s){
+	if (p==0) return;
+	struct Heap_Track_Item t={.p=p,.s=s};
+	if (heap_track.len==heap_track.alen){
+		heap_track.alen+=100;
+		heap_track.items = realloc(heap_track.items,heap_track.alen*sizeof(struct Heap_Track_Item));
+	}
+	heap_track.items[heap_track.len++]=t;
+	heap_track_update();
+}
+
+void heap_track_modify(size_t p0,size_t p1,size_t s){
+	if (p0==0){
+		heap_track_add(p1,s);
+		return;
+	}
+	for (size_t i=0;i<heap_track.len;i++){
+		if (heap_track.items[i].p==p0){
+			heap_track.items[i].p=p1;
+			heap_track.items[i].s=s;
+			heap_track_update();
+			return;
+		}
+	}
+	assert(false);
+}
+
+void heap_track_remove(size_t p){
+	for (size_t i=0;i<heap_track.len;i++){
+		if (heap_track.items[i].p==p){
+			for (i++;i<heap_track.len;i++){
+				heap_track.items[i-1]=heap_track.items[i];
+			}
+			heap_track.len--;
+			heap_track_update();
+			return;
+		}
+	}
+	assert(false);
+}
+#endif
+
 void* cosmic_malloc(size_t size){
 	if (size==INIT_INSTRUCTION_BUFFER_SIZE*sizeof(InstructionSingle)){
 		for (uint8_t i=0;i<ALT_ALLOC_INSTRUCTION_BUFFER_COUNT;i++){
@@ -44,8 +104,9 @@ void* cosmic_malloc(size_t size){
 		// if this position is reached, then there are more then ALT_ALLOC_INSTRUCTION_BUFFER_COUNT many instruction buffers that are of the initial size
 		// it's fine if this position is reached, by the way
 	}
-	if (size>ALT_ALLOC_BLK_SIZE) {
+	if (size>ALT_ALLOC_BLK_SIZE){
 		void* r=malloc(size);
+		//heap_track_add((size_t)r,size);
 		if (r==NULL){
 			printf("malloc() failed to allocate %lu bytes. Exiting now.\n",(unsigned long)size);
 			exit(3);
@@ -57,6 +118,7 @@ void* cosmic_malloc(size_t size){
 	progress:
 	if (localCurrent==cosmic_alloc_global.current){
 		localCurrent=calloc(1,sizeof(struct cosmic_alloc_block));
+		//heap_track_add((size_t)localCurrent,sizeof(struct cosmic_alloc_block));
 		if (localCurrent==NULL){
 			printf("calloc() failed to allocate %lu bytes. Exiting now.\n",(unsigned long)size);
 			exit(3);
@@ -135,11 +197,13 @@ void cosmic_free(void* ptr){
 		}
 		localCurrent=localCurrent->next;
 	} while (localCurrent!=cosmic_alloc_global.current);
+	//heap_track_remove((size_t)ptr);
 	free(ptr);
 	return;
 }
 
 void* cosmic_realloc(void* ptr,size_t size){
+	if (ptr==NULL) return cosmic_malloc(size);
 	if ((uint8_t*)ptr>=(uint8_t*)(cosmic_instruction_single_buffers.buffers[0].buffer) & 
 		(uint8_t*)ptr<=(uint8_t*)(cosmic_instruction_single_buffers.buffers[ALT_ALLOC_INSTRUCTION_BUFFER_COUNT-1].buffer)){
 		
@@ -151,6 +215,7 @@ void* cosmic_realloc(void* ptr,size_t size){
 				assert(cosmic_instruction_single_buffers.isTaken[i]);
 				cosmic_instruction_single_buffers.isTaken[i]=false;
 				uint8_t* new=malloc(size);
+				//heap_track_add((size_t)new,size);
 				if (new==NULL){
 					printf("malloc() failed to allocate %lu bytes. Exiting now.\n",(unsigned long)size);
 					exit(3);
@@ -176,6 +241,7 @@ void* cosmic_realloc(void* ptr,size_t size){
 		localCurrent=localCurrent->next;
 	} while (localCurrent!=cosmic_alloc_global.current);
 	void* r=realloc(ptr,size);
+	//heap_track_modify((size_t)ptr,(size_t)r,size);
 	if (r==NULL){
 		printf("realloc() failed to allocate %lu bytes. Exiting now.\n",(unsigned long)size);
 		exit(3);

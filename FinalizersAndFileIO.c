@@ -391,76 +391,80 @@ void safe_fputc(int value){
 
 // destroys global_static_data
 void finalOutputFromCompile(const char* filePath){
-	CompressedInstructionBuffer cis_global_static_data=compressInstructionBuffer(&global_static_data);
-	destroyInstructionBuffer(&global_static_data);
-	uint32_t symbolEntryLength=0;
-	for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots;i++){
-		struct GlobalVariableEntry gve=blockFrameArray.globalBlockFrame.globalVariableEntries[i];
-		if (!gve.usedStatic) symbolEntryLength++;
-	}
-	for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalFunctionEntrySlots;i++){
-		struct GlobalFunctionEntry gfe=blockFrameArray.globalBlockFrame.globalFunctionEntries[i];
-		if (!gfe.usedStatic^gfe.usedInline) symbolEntryLength++;
-	}
-	safe_fputc_file_path=filePath;
-	safe_fputc_file = fopen(safe_fputc_file_path,"wb");
-    if (safe_fputc_file==NULL) err_10_1_(strMerge3("Could not open \'",safe_fputc_file_path,"\' for output"));
-	safe_fputc((uint8_t)(symbolEntryLength));
-	safe_fputc((uint8_t)(symbolEntryLength>>8));
-	safe_fputc((uint8_t)(symbolEntryLength>>16));
-	safe_fputc((uint8_t)(symbolEntryLength>>24));
-	for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots;i++){
-		struct GlobalVariableEntry gve=blockFrameArray.globalBlockFrame.globalVariableEntries[i];
-		if (!gve.usedStatic){
-			safe_fputc((uint8_t)(gve.labelID));
-			safe_fputc((uint8_t)(gve.labelID>>8));
-			safe_fputc((uint8_t)(gve.labelID>>16));
-			safe_fputc((uint8_t)(gve.labelID>>24));
-			char* t=applyToTypeStringGetIdentifierToNew(gve.typeString);
-			for (uint32_t i2=0;t[i2];i2++) safe_fputc(t[i2]);
-			cosmic_free(t);
-			safe_fputc(gve.usedExtern+gve.hadInitializer*2);
-			/*
-			0- no extern, no initializer
-			1-yes extern, no initializer
-			2- no extern,yes initializer
-			3-yes extern,yes initializer
-			*/
+	if (filePath!=NULL){
+		CompressedInstructionBuffer cis_global_static_data=compressInstructionBuffer(&global_static_data);
+		destroyInstructionBuffer(&global_static_data);
+		uint32_t symbolEntryLength=0;
+		for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots;i++){
+			struct GlobalVariableEntry gve=blockFrameArray.globalBlockFrame.globalVariableEntries[i];
+			if (!gve.usedStatic) symbolEntryLength++;
 		}
-	}
-	for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalFunctionEntrySlots;i++){
-		struct GlobalFunctionEntry gfe=blockFrameArray.globalBlockFrame.globalFunctionEntries[i];
-		if (!gfe.usedStatic^gfe.usedInline){
-			safe_fputc((uint8_t)(gfe.labelID));
-			safe_fputc((uint8_t)(gfe.labelID>>8));
-			safe_fputc((uint8_t)(gfe.labelID>>16));
-			safe_fputc((uint8_t)(gfe.labelID>>24));
-			char* t=applyToTypeStringGetIdentifierToNew(gfe.typeString);
-			for (uint32_t i2=0;t[i2];i2++) safe_fputc(t[i2]);
-			cosmic_free(t);
-			safe_fputc(gfe.usedExtern+4);
-			/*
-			4- no extern (and therefore   defined)
-			5-yes extern (and therefore undefined)
-			*/
+		for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalFunctionEntrySlots;i++){
+			struct GlobalFunctionEntry gfe=blockFrameArray.globalBlockFrame.globalFunctionEntries[i];
+			if (!gfe.usedStatic^gfe.usedInline) symbolEntryLength++;
 		}
-	}
-	for (uint32_t i=0;i<globalInstructionBuffersOfFunctions.numberOfSlotsTaken;i++){
-		CompressedInstructionBuffer cib=globalInstructionBuffersOfFunctions.slots[i];
-		uint32_t lenWithoutTerminate=cib.allocLen-1;
-		for (uint32_t i2=0;i2<lenWithoutTerminate;i2++){
-			safe_fputc(cib.byteCode[i2]);
+		safe_fputc_file_path=filePath;
+		safe_fputc_file = fopen(safe_fputc_file_path,"wb");
+		 if (safe_fputc_file==NULL) err_10_1_(strMerge3("Could not open \'",safe_fputc_file_path,"\' for output"));
+		safe_fputc((uint8_t)(symbolEntryLength));
+		safe_fputc((uint8_t)(symbolEntryLength>>8));
+		safe_fputc((uint8_t)(symbolEntryLength>>16));
+		safe_fputc((uint8_t)(symbolEntryLength>>24));
+		for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots;i++){
+			struct GlobalVariableEntry gve=blockFrameArray.globalBlockFrame.globalVariableEntries[i];
+			if (!gve.usedStatic){
+				safe_fputc((uint8_t)(gve.labelID));
+				safe_fputc((uint8_t)(gve.labelID>>8));
+				safe_fputc((uint8_t)(gve.labelID>>16));
+				safe_fputc((uint8_t)(gve.labelID>>24));
+				char* t=applyToTypeStringGetIdentifierToNew(gve.typeString);
+				for (uint32_t i2=0;t[i2];i2++) safe_fputc(t[i2]);
+				cosmic_free(t);
+				safe_fputc(gve.usedExtern+gve.hadInitializer*2);
+				/*
+				0- no extern, no initializer
+				1-yes extern, no initializer
+				2- no extern,yes initializer
+				3-yes extern,yes initializer
+				*/
+			}
 		}
+		for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalFunctionEntrySlots;i++){
+			struct GlobalFunctionEntry gfe=blockFrameArray.globalBlockFrame.globalFunctionEntries[i];
+			if (!gfe.usedStatic^gfe.usedInline){
+				safe_fputc((uint8_t)(gfe.labelID));
+				safe_fputc((uint8_t)(gfe.labelID>>8));
+				safe_fputc((uint8_t)(gfe.labelID>>16));
+				safe_fputc((uint8_t)(gfe.labelID>>24));
+				char* t=applyToTypeStringGetIdentifierToNew(gfe.typeString);
+				for (uint32_t i2=0;t[i2];i2++) safe_fputc(t[i2]);
+				cosmic_free(t);
+				safe_fputc(gfe.usedExtern+4);
+				/*
+				4- no extern (and therefore   defined)
+				5-yes extern (and therefore undefined)
+				*/
+			}
+		}
+		for (uint32_t i=0;i<globalInstructionBuffersOfFunctions.numberOfSlotsTaken;i++){
+			CompressedInstructionBuffer cib=globalInstructionBuffersOfFunctions.slots[i];
+			uint32_t lenWithoutTerminate=cib.allocLen-1;
+			for (uint32_t i2=0;i2<lenWithoutTerminate;i2++){
+				safe_fputc(cib.byteCode[i2]);
+			}
+		}
+		safe_fputc(0);
+		for (uint32_t i=0;i<cis_global_static_data.allocLen;i++){
+			safe_fputc(cis_global_static_data.byteCode[i]);
+		}
+		// null terminator for static data is already placed by the loop above
+		if (fclose(safe_fputc_file)!=0) err_10_1_(strMerge3("Could not close \'",safe_fputc_file_path,"\' after writting"));
+		safe_fputc_file=NULL;
+		safe_fputc_file_path=NULL;
+		cosmic_free(cis_global_static_data.byteCode);
+	} else {
+		destroyInstructionBuffer(&global_static_data);
 	}
-	safe_fputc(0);
-	for (uint32_t i=0;i<cis_global_static_data.allocLen;i++){
-		safe_fputc(cis_global_static_data.byteCode[i]);
-	}
-	// null terminator for static data is already placed by the loop above
-	if (fclose(safe_fputc_file)!=0) err_10_1_(strMerge3("Could not close \'",safe_fputc_file_path,"\' after writting"));
-	safe_fputc_file=NULL;
-	safe_fputc_file_path=NULL;
-	cosmic_free(cis_global_static_data.byteCode);
 }
 
 // if destroyAllCompilerInfo() is run after the preprocesser and compiler, then nearly all global state effected by the preprocesser and compiler will be reset when it finishes
