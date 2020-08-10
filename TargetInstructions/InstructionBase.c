@@ -436,7 +436,8 @@ void backendInstructionWrite(uint8_t** byte,uint32_t symVal,uint16_t func_stack_
 		case I_CALL:*((*byte)++)=b0;*((*byte)++)=0xFA;return;
 		case I_MRBN:case I_MRBV:*((*byte)++)=b0;*((*byte)++)=0xFC;return;
 		case I_MWBN:case I_MWBV:*((*byte)++)=b0;*((*byte)++)=0xFD;return;
-		case I_JJMP:case I_AJMP:*((*byte)++)=b0;*((*byte)++)=0xFE;return;
+		case I_JJMP:*((*byte)++)=((unsigned)IS.arg.BBD.a_0&0xFu)|(((unsigned)IS.arg.BBD.a_1&0xFu)<<4);*((*byte)++)=0xFE;return;
+		case I_AJMP:*((*byte)++)=b0;*((*byte)++)=0xFE;return;
 		case I_RET_:*((*byte)++)=0;*((*byte)++)=0xFB;return;
 		case I_AND_:*((*byte)++)=b1;*((*byte)++)=0x40|b2;return;
 		case I_OR__:*((*byte)++)=b1;*((*byte)++)=0x50|b2;return;

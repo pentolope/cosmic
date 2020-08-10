@@ -2258,8 +2258,7 @@ void expressionToAssembly(
 	bool isFunctionCall = oID==65 | oID==66;
 	struct GlobalFunctionEntry* functionEntryPtr; // only used when oID==65
 	if (isFunctionCall){
-		uint16_t numberOfParameters=getNumberOfParametersOnFunctionCall(thisNode);
-		numberOfParameters=getNumberOfParametersOnFunctionCall(thisNode);
+		const uint16_t numberOfParameters=getNumberOfParametersOnFunctionCall(thisNode);
 		if (oID==65){
 			char* functionIdentifier = copyStringSegmentToHeap(sourceContainer.string,thisNode->startIndexInString,thisNode->endIndexInString);
 			struct IdentifierSearchResult identifierSearchResult;
@@ -2337,6 +2336,7 @@ void expressionToAssembly(
 					printf("Return size of function is too large (this should have been caught elsewhere)\n");
 					exit(1);
 				}
+				returnSize+=returnSize&1;
 				add_ALCR(&thisNode->ib,returnSize);
 			}
 			uint16_t stackSize=0;

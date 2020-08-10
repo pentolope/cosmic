@@ -127,7 +127,7 @@ bool resolveSwitch(){
 		}
 		case 1:
 		{
-		// this has NOT been verified
+		// this has been slightly tested
 		uint32_t labelForJJMP = ++globalLabelID;
 		
 		singleMergeIB(&currentSwitchManagment.ibFinal,&currentSwitchManagment.ibSwitchItem);
@@ -147,7 +147,7 @@ bool resolveSwitch(){
 		insert_IB_load_dword(&currentSwitchManagment.ibFinal,4);
 		singleMergeIB(&currentSwitchManagment.ibFinal,&ib_i_32mul);
 		insert_IB_address_label(&currentSwitchManagment.ibFinal,labelForJJMP);
-		singleMergeIB(&currentSwitchManagment.ibFinal,&ib_i_32add);
+		dualMergeIB(&currentSwitchManagment.ibFinal,&ib_i_32add,&ib_mem_dword_read_n);
 		
 		IS.id=I_POP2;
 		IS.arg.B2.a_0=2;
