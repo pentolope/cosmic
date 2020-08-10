@@ -348,11 +348,12 @@ char* strMerge2(const char*const s0,const char*const s1){
 	const uint32_t l0 = strlen(s0);
 	const uint32_t l1 = strlen(s1);
 	char*const sf = cosmic_malloc(l0+l1+1);
-	uint32_t w=0;
-	uint32_t i;
-	for (i=0;i<l0;) sf[w++]=s0[i++];
-	for (i=0;i<l1;) sf[w++]=s1[i++];
-	sf[w]=0;
+	char* wa = sf;
+	memcpy(wa,s0,l0);
+	wa+=l0;
+	memcpy(wa,s1,l1);
+	wa+=l1;
+	*wa=0;
 	return sf;
 }
 
@@ -361,12 +362,14 @@ char* strMerge3(const char*const s0,const char*const s1,const char*const s2){
 	const uint32_t l1 = strlen(s1);
 	const uint32_t l2 = strlen(s2);
 	char*const sf = cosmic_malloc(l0+l1+l2+1);
-	uint32_t w=0;
-	uint32_t i;
-	for (i=0;i<l0;) sf[w++]=s0[i++];
-	for (i=0;i<l1;) sf[w++]=s1[i++];
-	for (i=0;i<l2;) sf[w++]=s2[i++];
-	sf[w]=0;
+	char* wa = sf;
+	memcpy(wa,s0,l0);
+	wa+=l0;
+	memcpy(wa,s1,l1);
+	wa+=l1;
+	memcpy(wa,s2,l2);
+	wa+=l2;
+	*wa=0;
 	return sf;
 }
 
@@ -376,13 +379,16 @@ char* strMerge4(const char*const s0,const char*const s1,const char*const s2,cons
 	const uint32_t l2 = strlen(s2);
 	const uint32_t l3 = strlen(s3);
 	char*const sf = cosmic_malloc(l0+l1+l2+l3+1);
-	uint32_t w=0;
-	uint32_t i;
-	for (i=0;i<l0;) sf[w++]=s0[i++];
-	for (i=0;i<l1;) sf[w++]=s1[i++];
-	for (i=0;i<l2;) sf[w++]=s2[i++];
-	for (i=0;i<l3;) sf[w++]=s3[i++];
-	sf[w]=0;
+	char* wa = sf;
+	memcpy(wa,s0,l0);
+	wa+=l0;
+	memcpy(wa,s1,l1);
+	wa+=l1;
+	memcpy(wa,s2,l2);
+	wa+=l2;
+	memcpy(wa,s3,l3);
+	wa+=l3;
+	*wa=0;
 	return sf;
 }
 
@@ -393,14 +399,18 @@ char* strMerge5(const char*const s0,const char*const s1,const char*const s2,cons
 	const uint32_t l3 = strlen(s3);
 	const uint32_t l4 = strlen(s4);
 	char*const sf = cosmic_malloc(l0+l1+l2+l3+l4+1);
-	uint32_t w=0;
-	uint32_t i;
-	for (i=0;i<l0;) sf[w++]=s0[i++];
-	for (i=0;i<l1;) sf[w++]=s1[i++];
-	for (i=0;i<l2;) sf[w++]=s2[i++];
-	for (i=0;i<l3;) sf[w++]=s3[i++];
-	for (i=0;i<l4;) sf[w++]=s4[i++];
-	sf[w]=0;
+	char* wa = sf;
+	memcpy(wa,s0,l0);
+	wa+=l0;
+	memcpy(wa,s1,l1);
+	wa+=l1;
+	memcpy(wa,s2,l2);
+	wa+=l2;
+	memcpy(wa,s3,l3);
+	wa+=l3;
+	memcpy(wa,s4,l4);
+	wa+=l4;
+	*wa=0;
 	return sf;
 }
 

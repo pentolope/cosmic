@@ -26,7 +26,7 @@ const char* stripQualifiersC(const char* typeString,bool* hadVolatile,bool* hadC
 	return sub;
 }
 
-#define stripQualifiers(typeString,hadVolatile,hadConst) ((char*)stripQualifiersC((const char*)typeString,hadVolatile,hadConst))
+#define stripQualifiers(typeString,hadVolatile,hadConst) ((char*)stripQualifiersC((const char*)(typeString),hadVolatile,hadConst))
 
 
 void copyDownForInPlaceEdit(char* string){
