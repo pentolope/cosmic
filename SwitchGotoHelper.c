@@ -141,7 +141,7 @@ bool resolveSwitch(){
 		insert_IB_load_word(&currentSwitchManagment.ibFinal,0xFFFF);
 		dualMergeIB(&currentSwitchManagment.ibFinal,&ib_b_xor_int,&ib_stack_swp_11);
 		insert_IB_load_word(&currentSwitchManagment.ibFinal,
-			currentSwitchManagment.jumpTableDetails.maxValue-currentSwitchManagment.jumpTableDetails.minValue);
+			1+(currentSwitchManagment.jumpTableDetails.maxValue-currentSwitchManagment.jumpTableDetails.minValue));
 		quadMergeIB(&currentSwitchManagment.ibFinal,&ib_b_and_int,&ib_stack_swp_21,&ib_b_and_int,&ib_b_or_int);
 		singleMergeIB(&currentSwitchManagment.ibFinal,&ib_int_u_TO_long);
 		insert_IB_load_dword(&currentSwitchManagment.ibFinal,4);

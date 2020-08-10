@@ -117,7 +117,7 @@ uint32_t addBlockFrame(){
 		blockFrameArray.entries = cosmic_realloc(blockFrameArray.entries,blockFrameArray.numberOfAllocatedSlots*sizeof(struct BlockFrameEntry));
 	}
 	uint32_t thisBlockIndex = blockFrameArray.numberOfValidSlots++;
-	memZero(blockFrameArray.entries+thisBlockIndex,sizeof(struct BlockFrameEntry));
+	memset(blockFrameArray.entries+thisBlockIndex,0,sizeof(struct BlockFrameEntry));
 	return thisBlockIndex;
 }
 

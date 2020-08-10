@@ -138,15 +138,12 @@ void applyConvertToRvalue(ExpressionTreeNode* thisNode){
 			const InstructionBuffer* ibMem;
 			bool applySignedCharConvert=false;
 			if (size==1){
-				if (doStringsMatch(thisNode->post.typeStringNQ,"signed char")) applySignedCharConvert=true;
-				if (thisNode->post.isLValueVolatile) ibMem=&ib_mem_byte_read_v;
-				else ibMem=&ib_mem_byte_read_n;
+				applySignedCharConvert = (bool)doStringsMatch(thisNode->post.typeStringNQ,"signed char");
+				ibMem=thisNode->post.isLValueVolatile?&ib_mem_byte_read_v:&ib_mem_byte_read_n;
 			} else if (size==2){
-				if (thisNode->post.isLValueVolatile) ibMem=&ib_mem_word_read_v;
-				else ibMem=&ib_mem_word_read_n;
+				ibMem=thisNode->post.isLValueVolatile?&ib_mem_word_read_v:&ib_mem_word_read_n;
 			} else if (size==4){
-				if (thisNode->post.isLValueVolatile) ibMem=&ib_mem_dword_read_v;
-				else ibMem=&ib_mem_dword_read_n;
+				ibMem=thisNode->post.isLValueVolatile?&ib_mem_dword_read_v:&ib_mem_dword_read_n;
 			} else {
 				printf("Internal Error: bad size for lvalue->rvalue\n");
 				exit(1);
@@ -541,8 +538,7 @@ void pushAsParam(ExpressionTreeNode* thisNode,const char* typeStringTo){
 		applyTypeCast(thisNode,typeStringTo,15);
 		applyTypeCast(thisNode,singleTypicalIntegralTypePromote(typeStringTo,NULL),15); // should this and the previous warn?
 		uint16_t size = getSizeofForTypeString(thisNode->post.typeStringNQ,true);
-		assert((size&1)==0);
-		//if (size&1) size++;
+		assert((size&1)==0 & size!=0);
 		if (size==2) {
 			thisNode->post.sizeOnStack+=2;
 			addPopArgPush1(&thisNode->ib);

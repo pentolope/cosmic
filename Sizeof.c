@@ -7,7 +7,7 @@ this file is included inside BlockFrame.c
 // does not modify input
 uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifier){
 	uint32_t ret=0;
-	char* stringInternal = copyStringToHeapString(typeStringIn);
+	const char* stringInternal = typeStringIn;
 	if (doesThisTypeStringHaveAnIdentifierAtBeginning(stringInternal)){
 		if (failIfHasIdentifier){
 			err_00__1(strMerge3(
@@ -16,13 +16,13 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 				"` by \"identifier related corruption\""));
 			goto End;
 		}
-		applyToTypeStringRemoveIdentifierToSelf(stringInternal);
+		stringInternal=(getIndexOfFirstSpaceInString(stringInternal)+1)+stringInternal; // this removes the identifier
 	}
 	// if it has an identifier, then it is now removed
 	{
 		bool hadVolatile;
 		bool hadConst;
-		char* stringInternalNQ = stripQualifiers(stringInternal,&hadVolatile,&hadConst);
+		const char* stringInternalNQ = stripQualifiersC(stringInternal,&hadVolatile,&hadConst);
 		if (hadVolatile | hadConst){
 			ret=getSizeofForTypeString(stringInternalNQ,true);
 			goto End;
@@ -93,7 +93,7 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 			bool isStruct = isSectionOfStringEquivalent(stringInternal,0,"struct ");
 			if (isUnion | isStruct){
 				uint8_t typeOfThis=isUnion;
-				char* stringInternalSkipStart=stringInternal+(6+(1-typeOfThis));
+				const char* stringInternalSkipStart=stringInternal+(6+(1-typeOfThis));
 				if (getIndexOfFirstSpaceInString(stringInternalSkipStart)>0){
 					// this should not happen. sizeof should not get a struct/union definition either
 					err_10_01(strMerge3(
@@ -144,7 +144,6 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 		stringInternal,
 		"` by \"unrecognizable corruption\""));
 	End:
-	cosmic_free(stringInternal);
 	return ret;
 }
 

@@ -178,7 +178,6 @@ typedef struct ExpressionToken{
 	int16_t matchingIndex;      // this is valid for enclosements ()[]{}   initialized by the enclosement matcher
 	bool isOpenEnclosement;  // this is true even for things like function calls or type casts. initialized by the enclosement matcher
 	bool isCloseEnclosement; // this is true even for things like function calls or type casts. initialized by the enclosement matcher
-	bool containedNewlineAfterThisToken; // currently, this is initialized, but not used
 	bool isThisPieceOfTernaryBonded; // only used for the '?' on ternaries, and is used for error checking
 	uint8_t operatorID;              // this is a valid number for all tokens, however 
 	// it mostly only contains operator information and possibly a little information on the nature of the token
@@ -362,7 +361,7 @@ int16_t findIndexForAppropriatePrecedenceToLeft(bool includeThisPrecedence, int1
 }
 
 int16_t findIndexForAppropriatePrecedenceToRight(bool includeThisPrecedence, int16_t operatorIndex){
-	int16_t lengthOfExpressionTokens=expressionTokenArray.len;
+	const int16_t lengthOfExpressionTokens=expressionTokenArray.len;
 	if (operatorIndex==lengthOfExpressionTokens-1){
 		err_1111_("This operator requires a right operand",expressionTokenArray.tokens[operatorIndex].tokenStart,expressionTokenArray.tokens[operatorIndex].tokenEnd);
 	}
@@ -406,12 +405,12 @@ does not handle declarations.
 */
 void generatePrecedenceTotal(){
 	int16_t i;
-	int16_t tokenLen = expressionTokenArray.len;
+	const int16_t tokenLen = expressionTokenArray.len;
 	int32_t lengthOfStringInCurrentToken;
 	int16_t leftIndexForPairing;
 	int16_t rightIndexForPairing;
-	ExpressionToken *tokens = expressionTokenArray.tokens;
-	ExpressionToken *currentTokenPtr;
+	ExpressionToken*const tokens = expressionTokenArray.tokens;
+	ExpressionToken* currentTokenPtr;
 	char fcct; // first character of current token
 	uint8_t operatorIDofCurrentToken;
 	bool doPairing = false;
@@ -618,56 +617,29 @@ void generatePrecedenceTotal(){
 	for (i=0;i<tokenLen;i++){ // initialize part 6: for operators with multiple meanings, discern which meaning it to be used
 		currentTokenPtr = tokens+i;
 		operatorIDofCurrentToken = currentTokenPtr->operatorID;
-		uint8_t n_oID;
 		
-		if (operatorIDofCurrentToken==52 |
-			operatorIDofCurrentToken==53){
+		if (operatorIDofCurrentToken==52 | operatorIDofCurrentToken==53){
 			
-			bool isPostfix = true;
-			if (i==0){
-				isPostfix = false;
-			} else {
-				ExpressionToken *previousTokenPtr = tokens+(i-1);
+			bool isPostfix = false;
+			if (i!=0){
+				ExpressionToken *previousTokenPtr = currentTokenPtr-1;
 				uint8_t previousOperatorID = previousTokenPtr->operatorID;
-				if (previousTokenPtr->isOpenEnclosement | (previousOperatorID<=50 & previousOperatorID>=8)) isPostfix = false;
+				isPostfix=!(previousTokenPtr->isOpenEnclosement | (previousOperatorID<=50 & previousOperatorID>=8));
 			}
-			if (isPostfix)
-				tokens[i].operatorID -= 51; // this is relative, not absolute
-			else
-				tokens[i].operatorID -= 44; // this is relative, not absolute
-			
+			currentTokenPtr->operatorID -= 44+isPostfix*7; // this is relative, not absolute
 		} else if (operatorIDofCurrentToken>=54 & operatorIDofCurrentToken<=57){
 			bool isUnary = true;
 			if (i!=0){
-				ExpressionToken *previousTokenPtr = &(tokens[i-1]);
+				ExpressionToken *previousTokenPtr = currentTokenPtr-1;
 				uint8_t previousOperatorID = previousTokenPtr->operatorID;
-				if (
-					(previousOperatorID==1 |
-					previousOperatorID==2 |
-					previousOperatorID==59 | 
-					previousOperatorID==61 | 
-					previousOperatorID==62) ||
+				isUnary = !((previousOperatorID==1 | previousOperatorID==2 |
+					previousOperatorID==59 | previousOperatorID==61 | previousOperatorID==62) ||
 					(previousTokenPtr->isCloseEnclosement && 
-					tokens[previousTokenPtr->matchingIndex].operatorID!=14)){
-						// should the string literal be a check here?
-					
-					isUnary = false;
-				}
+					tokens[previousTokenPtr->matchingIndex].operatorID!=14));
+					// should the string literal be a check for isUnary?
 			}
-			if (isUnary){
-				if (operatorIDofCurrentToken==54)      n_oID = 10;
-				else if (operatorIDofCurrentToken==55) n_oID = 11;
-				else if (operatorIDofCurrentToken==56) n_oID = 15;
-				else if (operatorIDofCurrentToken==57) n_oID = 16;
-				// no other conditions should be possible
-			} else {
-				if (operatorIDofCurrentToken==54)      n_oID = 21;
-				else if (operatorIDofCurrentToken==55) n_oID = 22;
-				else if (operatorIDofCurrentToken==56) n_oID = 18;
-				else if (operatorIDofCurrentToken==57) n_oID = 31;
-				// no other conditions should be possible
-			}
-			currentTokenPtr->operatorID = n_oID;
+			static uint8_t oID_map[8]={21,22,18,31,10,11,15,16};
+			currentTokenPtr->operatorID = oID_map[(operatorIDofCurrentToken-54)+isUnary*4];
 		}
 	}
 	/* 
@@ -687,33 +659,40 @@ void generatePrecedenceTotal(){
 	for (i=0;i<tokenLen;i++){ // precedence level 1
 		currentTokenPtr = tokens+i;
 		operatorIDofCurrentToken = currentTokenPtr->operatorID;
-		
-		if (operatorIDofCurrentToken==1 | operatorIDofCurrentToken==2){ // postfix ++ and --
+		switch (operatorIDofCurrentToken){
+			case 1:
+			case 2:
+			// postfix ++ and --
 			leftIndexForPairing = findIndexForAppropriatePrecedenceToLeft(true,i);
 			rightIndexForPairing = i;
-			doPairing = true;
-		} else if (operatorIDofCurrentToken==5 | operatorIDofCurrentToken==6){ // . and ->
-			leftIndexForPairing  =  findIndexForAppropriatePrecedenceToLeft(true,i);
-			rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(true,i);
-			doPairing = true;
-		} else if (operatorIDofCurrentToken==3){ // function call
+			break;
+			case 3:
+			// function call
 			leftIndexForPairing = i-1;
 			rightIndexForPairing = currentTokenPtr->matchingIndex;
-			doPairing = true;
-		} else if (operatorIDofCurrentToken==66){ // dual sided function call
-			leftIndexForPairing  = findIndexForAppropriatePrecedenceToLeft(false,i); // I think don't include precedence?
-			rightIndexForPairing = currentTokenPtr->matchingIndex;
-			doPairing = true;
-		} else if (operatorIDofCurrentToken==4){ // array item
+			break;
+			case 4:
+			// array item
 			leftIndexForPairing  = findIndexForAppropriatePrecedenceToLeft(false,i); // don't include the enclosement precedence for array
 			rightIndexForPairing = currentTokenPtr->matchingIndex;
-			doPairing = true;
+			break;
+			case 5:
+			case 6:
+			// . and ->
+			leftIndexForPairing  =  findIndexForAppropriatePrecedenceToLeft(true,i);
+			rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(true,i);
+			break;
+			default:
+			if (operatorIDofCurrentToken==66){
+				// dual sided function call
+				leftIndexForPairing  = findIndexForAppropriatePrecedenceToLeft(false,i); // I think don't include precedence?
+				rightIndexForPairing = currentTokenPtr->matchingIndex;
+				break;
+			}
+			continue;
 		}
-		if (doPairing){
-			doPairing = false;
-			++tokens[leftIndexForPairing].precedenceToAddImmediatelyBeforeToken;
-			++tokens[rightIndexForPairing].precedenceToRemoveImmediatelyAfterToken;
-		}
+		++tokens[leftIndexForPairing].precedenceToAddImmediatelyBeforeToken;
+		++tokens[rightIndexForPairing].precedenceToRemoveImmediatelyAfterToken;
 	}
 	for (i=tokenLen-1;i>=0;i--){ // precedence level 2
 		currentTokenPtr = tokens+i;
@@ -721,13 +700,11 @@ void generatePrecedenceTotal(){
 		
 		if (operatorIDofCurrentToken>=8 & operatorIDofCurrentToken<=17){
 			if (operatorIDofCurrentToken==14){ // type cast
-				leftIndexForPairing = i;
 				rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(false,currentTokenPtr->matchingIndex);
 			} else { // prefixOperators ++ and --    and unaryOperators + and - and ! and ~ and * and & and sizeof
-				leftIndexForPairing = i;
 				rightIndexForPairing = findIndexForAppropriatePrecedenceToRight(true,i);
 			}
-			++tokens[leftIndexForPairing].precedenceToAddImmediatelyBeforeToken;
+			++tokens[i].precedenceToAddImmediatelyBeforeToken; // leftIndexForPairing is i
 			++tokens[rightIndexForPairing].precedenceToRemoveImmediatelyAfterToken;
 		}
 	}
@@ -857,7 +834,7 @@ void generatePrecedenceTotal(){
 }
 
 void checkForZeroPrecedenceInPrecedenceTotal(){
-	int16_t tokenLen=expressionTokenArray.len;
+	const int16_t tokenLen=expressionTokenArray.len;
 	for (int16_t i=0;i<tokenLen;i++){
 		if (expressionTokenArray.tokens[i].precedenceTotal==0){
 			flagPotentialSeperationsInRangeType1(0,tokenLen);
@@ -867,18 +844,9 @@ void checkForZeroPrecedenceInPrecedenceTotal(){
 }
 
 int16_t matchSpecificEnclosementOnExpressionTokenArray(int16_t tokenIndexToMatch){
-	int16_t tokenLen=expressionTokenArray.len;
-	char startTarget = sourceContainer.string[expressionTokenArray.tokens[tokenIndexToMatch].tokenStart];
-	char endTarget;
-	if (startTarget=='('){
-		endTarget=')';
-	} else if (startTarget=='['){
-		endTarget=']';
-	} else if (startTarget=='{'){
-		endTarget='}';
-	} else {
-		assert(false);
-	}
+	const int16_t tokenLen=expressionTokenArray.len;
+	const char startTarget = sourceContainer.string[expressionTokenArray.tokens[tokenIndexToMatch].tokenStart];
+	const char endTarget = (startTarget=='(')*')' | (startTarget=='[')*']' | (startTarget=='{')*'}';
 	for (int16_t i=tokenIndexToMatch+1;i<tokenLen;i++){
 		if (expressionTokenArray.tokens[i].isOpenEnclosement){
 			i = matchSpecificEnclosementOnExpressionTokenArray(i);
@@ -896,7 +864,7 @@ int16_t matchSpecificEnclosementOnExpressionTokenArray(int16_t tokenIndexToMatch
 }
 
 void matchEnclosementsOnExpressionTokenArray(){
-	int16_t tokenLen=expressionTokenArray.len;
+	const int16_t tokenLen=expressionTokenArray.len;
 	for (int16_t i=0;i<tokenLen;i++){
 		char c = sourceContainer.string[expressionTokenArray.tokens[i].tokenStart];
 		expressionTokenArray.tokens[i].isOpenEnclosement  = c=='(' | c=='[' | c=='{';
@@ -914,7 +882,7 @@ void matchEnclosementsOnExpressionTokenArray(){
 
 /*
 when the expression is terminated with a semicolon, then the following should be true:  sourceContainer.string[endIndex]==';'
-also removes spaces and newlines (but notates if a newline existed)
+also removes spaces and newlines
 does not call the enclosement matcher or the expression parsing functions
 */
 void generateTokenArrayForExpression(int32_t startIndex, int32_t endIndex){
@@ -934,14 +902,15 @@ void generateTokenArrayForExpression(int32_t startIndex, int32_t endIndex){
 		// the endIndex is inside of a token. That's the calling function's problem, and it shouldn't happen
 		err_1101_("(Internal), cannot agree on end of token",endIndex);
 	}
+	expressionTokenArray.len = lengthCount;
+	if (lengthCount==0) return;
 	if (expressionTokenArray.allocLen<lengthCount){
 		expressionTokenArray.allocLen=lengthCount;
 		cosmic_free(expressionTokenArray.tokens);
 		expressionTokenArray.tokens = cosmic_calloc(lengthCount,sizeof(ExpressionToken));
 	} else {
-		memZero(expressionTokenArray.tokens,lengthCount*sizeof(ExpressionToken));
+		memset(expressionTokenArray.tokens,0,lengthCount*sizeof(ExpressionToken));
 	}
-	expressionTokenArray.len = lengthCount;
 	int32_t walkingIndex = 0;
 	for (int32_t i=startIndex;i<endIndex;){
 		int32_t tokenStart = i;
@@ -951,8 +920,6 @@ void generateTokenArrayForExpression(int32_t startIndex, int32_t endIndex){
 			expressionTokenArray.tokens[walkingIndex].tokenStart = tokenStart;
 			expressionTokenArray.tokens[walkingIndex].tokenEnd = i;
 			walkingIndex++;
-		} else if (c=='\n' & walkingIndex!=0){
-			expressionTokenArray.tokens[walkingIndex-1].containedNewlineAfterThisToken = true;
 		}
 	}
 	return;

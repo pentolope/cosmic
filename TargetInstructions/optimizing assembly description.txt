@@ -448,11 +448,11 @@ MOV_ - move word in r1 to r0
 AND_ - bitwise and  of second and third register into first register
 OR__ - bitwise  or  of second and third register into first register
 XOR_ - bitwise xor  of second and third register into first register
-SSUB - do r0+r1+~Third_Reg -> r1, with carry stored to ones bit of r0 
+SSUB - do r0+r1+~r2 -> r1, with carry stored to ones bit of r0 
 		In general, carry should not extend past ones bit.
 		If the sum would have a carry greater then 1, r0 will still get 1.
 		r0 (as the input) is intended to only hold a value of 0 or 1, but could hold other values.
-		Note: the '~' is a bitwise invert on Third_Reg
+		Note: the '~' is a bitwise invert on r2
 ADDN - add      r1 and r2 into r0
 SUBN - subtract r1 and r2 into r0
 SUBC - subtract r1 and r2 then place carry into ones bit in r0 (all other bits get 0)
@@ -464,10 +464,10 @@ DIVM - do first register divided by second register, as well as first register m
 SHFT - shift bits in second register down (to lower bits) by 1 bit, then store into first register (second register is not modified, the most significant bit of first register will be 0)
 BSWP - take word in second register, swap the byte order, then place result into first register (second register is not modified)
 
-MWWN - memory write word non-volatile - read  word   at [r1,Third_Reg] and place in r0
-MRWN - memory read  word non-volatile - write word into [r1,Third_Reg] with word in r0
-MWWV - memory write word volatile     - read  word   at [r1,Third_Reg] and place in r0
-MRWV - memory read  word volatile     - write word into [r1,Third_Reg] with word in r0
+MWWN - memory write word non-volatile - read  word   at [r1,r2] and place in r0
+MRWN - memory read  word non-volatile - write word into [r1,r2] with word in r0
+MWWV - memory write word volatile     - read  word   at [r1,r2] and place in r0
+MRWV - memory read  word volatile     - write word into [r1,r2] with word in r0
 MWBN - memory write byte non-volatile - read  byte   at [%D,r1] and place in lower byte of r0
 MRBN - memory read  byte non-volatile - write byte into [%D,r1] with byte in lower byte of r0
 MWBV - memory write byte volatile     - read  byte   at [%D,r1] and place in lower byte of r0

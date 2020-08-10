@@ -897,8 +897,30 @@ uint8_t decompressInstruction(const uint8_t* byteCode,InstructionSingle* IS_pare
 
 void printInstructionBufferWithMessageAndNumber(const InstructionBuffer*,const char*,const uint32_t);
 void printSingleInstructionOptCode(const InstructionSingle);
-void addInstruction(InstructionBuffer*, const InstructionSingle);
-void initInstructionBuffer(InstructionBuffer*);
+
+#define INIT_INSTRUCTION_BUFFER_SIZE 1024
+
+void initInstructionBuffer(InstructionBuffer* ib){
+	memset(ib,0,sizeof(InstructionBuffer));
+	ib->numberOfSlotsAllocated = INIT_INSTRUCTION_BUFFER_SIZE;
+	ib->buffer = cosmic_malloc(ib->numberOfSlotsAllocated*sizeof(InstructionSingle));
+}
+
+void destroyInstructionBuffer(InstructionBuffer* ib){
+	cosmic_free(ib->buffer);
+	ib->buffer = NULL;
+	ib->numberOfSlotsTaken = 0;
+	ib->numberOfSlotsAllocated = 0;
+}
+
+void addInstruction(InstructionBuffer* ib, const InstructionSingle instructionSingle){
+	if (ib->numberOfSlotsTaken>=ib->numberOfSlotsAllocated){
+		assert(ib->numberOfSlotsAllocated!=0); // Cannot add instruction to destroyed instruction buffer
+		ib->numberOfSlotsAllocated*=2;
+		ib->buffer = cosmic_realloc(ib->buffer,ib->numberOfSlotsAllocated*sizeof(InstructionSingle));
+	}
+	ib->buffer[ib->numberOfSlotsTaken++]=instructionSingle;
+}
 
 // byteCodeEnd may be NULL. byteCodeEnd represents the position of the terminating zero
 InstructionBuffer decompressInstructionBuffer(const uint8_t* byteCodeStart,const uint8_t** byteCodeEnd){
@@ -915,58 +937,50 @@ InstructionBuffer decompressInstructionBuffer(const uint8_t* byteCodeStart,const
 	return ib;
 }
 
-void addInstruction(InstructionBuffer* ib, const InstructionSingle instructionSingle){
-	if (ib->numberOfSlotsTaken>=ib->numberOfSlotsAllocated){
-		assert(ib->numberOfSlotsAllocated!=0); // Cannot add instruction to destroyed instruction buffer
-		ib->numberOfSlotsAllocated*=2;
-		ib->buffer = cosmic_realloc(ib->buffer,ib->numberOfSlotsAllocated*sizeof(InstructionSingle));
+void ensureInstructionBufferSize(InstructionBuffer* ib,uint32_t size){
+	if (size>=ib->numberOfSlotsAllocated){
+		do {
+			ib->numberOfSlotsAllocated*=2;
+		} while (size>=ib->numberOfSlotsAllocated);
+		ib->buffer=cosmic_realloc(ib->buffer,ib->numberOfSlotsAllocated*sizeof(InstructionSingle));
 	}
-	ib->buffer[ib->numberOfSlotsTaken++]=instructionSingle;
 }
 
 // the first is modified, the second is not
-void singleMergeIB(InstructionBuffer* ib1, const InstructionBuffer* ib2){
-	uint32_t numberOfSlotsTakenOn2=ib2->numberOfSlotsTaken;
-	const InstructionSingle* buffer2=ib2->buffer;
-	for (uint32_t i=0;i<numberOfSlotsTakenOn2;i++){
-		addInstruction(ib1,buffer2[i]);
-	}
+void singleMergeIB(InstructionBuffer* ib0, const InstructionBuffer* ib1){
+	ensureInstructionBufferSize(ib0,ib0->numberOfSlotsTaken+ib1->numberOfSlotsTaken);
+	memcpy(ib0->buffer+ib0->numberOfSlotsTaken,ib1->buffer,ib1->numberOfSlotsTaken*sizeof(InstructionSingle));
+	ib0->numberOfSlotsTaken+=ib1->numberOfSlotsTaken;
 }
 
 void dualMergeIB(InstructionBuffer* ib0,const InstructionBuffer* ib1,const InstructionBuffer* ib2){
-	singleMergeIB(ib0,ib1);
-	singleMergeIB(ib0,ib2);
+	ensureInstructionBufferSize(ib0,ib0->numberOfSlotsTaken+ib1->numberOfSlotsTaken+ib2->numberOfSlotsTaken);
+	memcpy(ib0->buffer+ib0->numberOfSlotsTaken,ib1->buffer,ib1->numberOfSlotsTaken*sizeof(InstructionSingle));
+	ib0->numberOfSlotsTaken+=ib1->numberOfSlotsTaken;
+	memcpy(ib0->buffer+ib0->numberOfSlotsTaken,ib2->buffer,ib2->numberOfSlotsTaken*sizeof(InstructionSingle));
+	ib0->numberOfSlotsTaken+=ib2->numberOfSlotsTaken;
 }
 
 void tripleMergeIB(InstructionBuffer* ib0,const InstructionBuffer* ib1,const InstructionBuffer* ib2,const InstructionBuffer* ib3){
-	singleMergeIB(ib0,ib1);
-	singleMergeIB(ib0,ib2);
-	singleMergeIB(ib0,ib3);
+	ensureInstructionBufferSize(ib0,ib0->numberOfSlotsTaken+ib1->numberOfSlotsTaken+ib2->numberOfSlotsTaken+ib3->numberOfSlotsTaken);
+	memcpy(ib0->buffer+ib0->numberOfSlotsTaken,ib1->buffer,ib1->numberOfSlotsTaken*sizeof(InstructionSingle));
+	ib0->numberOfSlotsTaken+=ib1->numberOfSlotsTaken;
+	memcpy(ib0->buffer+ib0->numberOfSlotsTaken,ib2->buffer,ib2->numberOfSlotsTaken*sizeof(InstructionSingle));
+	ib0->numberOfSlotsTaken+=ib2->numberOfSlotsTaken;
+	memcpy(ib0->buffer+ib0->numberOfSlotsTaken,ib3->buffer,ib3->numberOfSlotsTaken*sizeof(InstructionSingle));
+	ib0->numberOfSlotsTaken+=ib3->numberOfSlotsTaken;
 }
 
 void quadMergeIB(InstructionBuffer* ib0,const InstructionBuffer* ib1,const InstructionBuffer* ib2,const InstructionBuffer* ib3,const InstructionBuffer* ib4){
-	singleMergeIB(ib0,ib1);
-	singleMergeIB(ib0,ib2);
-	singleMergeIB(ib0,ib3);
-	singleMergeIB(ib0,ib4);
-}
-
-static const InstructionBuffer resetInstructionBuffer={0};
-#define INIT_INSTRUCTION_BUFFER_SIZE 1024
-
-void initInstructionBuffer(InstructionBuffer* ib){
-	*ib=resetInstructionBuffer;
-	ib->numberOfSlotsAllocated = INIT_INSTRUCTION_BUFFER_SIZE;
-	ib->buffer = cosmic_malloc(ib->numberOfSlotsAllocated*sizeof(InstructionSingle));
-}
-
-void destroyInstructionBuffer(InstructionBuffer* ib){
-	if (ib->buffer!=NULL){
-		cosmic_free(ib->buffer);
-		ib->buffer = NULL;
-		ib->numberOfSlotsTaken = 0;
-		ib->numberOfSlotsAllocated = 0;
-	}
+	ensureInstructionBufferSize(ib0,ib0->numberOfSlotsTaken+ib1->numberOfSlotsTaken+ib2->numberOfSlotsTaken+ib3->numberOfSlotsTaken+ib4->numberOfSlotsTaken);
+	memcpy(ib0->buffer+ib0->numberOfSlotsTaken,ib1->buffer,ib1->numberOfSlotsTaken*sizeof(InstructionSingle));
+	ib0->numberOfSlotsTaken+=ib1->numberOfSlotsTaken;
+	memcpy(ib0->buffer+ib0->numberOfSlotsTaken,ib2->buffer,ib2->numberOfSlotsTaken*sizeof(InstructionSingle));
+	ib0->numberOfSlotsTaken+=ib2->numberOfSlotsTaken;
+	memcpy(ib0->buffer+ib0->numberOfSlotsTaken,ib3->buffer,ib3->numberOfSlotsTaken*sizeof(InstructionSingle));
+	ib0->numberOfSlotsTaken+=ib3->numberOfSlotsTaken;
+	memcpy(ib0->buffer+ib0->numberOfSlotsTaken,ib4->buffer,ib4->numberOfSlotsTaken*sizeof(InstructionSingle));
+	ib0->numberOfSlotsTaken+=ib4->numberOfSlotsTaken;
 }
 
 

@@ -133,9 +133,7 @@ void* cosmic_malloc(size_t size){
 			localCurrent->next=localCurrent;
 			localCurrent->prev=localCurrent;
 		}
-		for (uint16_t i=0;i<ALT_ALLOC_BLK_SIZE;i++){
-			localCurrent->isNotTaken[i]=0xFF;
-		}
+		memset(&(localCurrent->isNotTaken),0xFF,ALT_ALLOC_BLK_SIZE);
 	}
 	find:;
 	uint16_t i=ALT_ALLOC_BLK_SIZE;
@@ -164,7 +162,7 @@ void* cosmic_malloc(size_t size){
 void* cosmic_calloc(size_t nmemb,size_t size){
 	size_t total=nmemb*size;
 	uint8_t* ret=cosmic_malloc(total);
-	for (size_t i=0;i<total;i++) ret[i]=0;
+	memset(ret,0,total);
 	return ret;
 }
 
@@ -220,7 +218,7 @@ void* cosmic_realloc(void* ptr,size_t size){
 					printf("malloc() failed to allocate %lu bytes. Exiting now.\n",(unsigned long)size);
 					exit(3);
 				}
-				for (size_t c=0;c<size;c++) new[c]=((uint8_t*)ptr)[c];
+				memcpy(new,ptr,INIT_INSTRUCTION_BUFFER_SIZE*sizeof(InstructionSingle));
 				return new;
 			}
 		}
@@ -231,7 +229,7 @@ void* cosmic_realloc(void* ptr,size_t size){
 		if ((uint8_t*)ptr>=(uint8_t*)&localCurrent->entries & (uint8_t*)ptr<(uint8_t*)&localCurrent->isNotTaken){
 			if (size>ALT_ALLOC_BLK_SIZE){
 				uint8_t* new=cosmic_malloc(size);
-				for (uint16_t i=0;i<ALT_ALLOC_BLK_SIZE;i++) new[i]=((uint8_t*)ptr)[i];
+				memcpy(new,ptr,ALT_ALLOC_BLK_SIZE);
 				cosmic_ptr_hit(ptr,localCurrent);
 				return new;
 			} else {

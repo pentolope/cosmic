@@ -161,12 +161,6 @@ void resetColor(){
 
 
 
-void memZero(void* ptr, uint32_t numberOfBytes){
-	for (uint32_t i=0;i<numberOfBytes;i++){
-		((uint8_t*)ptr)[i]=0;
-	}
-}
-
 static void checkArchitecture(){
 	uint32_t v0 = 0xFFEE5522;
 	uint8_t* a0 = (uint8_t*)(&v0);
