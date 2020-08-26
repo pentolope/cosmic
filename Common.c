@@ -266,7 +266,7 @@ bool specificStringEqualCheck(const char*const stringLarge,const int32_t startIn
 // lower letters are c>96 & c<123
 // upper letters are c>64 & c<91
 #define isLetter(c) ((c>96 & c<123) | (c>64 & c<91) | c=='_')
-#define isDigit(c) (c>47 & c<5)
+#define isDigit(c) (c>47 & c<58)
 
 
 bool isSectionOfStringEquivalent(const char*const string1,const int32_t startIndexForString1,const char*const string2){
