@@ -9,21 +9,30 @@ uint32_t getSizeofForTypeString(const char*, bool);
 /*
 only strips what is at the base.
 expects that typeString has no identifier.
-return value should NOT be cosmic_freed.
+return value should NOT be cosmic_free-d.
 hadVolatile and hadConst may be NULL.
 */
 const char* stripQualifiersC(const char* typeString,bool* hadVolatile,bool* hadConst){
 	if (hadVolatile!=NULL) *hadVolatile=false;
 	if (hadConst!=NULL) *hadConst=false;
-	const char* sub=typeString;
+	Repeat:;
 	if (isSectionOfStringEquivalent(typeString,0,"volatile ")){
-		sub=stripQualifiersC(typeString+9,hadVolatile,hadConst);
+		typeString+=9;
 		if (hadVolatile!=NULL) *hadVolatile=true;
-	} else if (isSectionOfStringEquivalent(typeString,0,"const ")){
-		sub=stripQualifiersC(typeString+6,hadVolatile,hadConst);
-		if (hadConst!=NULL) *hadConst=true;
+		goto Repeat;
 	}
-	return sub;
+	if (isSectionOfStringEquivalent(typeString,0,"const ")){
+		typeString+=6;
+		if (hadConst!=NULL) *hadConst=true;
+		goto Repeat;
+	}
+	if (hadVolatile!=NULL & hadConst!=NULL){
+		if (*hadConst & *hadVolatile){
+			*hadVolatile=false;
+			err_00__0("Type with \'volatile\' and \'const\' qualifier is being interpreted as not having the \'volatile\' qualifier");
+		}
+	}
+	return typeString;
 }
 
 #define stripQualifiers(typeString,hadVolatile,hadConst) ((char*)stripQualifiersC((const char*)(typeString),hadVolatile,hadConst))

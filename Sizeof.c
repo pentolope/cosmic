@@ -28,6 +28,13 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 			goto End;
 		}
 	}
+	if (stringInternal[0]==':'){
+		err_00__1(strMerge3(
+				"sizeof failed on type `",
+				stringInternal,
+				"` by \"sizeof bitfield is invalid\""));
+			goto End;
+	}
 	if (getIndexOfNthSpace(stringInternal,0)==-1){
 		if (doStringsMatch(stringInternal,"int") ||
 			doStringsMatch(stringInternal,"short")){
