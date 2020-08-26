@@ -120,7 +120,7 @@ void* cosmic_malloc(size_t size){
 		localCurrent=calloc(1,sizeof(struct cosmic_alloc_block));
 		//heap_track_add((size_t)localCurrent,sizeof(struct cosmic_alloc_block));
 		if (localCurrent==NULL){
-			printf("calloc() failed to allocate %lu bytes. Exiting now.\n",(unsigned long)size);
+			printf("calloc() failed to allocate %lu bytes. Exiting now.\n",(unsigned long)sizeof(struct cosmic_alloc_block));
 			exit(3);
 		}
 		if (cosmic_alloc_global.current!=NULL){
@@ -260,7 +260,7 @@ void* cosmic_malloc(size_t size){
 void* cosmic_calloc(size_t nmemb,size_t size){
 	void* r=calloc(nmemb,size);
 	if (r==NULL){
-		printf("calloc() failed to allocate %lu bytes. Exiting now.\n",(unsigned long)size);
+		printf("calloc() failed to allocate %lu bytes. Exiting now.\n",(unsigned long)(nmemb*size));
 		exit(3);
 	}
 	return r;

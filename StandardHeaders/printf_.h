@@ -13,25 +13,29 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#ifdef __STD_REAL
 
-int vsprintf(char *dest, const char *fmt, va_list args){
-	return 0;
-}
+struct _print_target{
+	_Bool isStr;
+	_Bool strMaxHit;
+	char* str;
+	FILE* stream;
+	uint32_t strMax;
+	int writeCount;
+};
 
-int fprintf(FILE* stream, const char* format, ...){
-	return 0;
-}
+static int vsprintf(char *dest, const char *fmt, va_list args);
+static int fprintf(FILE* stream, const char* format, ...);
+static int printf(const char* format, ...);
+static int snprintf(char* str, unsigned long size, const char* format, ...);
 
-int printf(const char* format, ...){
-	long i=0;
-	while (format[i++]){
-	}
-	return fprintf(stdout,format);
-}
+#else // #ifdef __STD_REAL
 
-int snprintf(char* str, unsigned long size, const char* format, ...){
-	return 0;
-}
+extern int vsprintf(char *dest, const char *fmt, va_list args);
+extern int fprintf(FILE* stream, const char* format, ...);
+extern int printf(const char* format, ...);
+extern int snprintf(char* str, unsigned long size, const char* format, ...);
 
+#endif // #ifdef __STD_REAL
 
 #endif

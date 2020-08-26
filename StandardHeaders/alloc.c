@@ -2,25 +2,29 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
-
+static int printf(const char* format, ...);
 
 #define _MemorySize 67108864LU // 2**26
-#define _AlignExtend(size) (((size)+5U)&0x03FFFFFC)
+#define _AlignExtend(size) (((size)+7U)&0x03FFFFFC)
 #define _MemoryRead32(addr) (*((uint32_t*)(addr)))
 #define _MemoryWrite32(addr,val) (*((uint32_t*)(addr)))=((uint32_t)(val))
 
+#if 0
+//#define _HeapFreeEntryCount 65536
+#define _HeapFreeEntryCount 2048
+//#define _HeapFreeEntryCount 256
 
-
-struct _HeapFreeEntries{
+static struct _HeapFreeEntries{
 	struct _HeapFreeEntry{
 		uint32_t size; // size (in bytes) of this free section
 		uint32_t start; // start address (lowest address) of this free section
-	} entries[65536];
+	} entries[_HeapFreeEntryCount];
 	uint32_t begin;
 } _hfe;
 
 
-void* malloc(uint32_t size){
+
+static void* malloc(uint32_t size){
 	if (_hfe.begin==0){
 		// bootstrap the heap then
 		_hfe.begin=_MemoryRead32(0);
@@ -28,7 +32,7 @@ void* malloc(uint32_t size){
 		_hfe.entries[0].size=_MemorySize-_hfe.begin;
 	}
 	uint32_t rsize = _AlignExtend(size);
-	struct _HeapFreeEntry* end=_hfe.entries+65536;
+	struct _HeapFreeEntry* end=_hfe.entries+_HeapFreeEntryCount;
 	struct _HeapFreeEntry* target=NULL;
 	{
 		struct _HeapFreeEntry* i;
@@ -50,10 +54,12 @@ void* malloc(uint32_t size){
 	_MemoryWrite32(target->start,rsize);
 	target->size-=rsize;
 	target->start+=rsize;
+	//printf("+%lu,%lu\n",uptr,rsize);
+	
 	return uptr;
 }
 
-void* calloc(uint32_t nitems, uint32_t size){
+static void* calloc(uint32_t nitems, uint32_t size){
 	uint32_t usize = nitems*size;
 	void* ptr = malloc(usize);
 	if (ptr==NULL) return NULL;
@@ -63,11 +69,14 @@ void* calloc(uint32_t nitems, uint32_t size){
 	return ptr;
 }
 
-void free(void* ptr){
+static void free(void* ptr){
+	//printf("-%lu\n",ptr);
+	
+	if (ptr==NULL) return;
 	uint32_t rstart=(uint32_t)(((uint32_t*)ptr)-1U);
 	uint32_t rsize=_MemoryRead32(rstart);
 	uint32_t rend=rstart+rsize;
-	struct _HeapFreeEntry* end=_hfe.entries+65536;
+	struct _HeapFreeEntry* end=_hfe.entries+_HeapFreeEntryCount;
 	struct _HeapFreeEntry* targetAtStart=NULL;
 	struct _HeapFreeEntry* targetAtEnd=NULL;
 	struct _HeapFreeEntry* targetZero=NULL;
@@ -82,6 +91,11 @@ void free(void* ptr){
 	}
 	if (targetAtStart==NULL & targetAtEnd==NULL){
 		if (targetZero==NULL){
+			*((volatile char*)0x04030000)='!';
+			*((volatile char*)0x04030000)='!';
+			*((volatile char*)0x04030000)='!';
+			*((volatile char*)0x04030000)='!';
+			
 			/*
 			then an entry will need to be created.
 			This is a relatively complex operation, and will hopefully be avoided in the typical case
@@ -122,7 +136,7 @@ void free(void* ptr){
 				}
 				walk=tempWalk;
 			}
-			exit(0xC0000374);
+			exit(0x0374);
 		}
 		MakeEntry:
 		
@@ -143,7 +157,7 @@ void free(void* ptr){
 
 
 
-void* realloc(void* ptr, uint32_t size){
+static void* realloc(void* ptr, uint32_t size){
 	if (ptr==NULL) return malloc(size);
 	uint32_t rstartOld = (uint32_t)(((uint32_t*)ptr)-1U);
 	uint32_t rsizeOld=_MemoryRead32(rstartOld);
@@ -158,7 +172,7 @@ void* realloc(void* ptr, uint32_t size){
 		return ptr;
 	} else {
 		uint32_t rsizeDelta = rsizeNew-rsizeOld;
-		struct _HeapFreeEntry* end=_hfe.entries+65536;
+		struct _HeapFreeEntry* end=_hfe.entries+_HeapFreeEntryCount;
 		struct _HeapFreeEntry* targetAtStartOld=NULL;
 		struct _HeapFreeEntry* targetAtEndOld=NULL;
 		struct _HeapFreeEntry* targetZero=NULL;
@@ -204,11 +218,148 @@ void* realloc(void* ptr, uint32_t size){
 		return (void*)(rstartNew+4U);
 	}
 }
+#else
+
+static void memcpy(void* dest, const void* src, unsigned long n);
+
+static uint32_t _heapStart;
+
+
+static void* malloc(uint32_t size){
+	if (_heapStart==0){
+		uint32_t s=_MemorySize-(_heapStart=_MemoryRead32(0));
+		uint8_t allign=s&2;
+		s-=allign;
+		_heapStart+=allign;
+		_MemoryWrite32(_heapStart,s);
+	}
+	uint32_t prevBlockAddr=0;
+	uint32_t prevBlockSize=0;
+	
+	uint32_t bsize=_AlignExtend(size);
+	uint32_t currentBlockAddr=_heapStart;
+	uint32_t currentBlockSize=_MemoryRead32(currentBlockAddr);
+	bool isCurrentAllocated=currentBlockSize&1;
+	currentBlockSize^=isCurrentAllocated;
+	
+	uint32_t bestBlockAddr=0;
+	uint32_t bestBlockSize=0xFFFFFFFF;
+	while (1){
+		if ((currentBlockSize&3)!=0){
+			// heap corruption
+			exit(0x0372);
+		}
+		if (currentBlockSize==0){
+			// heap corruption
+			exit(0x0373);
+		}
+		if (!isCurrentAllocated & currentBlockSize>=bsize & currentBlockSize<=bestBlockSize){
+			// then this is a better block [or identical, which doesn't matter] then the one currently stored, so replace it
+			bestBlockAddr=currentBlockAddr;
+			bestBlockSize=currentBlockSize;
+			if (bestBlockSize==bsize){
+				// if size of free entry matches perfectly, that take it right away
+				break;
+			}
+		}
+		uint32_t nextBlockAddr;
+		uint32_t nextBlockSize;
+		bool isNextAllocated;
+		
+		
+		nextBlockAddr=currentBlockSize+currentBlockAddr;
+		if (nextBlockAddr>_MemorySize){
+			// heap corruption
+			exit(0x0374);
+		}
+		
+		prevBlockAddr=currentBlockAddr;
+		prevBlockSize=currentBlockSize;
+		
+		if (nextBlockAddr==_MemorySize) break;
+		nextBlockSize=_MemoryRead32(nextBlockAddr);
+		isNextAllocated=nextBlockSize&1;
+		nextBlockSize^=isNextAllocated;
+		if (!isCurrentAllocated & !isNextAllocated){
+			// merge the two free blocks that are next to each other, restart loop on updated current block
+			currentBlockSize+=nextBlockSize;
+			_MemoryWrite32(currentBlockAddr,currentBlockSize);
+			continue;
+		}
+		currentBlockAddr=nextBlockAddr;
+		currentBlockSize=nextBlockSize;
+		isCurrentAllocated=isNextAllocated;
+	}
+	if (bestBlockAddr==0){
+		// no space
+		return NULL;
+	}
+	uint32_t leftoverSize=bestBlockSize-bsize;
+	if (leftoverSize<=8){
+		// if the best block size is close [or exact], just pretend the asked-for size is exactly the block size
+		_MemoryWrite32(bestBlockAddr,bestBlockSize^1);
+		return (void*)(bestBlockAddr+4);
+	} else {
+		_MemoryWrite32(bestBlockAddr+bsize,leftoverSize);
+		_MemoryWrite32(bestBlockAddr,(bestBlockSize-leftoverSize)^1);
+		return (void*)(bestBlockAddr+4);
+	}
+}
+
+static void* calloc(uint32_t numitems, uint32_t itemSize){
+	uint32_t size=numitems*itemSize;
+	uint32_t* ptr=malloc(size);
+	if (ptr==NULL){
+		return NULL;
+	}
+	// inside of calloc, we can do the memory setting faster then memset() because allignments are already known to not be an issue as well as the value is always 0
+	uint32_t* ptre=(uint32_t*)((uint8_t*)ptr+(_AlignExtend(size)-4));
+	for (uint32_t* ptri=ptr;ptri!=ptre;ptri++){
+		*ptri=0;
+	}
+	return ptr;
+}
+
+static void free(void* ptr){
+	if (ptr==NULL) return;
+	uint32_t* tp=(uint32_t*)ptr-1;
+	uint32_t t=*tp;
+	assert(t==*((uint32_t*)ptr-1));
+	*tp=t^1;
+	if ((t&1)^1){
+		// ptr already free-d or heap corruption
+		exit(0x0376);
+	}
+}
+
+static void* realloc(void* ptr, uint32_t size_new){
+	if (ptr==NULL) return malloc(size_new);
+	uint32_t bsize_new=_AlignExtend(size_new);
+	uint32_t bsize_old=*((uint32_t*)ptr-1)^1;
+	if (bsize_old&1){
+		// ptr already free-d or heap corruption
+		exit(0x0377);
+	}
+	if (bsize_new==bsize_old){
+		return ptr;
+	}
+	uint32_t bsize_copy=bsize_old>bsize_new?bsize_new:bsize_old;
+	// I'm not doing anything clever right now
+	void* ptr_new=malloc(size_new);
+	memcpy(ptr_new,ptr,bsize_copy-4);
+	free(ptr);
+	return ptr_new;
+}
+
+
+
+
+
+#endif
+
 
 
 #undef _MemorySize
 #undef _AlignExtend(size)
 #undef _MemoryRead32(addr)
 #undef _MemoryWrite32(addr,val)
-
-

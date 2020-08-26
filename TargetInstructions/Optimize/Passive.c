@@ -33,13 +33,130 @@ typedef struct InstructionInformation{
 bool doingSanityCheck = false;
 #endif
 
+
+
+
+#if 0
+
+#include <windows.h>
+
+
+
+/*
+0=default
+1=default
+2=yellow
+3=green
+4=default
+*/
+
+const char* consolePrintBufferGeneralMessage="";
+void printSingleInstructionOptCode(const InstructionSingle);
+void consolePrintBufferPoint(const InstructionBuffer*const ib, int32_t index0, int32_t index1, uint8_t mode,const char* message){
+	static bool isFirst=true;
+	static char printf_buffer[120000];
+	if (isFirst){
+		setvbuf(stdout,printf_buffer,_IOFBF,120000);
+		isFirst=false;
+	}
+	//const int32_t nLines=250;
+	const int32_t nLines=123;
+	//const int32_t nLines=79;
+	const char* resetLineString="\r                                                            \r";
+	if (ib->numberOfSlotsTaken==0){
+		return;
+	}
+	if (ib->buffer[0].id==I_LOFF | ib->buffer[0].id==I_NSNB){
+		return;
+	}
+	if (!(((index0!=-1 & index0<nLines) | (index1!=-1 & index1<nLines)) | (index0==-1 & index1==-1))){
+		/*
+		resetColor();
+		makeColor(COLOR_TO_TEXT,COLOR_RED);
+		printf("\x1b[1A");
+		printf("SKIPPING - indexes not in range\n");
+		resetColor();
+		*/
+		return;
+	}
+	for (int32_t l=0;l<nLines+2;l++){
+		printf("\x1b[1A");
+	}
+	resetColor();
+	makeColor(COLOR_TO_BACKGROUND,COLOR_BLUE);
+	makeColor(COLOR_TO_TEXT,COLOR_GREEN);
+	printf("%s  %s\n%s  %s\n",resetLineString,consolePrintBufferGeneralMessage,resetLineString,message);
+	resetColor();
+	switch (mode){
+		case 1:break;
+		case 2:makeColor(COLOR_TO_TEXT,COLOR_YELLOW);break;
+		case 3:makeColor(COLOR_TO_TEXT,COLOR_GREEN);break;
+		case 4:break;
+	}
+	for (int32_t a=0;a<ib->numberOfSlotsTaken & a<nLines;a++){
+		printf("%s",resetLineString);
+		if (a==index0){
+			if (mode==4) makeColor(COLOR_TO_TEXT,COLOR_GREEN);
+			else makeColor(COLOR_TO_TEXT,COLOR_CYAN);
+		}
+		if (a==index1 & index0!=-1){
+			makeColor(COLOR_TO_TEXT,COLOR_MAGENTA);
+		}
+		if (a==index1 & index0==-1){
+			makeColor(COLOR_TO_TEXT,COLOR_RED);
+		}
+		printf("%c",(a==index0 | a==index1)?'>':' ');
+		printSingleInstructionOptCode(ib->buffer[a]);
+		if (a==index0 | a==index1){
+			resetColor();
+			switch (mode){
+				case 1:break;
+				case 2:makeColor(COLOR_TO_TEXT,COLOR_YELLOW);break;
+				case 3:makeColor(COLOR_TO_TEXT,COLOR_GREEN);break;
+				case 4:break;
+			}
+		}
+		printf("\n");
+	}
+	resetColor();
+	for (int32_t a=ib->numberOfSlotsTaken;a<nLines;a++){
+		printf("%s\n",resetLineString);
+	}
+	fflush(stdout);
+	if ((index0==-1 || ib->buffer[index0].id==I_NOP_) & (index1==-1 || ib->buffer[index1].id==I_NOP_) & (index0!=-1 | index1!=-1)){
+		Sleep(10);
+	} else {
+		Sleep(mode*20+20);
+		Sleep(20);
+	}
+	if (mode==3) Sleep(100);
+}
+void consolePrintBufferGeneralMessageSet(const char* message){
+	consolePrintBufferGeneralMessage=message;
+}
+
+
+
+
+#else
+
+#define consolePrintBufferPoint(ib,index0,index1,mode,message) ((void)0)
+#define consolePrintBufferGeneralMessageSet(message) ((void)0)
+
+#endif
+
+
+
+
 const InstructionInformation resetII = {.regIN={16,16,16,16,16,16,16,16,16},.regOUT={16,16,16,16,16}};
 
+
 void fillInstructionInformation(InstructionInformation*const II, const InstructionBuffer*const ib, uint32_t index){
+	consolePrintBufferPoint(ib,index,-1,1,"Detailed Information Calculated for this Instruction");
+	
 	const InstructionSingle*const buffer = ib->buffer;
 	*II=resetII;
 	II->id=buffer[index].id;
-	AfterReset:;
 	const InstructionSingle IS=buffer[index];
 	switch (IS.id){
 		case I_SYRE:
@@ -95,23 +212,41 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		case I_SCQB:
 		II->isSymbolicInternal=true;
 		{
-		enum InstructionTypeID id;
-		do {
-			assert(index!=0);
-			id=buffer[--index].id;
-		} while (id!=I_SYRB & id!=I_SYRW & id!=I_SYRD & id!=I_SYRQ);
+			enum InstructionTypeID id;
+			do {
+				assert(index!=0);
+				id=buffer[--index].id;
+			} while (id!=I_SYRB & id!=I_SYRW & id!=I_SYRD & id!=I_SYRQ);
+			const InstructionSingle IS_2 = buffer[index];
+			switch ((uint8_t)id){ // cast is to avoid warnings for missing enumeration values
+				case I_SYRB:
+				case I_SYRW:
+				II->regOUT[0]=IS_2.arg.B1.a_0;
+				break;
+				case I_SYRD:
+				II->regOUT[0]=IS_2.arg.B2.a_0;
+				II->regOUT[1]=IS_2.arg.B2.a_1;
+				break;
+				case I_SYRQ:
+				II->regOUT[0]=IS_2.arg.B4.a_0;
+				II->regOUT[1]=IS_2.arg.B4.a_1;
+				II->regOUT[2]=IS_2.arg.B4.a_2;
+				II->regOUT[3]=IS_2.arg.B4.a_3;
+				break;
+				// there are no other possibilities
+			}
 		}
-		goto AfterReset;
+		break;
 		case I_PHIS:
 		II->regIN[0]=IS.arg.B1.a_0;
 		II->doesBlockReorder=true;
 		II->noRename=true;
-		return;
+		break;
 		case I_PHIE:
 		II->regOUT[0]=IS.arg.B1.a_0;
 		II->doesBlockReorder=true;
 		II->noRename=true;
-		return;
+		break;
 		case I_JJMP:
 		II->regIN[0]=IS.arg.BBD.a_0;
 		II->regIN[1]=IS.arg.BBD.a_1;
@@ -120,65 +255,65 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->doesBlockReorder=true;
 		II->stopLinearRegTrace=true;
 		case I_NOP_:
-		return;
+		break;
 		case I_FCST:
 		case I_FCEN:
 		II->doesBlockReorder=true;
 		II->doesDestroyReg=true;
-		return;
+		break;
 		case I_PU1_:
 		case I_PUA1:
 		II->doesMoveStack=true;
 		II->doesRelyOnStack=true;
 		II->regIN[0]=IS.arg.B1.a_0;
-		return;
+		break;
 		case I_PU2_:
 		case I_PUA2:
 		II->doesMoveStack=true;
 		II->doesRelyOnStack=true;
 		II->regIN[0]=IS.arg.B2.a_0;
 		II->regIN[1]=IS.arg.B2.a_1;
-		return;
+		break;
 		case I_POP1:
 		II->doesMoveStack=true;
 		II->doesRelyOnStack=true;
 		II->regOUT[0]=IS.arg.B1.a_0;
-		return;
+		break;
 		case I_POP2:
 		II->doesMoveStack=true;
 		II->doesRelyOnStack=true;
 		II->regOUT[0]=IS.arg.B2.a_0;
 		II->regOUT[1]=IS.arg.B2.a_1;
-		return;
+		break;
 		case I_BL1_:
 		II->cv=IS.arg.B2.a_1;
 		II->regOUT[0]=IS.arg.B2.a_0;
 		II->isAllowedInVTE=true;
-		return;
+		break;
 		case I_RL1_:
 		II->cv=IS.arg.BW.a_1;
 		II->regOUT[0]=IS.arg.BW.a_0;
 		II->isAllowedInVTE=true;
-		return;
+		break;
 		case I_RL2_:
 		II->cv=IS.arg.BBD.a_2;
 		II->regOUT[0]=IS.arg.BBD.a_0;
 		II->regOUT[1]=IS.arg.BBD.a_1;
-		return;
+		break;
 		case I_SYRB:
 		case I_SYRW:
 		II->regOUT[0]=IS.arg.B1.a_0;
-		return;
+		break;
 		case I_SYRD:
 		II->regOUT[0]=IS.arg.B2.a_0;
 		II->regOUT[1]=IS.arg.B2.a_1;
-		return;
+		break;
 		case I_SYRQ:
 		II->regOUT[0]=IS.arg.B4.a_0;
 		II->regOUT[1]=IS.arg.B4.a_1;
 		II->regOUT[2]=IS.arg.B4.a_2;
 		II->regOUT[3]=IS.arg.B4.a_3;
-		return;
+		break;
 		case I_CALL:
 		II->regIN[0]=IS.arg.B2.a_0;
 		II->regIN[1]=IS.arg.B2.a_1;
@@ -187,31 +322,31 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->doesMoveStack=true;
 		II->doesDestroyReg=true;
 		II->doesBlockReorder=true;
-		return;
+		break;
 		case I_LABL:
 		II->stopLinearRegTrace=true;
 		II->doesBlockReorder=true;
 		II->requireRegValuePhi=true;
-		return;
+		break;
 		case I_STWV:
 		II->isMemoryAccessVolatile=true;
 		case I_STWN:
 		II->isMemoryAccess=true;
 		II->regIN[0]=IS.arg.B2.a_0;
 		II->cv=IS.arg.B2.a_1;
-		return;
+		break;
 		case I_STRV:
 		II->isMemoryAccessVolatile=true;
 		case I_STRN:
 		II->isMemoryAccess=true;
 		II->regOUT[0]=IS.arg.B2.a_0;
 		II->cv=IS.arg.B2.a_1;
-		return;
+		break;
 		case I_ALOC:
 		II->doesMoveStack=true;
 		II->doesRelyOnStack=true;
 		II->doesBlockReorder=true;
-		return;
+		break;
 		case I_ALCR:
 		II->doesMoveStack=true;
 		case I_STOF:
@@ -220,26 +355,26 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		case I_STPS:
 		II->cv=IS.arg.BW.a_1;
 		II->regOUT[0]=IS.arg.BW.a_0;
-		return;
+		break;
 		case I_AJMP:
 		II->doesBlockReorder=true;
 		II->stopLinearRegTrace=true;
 		II->regIN[0]=IS.arg.B2.a_0;
 		II->regIN[1]=IS.arg.B2.a_1;
-		return;
+		break;
 		case I_CJMP:
 		II->doesBlockReorder=true;
 		II->regIN[0]=IS.arg.B3.a_0;
 		II->regIN[1]=IS.arg.B3.a_1;
 		II->regIN[2]=IS.arg.B3.a_2;
-		return;
+		break;
 		case I_MOV_:
 		case I_SHFT:
 		case I_BSWP:
 		II->regOUT[0]=IS.arg.B2.a_0;
 		II->regIN[0]=IS.arg.B2.a_1;
 		II->isAllowedInVTE=true;
-		return;
+		break;
 		case I_AND_:
 		case I_OR__:
 		case I_XOR_:
@@ -251,7 +386,7 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->regIN[0]=IS.arg.B3.a_1;
 		II->regIN[1]=IS.arg.B3.a_2;
 		II->isAllowedInVTE=true;
-		return;
+		break;
 		case I_SSUB:
 		II->regOUT[0]=IS.arg.B3.a_0;
 		II->regOUT[1]=IS.arg.B3.a_1;
@@ -259,21 +394,21 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->regIN[1]=IS.arg.B3.a_1;
 		II->regIN[2]=IS.arg.B3.a_2;
 		II->isAllowedInVTE=true;
-		return;
+		break;
 		case I_DIVM:
 		II->regOUT[1]=IS.arg.B2.a_1;
 		II->regOUT[0]=IS.arg.B2.a_0;
 		II->regIN[0]=IS.arg.B2.a_0;
 		II->regIN[1]=IS.arg.B2.a_1;
 		II->isAllowedInVTE=true;
-		return;
+		break;
 		case I_MULS:
 		II->regOUT[0]=IS.arg.B2.a_0;
 		II->regIN[0]=IS.arg.B2.a_0;
 		II->regIN[1]=IS.arg.B2.a_1;
 		II->isAllowedInVTE=true;
 		II->inputTrivialSwapable=true;
-		return;
+		break;
 		case I_MULL:
 		II->usesReg_D=true;
 		II->usesReg_E=true;
@@ -284,7 +419,7 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->regOUT[0]=13;
 		II->regOUT[1]=14;
 		II->isAllowedInVTE=true;
-		return;
+		break;
 		case I_MWWV:
 		II->isMemoryAccessVolatile=true;
 		case I_MWWN:
@@ -292,7 +427,7 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->regIN[0]=IS.arg.B3.a_1;
 		II->regIN[1]=IS.arg.B3.a_2;
 		II->regIN[2]=IS.arg.B3.a_0;
-		return;
+		break;
 		case I_MRWV:
 		II->isMemoryAccessVolatile=true;
 		case I_MRWN:
@@ -300,7 +435,7 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->regOUT[0]=IS.arg.B3.a_0;
 		II->regIN[0]=IS.arg.B3.a_1;
 		II->regIN[1]=IS.arg.B3.a_2;
-		return;
+		break;
 		case I_MWBV:
 		II->isMemoryAccessVolatile=true;
 		case I_MWBN:
@@ -309,7 +444,7 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->regIN[0]=13;
 		II->regIN[1]=IS.arg.B2.a_1;
 		II->regIN[2]=IS.arg.B2.a_0;
-		return;
+		break;
 		case I_MRBV:
 		II->isMemoryAccessVolatile=true;
 		case I_MRBN:
@@ -318,7 +453,7 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->regOUT[0]=IS.arg.B2.a_0;
 		II->regIN[0]=13;
 		II->regIN[1]=IS.arg.B2.a_1;
-		return;
+		break;
 		case I_LSU0:
 		II->regOUT[0]=IS.arg.B4.a_0;
 		II->regOUT[1]=IS.arg.B4.a_1;
@@ -327,14 +462,14 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->regIN[2]=IS.arg.B4.a_2;
 		II->regIN[3]=IS.arg.B4.a_3;
 		II->isAllowedInVTE=true;
-		return;
+		break;
 		case I_LAD2:
 		II->regOUT[0]=IS.arg.B4.a_0;
 		II->regOUT[1]=IS.arg.B4.a_1;
 		II->regIN[0]=IS.arg.B4.a_2;
 		II->regIN[1]=IS.arg.B4.a_3;
 		II->isAllowedInVTE=true;
-		return;
+		break;
 		case I_LAD1:
 		II->regOUT[0]=IS.arg.B5.a_0;
 		II->regOUT[1]=IS.arg.B5.a_1;
@@ -342,7 +477,7 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->regIN[1]=IS.arg.B5.a_3;
 		II->regIN[2]=IS.arg.B5.a_4;
 		II->isAllowedInVTE=true;
-		return;
+		break;
 		case I_LAD0:
 		II->regOUT[0]=IS.arg.B6.a_0;
 		II->regOUT[1]=IS.arg.B6.a_1;
@@ -351,7 +486,7 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->regIN[2]=IS.arg.B6.a_4;
 		II->regIN[3]=IS.arg.B6.a_5;
 		II->isAllowedInVTE=true;
-		return;
+		break;
 		case I_LAD3:
 		case I_LSU3:
 		case I_LMU3:
@@ -367,7 +502,7 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->regIN[5]=IS.arg.B8.a_5;
 		II->regIN[6]=IS.arg.B8.a_6;
 		II->regIN[7]=IS.arg.B8.a_7;
-		return;
+		break;
 		case I_LLS6:
 		case I_LRS6:
 		II->noRename=true;
@@ -377,7 +512,7 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->regIN[2]=10;
 		II->regOUT[0]=2;
 		II->regOUT[1]=3;
-		return;
+		break;
 		case I_LLS7:
 		case I_LRS7:
 		II->noRename=true;
@@ -391,7 +526,7 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->regOUT[1]=3;
 		II->regOUT[2]=4;
 		II->regOUT[3]=5;
-		return;
+		break;
 		case I_D32U:
 		case I_D32S:
 		II->noRename=true;
@@ -402,7 +537,7 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->regIN[3]=5;
 		II->regOUT[0]=8;
 		II->regOUT[1]=9;
-		return;
+		break;
 		case I_R32U:
 		case I_R32S:
 		II->noRename=true;
@@ -413,7 +548,7 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->regIN[3]=5;
 		II->regOUT[0]=6;
 		II->regOUT[1]=7;
-		return;
+		break;
 		case I_LAD4:
 		case I_LSU4:
 		case I_LMU4:
@@ -426,7 +561,7 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->regIN[3]=7;
 		II->regOUT[0]=2;
 		II->regOUT[1]=3;
-		return;
+		break;
 		case I_D64U:
 		case I_D64S:
 		case I_R64U:
@@ -449,16 +584,18 @@ void fillInstructionInformation(InstructionInformation*const II, const Instructi
 		II->regOUT[1]=3;
 		II->regOUT[2]=4;
 		II->regOUT[3]=5;
-		return;
+		break;
 		case I_ERR_:
 		case I_INSR:
 		case I_DEPL:
 		default:
 		printf("Internal Error: fillInstructionInformation() got bad opcode\n");
 		exit(1);
-		return;
 	}
 }
+
+
+
 
 // does not care about LABL,JJMP,FCST, instead it only looks for things targeting the label (such as SYCL,JTEN)
 bool doesLabelHaveUsage(const InstructionBuffer* ib,const uint32_t labelNumber){
@@ -466,7 +603,7 @@ bool doesLabelHaveUsage(const InstructionBuffer* ib,const uint32_t labelNumber){
 	InstructionSingle* buffer = ib->buffer;
 	uint32_t i = ib->numberOfSlotsTaken;
 	while (i--!=0){
-		ISP = &(buffer[i]);
+		ISP = buffer+i;
 		if (ISP->id==I_SYCL | ISP->id==I_JTEN){
 			if (ISP->arg.D.a_0==labelNumber) return true;
 		}
@@ -618,70 +755,66 @@ the startInstruction should have the targetRegister in it's output and not it's 
 bool findRegRenameBoundaryFromOrigin(const InstructionBuffer* ib, uint32_t startInstruction, uint8_t targetRegister, uint32_t* upperBound){
 	InstructionInformation II;
 	fillInstructionInformation(&II,ib,startInstruction);
-	if (!(doesRegListContain(II.regOUT,targetRegister) & !doesRegListContain(II.regIN,targetRegister))){
-		printf("Internal Error: findRegRenameBoundaryFromOrigin() called on non-origin\n");
-		exit(1);
-	}
-	bool checkReg_D=targetRegister==13;
-	bool checkReg_E=targetRegister==14;
-	if ((checkReg_D & II.usesReg_D) |
-		(checkReg_E & II.usesReg_E) | II.noRename){
+	assert(doesRegListContain(II.regOUT,targetRegister) & !doesRegListContain(II.regIN,targetRegister)); // ensure called on origin
+	const bool checkReg_D=targetRegister==13;
+	const bool checkReg_E=targetRegister==14;
+	if ((checkReg_D & II.usesReg_D) | (checkReg_E & II.usesReg_E) | II.noRename){
 		// the startInstruction needs to be checked for this
 		return false;
 	}
-
-	uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
-	++startInstruction;
-	uint32_t i;
-	for (i=startInstruction;true;i++){
-		if (i==numberOfSlotsTaken){
-			i--;
-			break;
-		}
+	const uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
+	uint32_t lastMentioned=startInstruction;
+	uint32_t i=startInstruction;
+	while (++i!=numberOfSlotsTaken){
 		fillInstructionInformation(&II,ib,i);
 		if (II.isSymbolicInternal) continue;
-		bool containedRegIN = doesRegListContain(II.regIN,targetRegister);
-		bool containedRegOUT = doesRegListContain(II.regOUT,targetRegister);
+		const bool containedRegIN = doesRegListContain(II.regIN,targetRegister);
 		if ((checkReg_D & II.usesReg_D)|(checkReg_E & II.usesReg_E)|(containedRegIN & II.noRename)){
 			return false; // cannot rename
 		}
+		const bool containedRegOUT = doesRegListContain(II.regOUT,targetRegister);
 		if (II.doesDestroyReg | II.stopLinearRegTrace){
-			i-=II.noRename;
-			break;
+			if (!II.noRename & (containedRegOUT | containedRegIN)){
+				*upperBound=i;
+				return true;
+			} else {
+				*upperBound=lastMentioned;
+				return true;
+			}
 		}
 		if (containedRegOUT & !containedRegIN){
-			i--;
-			break;
+			*upperBound=lastMentioned;
+			return true;
+		}
+		if (containedRegOUT |  containedRegIN){
+			lastMentioned=i;
 		}
 	}
-	for (;i>startInstruction;i--){
-		fillInstructionInformation(&II,ib,i);
-		if (II.isSymbolicInternal) continue;
-		if (doesRegListContain(II.regIN,targetRegister) || doesRegListContain(II.regOUT,targetRegister)){
-			break;
-		}
-	}
-	*upperBound=i;
+	*upperBound=lastMentioned;
 	return true;
 }
 
 
-
+// assumes the label exists. if it doesn't, it will run off the end of the buffer.
+// starts search at the start, which is important for a specific type of JMP optimization.
 uint32_t findLabelLocation(const InstructionBuffer* ib,const uint32_t labelNumber){
-	InstructionSingle* IS_i;
-	InstructionSingle* buffer=ib->buffer;
-	uint32_t i=ib->numberOfSlotsTaken;
-	while (i--!=0){
-		enum InstructionTypeID id=(IS_i=&(buffer[i]))->id;
+	const InstructionSingle* IS_i=ib->buffer-1;
+	uint32_t i=0;// i is offset from where IS_i is
+	while (true){
+		++i;
+		if (i>=ib->numberOfSlotsTaken){
+			printInstructionBufferWithMessageAndNumber(ib,"WRONG",labelNumber);
+			fflush(stdout);
+			assert(false);
+		}
+		const enum InstructionTypeID id=(++IS_i)->id;
 		if (id==I_LABL | id==I_FCST){
-			if (IS_i->arg.D.a_0==labelNumber) return i;
-		} else if (id==I_JJMP){
-			if (IS_i->arg.BBD.a_2==labelNumber) return i;
+			if (IS_i->arg.D.a_0==labelNumber) return i-1;
+		}
+		if (id==I_JJMP){
+			if (IS_i->arg.BBD.a_2==labelNumber) return i-1;
 		}
 	}
-	printInstructionBufferWithMessageAndNumber(ib,"",0);
-	printf("Internal Error: could not find any of LABL,JJMP,FCST for labelNumber [%08X]\n",labelNumber);
-	exit(1);
 }
 
 
@@ -798,6 +931,11 @@ void sanityCheck(const InstructionBuffer* ib){
 					}
 				}
 			}
+		}
+		if ((II.id==I_LAD0 | II.id==I_LAD1 | II.id==I_LSU0) & (II.regOUT[0]==II.regIN[1] | II.regOUT[0]==II.regIN[3])){
+			printf("{ Caught during sanity check }\n");
+			printInstructionBufferWithMessageAndNumber(ib,"Instructions LAD0,LAD1,LSU0 cannot use that identical register for r0:",i);
+			exit(1);
 		}
 		if (II.id==I_LAD3 | II.id==I_LSU3 | II.id==I_LMU3){
 			uint8_t r2;
@@ -929,10 +1067,8 @@ bool isRegMentionedAtOrAfterTarget(const InstructionBuffer* ib,const uint32_t ta
 	for (uint32_t i=target;i<numberOfSlotsTaken;i++){
 		fillInstructionInformation(&II,ib,i);
 		if (II.isSymbolicInternal) continue;
-		if (doesRegListContain(II.regIN,reg) || doesRegListContain(II.regOUT,reg)){
-			if (indexOfFirstMention!=NULL){
-				*indexOfFirstMention=i;
-			}
+		if (doesRegListContain(II.regIN,reg) | doesRegListContain(II.regOUT,reg)){
+			if (indexOfFirstMention!=NULL) *indexOfFirstMention=i;
 			return true;
 		}
 	}
@@ -980,6 +1116,7 @@ bool isValueInRegUsedAnywhereThroughoutRangeWithExtentionCheck(const Instruction
 	return false;
 }
 
+
 bool wouldRegRenameViolateMultiOutputLaws(const InstructionBuffer* ib,const uint32_t start,const uint32_t end,const uint8_t regFrom,const uint8_t regTo){
 	InstructionInformation II;
 	for (uint32_t i=start;i<=end;i++){
@@ -1000,8 +1137,12 @@ bool wouldRegRenameViolateMultiOutputLaws(const InstructionBuffer* ib,const uint
 						return true;
 					}
 				}
+				if ((II.id==I_LAD0 | II.id==I_LAD1 | II.id==I_LSU0) & (ri0==1) & (II.regIN[1]==regTo | II.regIN[3]==regTo)){
+					return true;
+				}
 			}
 		}
+		
 	}
 	return false;
 }

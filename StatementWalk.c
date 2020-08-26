@@ -70,6 +70,10 @@ void addFunctionParemetersAndInternalValuesToBlockFrame(char* typeStringOfFuncti
 	// put __FUNCTION_ARG_SIZE into blockframe (this is one word of size)
 	// put __FUNCTION_RET_INSTRUCTION_ADDRESS into blockframe (this is two words of size)
 	
+	
+	// TODO: check for main and do some overiding. the loader currently requires that main has the same structure as it always does. even ignoring parameters might have a very bad effect.
+	
+	
 	char* internalTypeString = applyToTypeStringRemoveIdentifierToNew(typeStringOfFunction);
 	if (internalTypeString[0]!='('){
 		printf("addFunctionParemetersAndInternalValuesToBlockFrame() got a type string that wasn\'t a function with an identifier\n");
@@ -133,7 +137,6 @@ void addFunctionParemetersAndInternalValuesToBlockFrame(char* typeStringOfFuncti
 	addVariableToBlockFrame("__FUNCTION_CALLER_RET_STACK_ADDRESS unsigned int",0,false,false);
 	addVariableToBlockFrame("__FUNCTION_CALLER_FRAME_STACK_ADDRESS unsigned int",0,false,false);
 	addVariableToBlockFrame("__FUNCTION_RET_INSTRUCTION_ADDRESS unsigned long",0,false,false);
-	
 }
 
 void addBlankStaticVariable(const char* typeString){
@@ -822,6 +825,7 @@ void fileScopeStatementsWalk(){
 						instructionBufferForFunction.buffer[0].arg.BWD.a_1=blockFrameArray.maxStackSize;
 						
 						resolveGoto(gotoFailIndex);
+						
 #ifdef OPT_DEBUG_GENERAL_ACTIVE
 printf("%s\n",typeString);
 #endif

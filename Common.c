@@ -19,11 +19,13 @@
 #include <string.h>
 
 
+
+
 // this is for valgrind testing. if defined it will null out the entire exp buffer when clearing previous expressions
 //#define FORCE_EXP_BUFFER_NULL
 
 
-#define ERR_MSG_LEN 60 // controls the length of error messages
+#define ERR_MSG_LEN 18 // controls the length of error messages (60 is generally good)
 
 
 //#define STATEMENT_DEBUG
@@ -116,7 +118,7 @@ void err_1111_(const char* message,int32_t s,int32_t e){printInformativeMessageA
 
 
 
-struct CompileSettings{
+struct {
 	uint8_t optLevel; // range is 0->4 inclusive. The value is one higher then the argument supplied
 	bool noColor; // used to disable color printing if desired
 	
@@ -125,9 +127,14 @@ struct CompileSettings{
 	
 	bool hasGivenOutOfBoundsStackAccessWarning; 
 	// if the optimizer detects an out of bounds stack access, it sets this and prints a warning if the flag wasn't set
+	
+	bool hasGivenMisalignedWordOnStackWarning; 
+	// if the optimizer detects a misaligned memory access to a word, it sets this and prints a warning if the flag wasn't set
+	
 } compileSettings = {
 	.optLevel=1
 };
+
 
 
 
@@ -171,7 +178,7 @@ static void checkArchitecture(){
 	uint16_t* a1 = (uint16_t*)(&v0);
 	uint16_t r4 = *(a1+0);
 	uint16_t r5 = *(a1+1);
-	if ((r0!=0x22) | (r1!=0x55) | (r2!=0xEE) | (r3!=0xFF) | (r4!=0x5522u) | (r5!=0xFFEE)){
+	if (r0!=0x22 | r1!=0x55 | r2!=0xEE | r3!=0xFF | r4!=0x5522u | r5!=0xFFEE){
 		printf("Fatal Error: Computer Architecture not compatible. This compiler requires running on a computer with a byte-accessed little-endian architecture.\n");
 		exit(2);
 	}
@@ -195,20 +202,6 @@ typedef struct SourceContainer{
 SourceContainer sourceContainer;
 
 
-struct BinContainer{
-	uint8_t* data;
-	struct SymbolEntry{
-		char* name;
-		uint32_t label;
-		uint8_t type;
-		bool hasMatch; // this is if the identifier is in the other BinContainer
-		uint32_t match; // this is the index in the other BinContainer
-	}* symbols;
-	uint32_t len_data;
-	uint32_t len_symbols;
-	InstructionBuffer staticData;
-	InstructionBuffer functions;
-};
 
 
 bool doStringsMatch(const char*const string1,const char*const string2){
@@ -222,26 +215,6 @@ bool doStringsMatch(const char*const string1,const char*const string2){
 	return c1==c2;
 }
 
-void genAllBinContainerMatch(struct BinContainer bc0,struct BinContainer bc1){
-	for (uint32_t i0=0;i0<bc0.len_symbols;i0++){
-		bool* hasMatch=&bc0.symbols[i0].hasMatch;
-		*hasMatch=false;
-		uint32_t* match=&bc0.symbols[i0].match;
-		char* name=bc0.symbols[i0].name;
-		for (uint32_t i1=0;i1<bc1.len_symbols;i1++){
-			if (doStringsMatch(name,bc1.symbols[i1].name)){*hasMatch=true;*match=i1;break;}
-		}
-	}
-	for (uint32_t i1=0;i1<bc1.len_symbols;i1++){
-		bool* hasMatch=&bc1.symbols[i1].hasMatch;
-		*hasMatch=false;
-		uint32_t* match=&bc1.symbols[i1].match;
-		char* name=bc1.symbols[i1].name;
-		for (uint32_t i0=0;i0<bc0.len_symbols;i0++){
-			if (doStringsMatch(name,bc0.symbols[i0].name)){*hasMatch=true;*match=i0;break;}
-		}
-	}
-}
 
 char* copyStringToHeapString(const char*const string){
 	int32_t length = strlen(string);
@@ -289,15 +262,12 @@ bool specificStringEqualCheck(const char*const stringLarge,const int32_t startIn
 	return true;
 }
 
-static inline bool isLetter(const char c){
-	// lower letters are c>96 & c<123
-	// upper letters are c>64 & c<91
-	return (c>96 & c<123) | (c>64 & c<91) | c=='_';
-}
 
-static inline bool isDigit(const char c){
-	return c>47 & c<58;
-}
+// lower letters are c>96 & c<123
+// upper letters are c>64 & c<91
+#define isLetter(c) ((c>96 & c<123) | (c>64 & c<91) | c=='_')
+#define isDigit(c) (c>47 & c<5)
+
 
 bool isSectionOfStringEquivalent(const char*const string1,const int32_t startIndexForString1,const char*const string2){
 	for (int32_t i=0;string2[i];i++){
@@ -679,6 +649,8 @@ int32_t emptyIndexAdvance(int32_t index){
 
 
 #include "NumberParser.c"
+
+
 
 #endif //#ifndef HAS_COMMON_BEEN_INCLUDED
 

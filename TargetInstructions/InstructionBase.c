@@ -168,11 +168,17 @@ typedef struct InstructionSingle{
 		struct {
 			uint8_t a_0;
 			uint8_t a_1;
+			
+			bool mem_flag_upper_byte_unused; // [for stack memory access instructions only] used to flag stack memory word accesses as having the upper or lower byte in memory being unused
+			bool mem_flag_lower_byte_unused;
 		} B2;
 		struct {
 			uint8_t a_0;
 			uint8_t a_1;
 			uint8_t a_2;
+			
+			bool mem_flag_upper_byte_unused; // [for non-stack memory access instructions only] used to flag non-stack memory word accesses as having the upper or lower byte in memory being unused
+			bool mem_flag_lower_byte_unused;
 		} B3;
 		struct {
 			uint16_t a_1;
@@ -193,7 +199,8 @@ typedef struct InstructionSingle{
 		} W;
 		struct {
 			uint32_t a_0;
-			bool mark; // [for use on LABL only] may be used in the optimizer to avoid infinite loops (as of writing this it is unused)
+			
+			bool mark; // [for use on LABL only] used in the optimizer to avoid infinite loops
 		} D;
 		struct {
 			uint8_t a_0;
@@ -244,7 +251,7 @@ typedef struct InstructionBuffer{
 	uint32_t numberOfSlotsTaken;
 } InstructionBuffer;
 
-#define INCLUDE_BACKEND // temp
+
 
 #ifdef INCLUDE_BACKEND
 uint32_t backendInstructionSize(const InstructionSingle IS){
@@ -787,11 +794,158 @@ uint8_t instructionContentCatagory(enum InstructionTypeID id){
 	exit(1);
 }
 
+#define INIT_INSTRUCTION_BUFFER_SIZE 1024
+
+void initInstructionBuffer(InstructionBuffer* ib){
+	memset(ib,0,sizeof(InstructionBuffer));
+	ib->numberOfSlotsAllocated = INIT_INSTRUCTION_BUFFER_SIZE;
+	ib->buffer = cosmic_malloc(ib->numberOfSlotsAllocated*sizeof(InstructionSingle));
+}
+
+void destroyInstructionBuffer(InstructionBuffer* ib){
+	cosmic_free(ib->buffer);
+	ib->buffer = NULL;
+	ib->numberOfSlotsTaken = 0;
+	ib->numberOfSlotsAllocated = 0;
+}
+
+void addInstruction(InstructionBuffer* ib, const InstructionSingle instructionSingle){
+	if (ib->numberOfSlotsTaken>=ib->numberOfSlotsAllocated){
+		assert(ib->numberOfSlotsAllocated!=0); // Cannot add instruction to destroyed instruction buffer
+		ib->numberOfSlotsAllocated*=2;
+		ib->buffer = cosmic_realloc(ib->buffer,ib->numberOfSlotsAllocated*sizeof(InstructionSingle));
+	}
+	ib->buffer[ib->numberOfSlotsTaken++]=instructionSingle;
+}
+
+struct {
+	const char* corruptionErrorMessage;
+	FILE* binaryFile;
+} binaryFileLoadState = {0};
+
+// gets the next character from the currently open binary fle and ensures it is not EOF
+uint8_t binaryFile_noEOF_fgetc(){
+	int v;
+	if ((v=fgetc(binaryFileLoadState.binaryFile))==EOF) err_10_1_(binaryFileLoadState.corruptionErrorMessage);
+	return (uint8_t)v;
+}
+
+// ensures the next call to fgetc on the currently open binary file will give the EOF
+void binaryFile_isEOF_fgetc(){
+	if (fgetc(binaryFileLoadState.binaryFile)!=EOF) err_10_1_(binaryFileLoadState.corruptionErrorMessage);
+}
+
+
+InstructionBuffer decompressInstructionBufferOnLoad(){
+	InstructionBuffer ib;
+	initInstructionBuffer(&ib);
+	while (true){
+		unsigned int byteCode[8];
+		InstructionSingle IS;
+		IS.id=(byteCode[0]=binaryFile_noEOF_fgetc());
+		if (byteCode[0]==0) return ib;
+		uint8_t icc = instructionContentCatagory(IS.id);
+		static uint8_t icc_to_delta[] = {[0]=0,[1]=1,[2]=2,[3]=2,[4]=2,[5]=3,[6]=3,[7]=3,[8]=4,[9]=5,[10]=6,[11]=8,[12]=3,[13]=4,[14]=4,[15]=5};
+		const uint8_t delta=icc_to_delta[icc];
+		for (uint8_t deltaTemp=1;deltaTemp<delta;deltaTemp++){
+			byteCode[deltaTemp]=binaryFile_noEOF_fgetc();
+		}
+		switch (icc){
+			case 0:
+			case 1:
+			break;
+			case 2:
+			IS.arg.B1.a_0=byteCode[1]&15;
+			break;
+			case 3:
+			IS.arg.B1.a_0=byteCode[1];
+			break;
+			case 4:
+			IS.arg.B2.a_0=(unsigned)byteCode[1]&15u;
+			IS.arg.B2.a_1=(unsigned)byteCode[1]/16u;
+			break;
+			case 5:
+			IS.arg.B3.a_0=(unsigned)byteCode[1]&15u;
+			IS.arg.B3.a_1=(unsigned)byteCode[1]/16u;
+			IS.arg.B3.a_2=(unsigned)byteCode[2]&15u;
+			break;
+			case 6:
+			IS.arg.B2.a_0=(unsigned)byteCode[1]&15u;
+			IS.arg.B2.a_1=byteCode[2];
+			break;
+			case 7:
+			IS.arg.W.a_0=(unsigned)byteCode[1]|(unsigned)byteCode[2]*256u;
+			break;
+			case 8:
+			IS.arg.BW.a_0=(unsigned)byteCode[1]&15u;
+			IS.arg.BW.a_1=(unsigned)byteCode[2]|(unsigned)byteCode[3]*256u;
+			break;
+			case 9:
+			IS.arg.D.a_0=
+			(uint32_t)((unsigned)byteCode[1]|(unsigned)byteCode[2]*256u)|
+			(uint32_t)((unsigned)byteCode[3]|(unsigned)byteCode[4]*256u)*65536lu;
+			break;
+			case 10:
+			IS.arg.BBD.a_0=(uint16_t)byteCode[1]&15u;
+			IS.arg.BBD.a_1=(uint16_t)byteCode[1]/16u;
+			IS.arg.BBD.a_2=
+			(uint32_t)((unsigned)byteCode[2]|(unsigned)byteCode[3]*256u)|
+			(uint32_t)((unsigned)byteCode[4]|(unsigned)byteCode[5]*256u)*65536lu;
+			break;
+			case 11:
+			IS.arg.BWD.a_0=byteCode[1];
+			IS.arg.BWD.a_1=(unsigned)byteCode[2]|(unsigned)byteCode[3]*256u;
+			IS.arg.BWD.a_2=
+			(uint32_t)((unsigned)byteCode[4]|(unsigned)byteCode[5]*256u)|
+			(uint32_t)((unsigned)byteCode[6]|(unsigned)byteCode[7]*256u)*65536lu;
+			break;
+			case 12:
+			IS.arg.B4.a_0=(unsigned)byteCode[1]&15u;
+			IS.arg.B4.a_1=(unsigned)byteCode[1]/16u;
+			IS.arg.B4.a_2=(unsigned)byteCode[2]&15u;
+			IS.arg.B4.a_3=(unsigned)byteCode[2]/16u;
+			break;
+			case 13:
+			IS.arg.B5.a_0=(unsigned)byteCode[1]&15u;
+			IS.arg.B5.a_1=(unsigned)byteCode[1]/16u;
+			IS.arg.B5.a_2=(unsigned)byteCode[2]&15u;
+			IS.arg.B5.a_3=(unsigned)byteCode[2]/16u;
+			IS.arg.B5.a_4=(unsigned)byteCode[3]&15u;
+			break;
+			case 14:
+			IS.arg.B6.a_0=(unsigned)byteCode[1]&15u;
+			IS.arg.B6.a_1=(unsigned)byteCode[1]/16u;
+			IS.arg.B6.a_2=(unsigned)byteCode[2]&15u;
+			IS.arg.B6.a_3=(unsigned)byteCode[2]/16u;
+			IS.arg.B6.a_4=(unsigned)byteCode[3]&15u;
+			IS.arg.B6.a_5=(unsigned)byteCode[3]/16u;
+			break;
+			case 15:
+			IS.arg.B8.a_0=(unsigned)byteCode[1]&15u;
+			IS.arg.B8.a_1=(unsigned)byteCode[1]/16u;
+			IS.arg.B8.a_2=(unsigned)byteCode[2]&15u;
+			IS.arg.B8.a_3=(unsigned)byteCode[2]/16u;
+			IS.arg.B8.a_4=(unsigned)byteCode[3]&15u;
+			IS.arg.B8.a_5=(unsigned)byteCode[3]/16u;
+			IS.arg.B8.a_6=(unsigned)byteCode[4]&15u;
+			IS.arg.B8.a_7=(unsigned)byteCode[4]/16u;
+			break;
+		}
+		addInstruction(&ib,IS);
+	}
+}
+
+
+
+
+
+#ifndef IS_BUILDING_RUN
+
 // returns the delta
 uint8_t decompressInstruction(const uint8_t* byteCode,InstructionSingle* IS_parent){
 	uint8_t delta=0;
 	InstructionSingle IS;
-	switch(instructionContentCatagory(IS.id=byteCode[0])){
+	switch (instructionContentCatagory(IS.id=byteCode[0])){
 		case 0:
 		delta=0;
 		break;
@@ -893,37 +1047,14 @@ uint8_t decompressInstruction(const uint8_t* byteCode,InstructionSingle* IS_pare
 	return delta;
 }
 
-#ifndef IS_BUILDING_RUN
+
 
 void printInstructionBufferWithMessageAndNumber(const InstructionBuffer*,const char*,const uint32_t);
 void printSingleInstructionOptCode(const InstructionSingle);
 
-#define INIT_INSTRUCTION_BUFFER_SIZE 1024
 
-void initInstructionBuffer(InstructionBuffer* ib){
-	memset(ib,0,sizeof(InstructionBuffer));
-	ib->numberOfSlotsAllocated = INIT_INSTRUCTION_BUFFER_SIZE;
-	ib->buffer = cosmic_malloc(ib->numberOfSlotsAllocated*sizeof(InstructionSingle));
-}
-
-void destroyInstructionBuffer(InstructionBuffer* ib){
-	cosmic_free(ib->buffer);
-	ib->buffer = NULL;
-	ib->numberOfSlotsTaken = 0;
-	ib->numberOfSlotsAllocated = 0;
-}
-
-void addInstruction(InstructionBuffer* ib, const InstructionSingle instructionSingle){
-	if (ib->numberOfSlotsTaken>=ib->numberOfSlotsAllocated){
-		assert(ib->numberOfSlotsAllocated!=0); // Cannot add instruction to destroyed instruction buffer
-		ib->numberOfSlotsAllocated*=2;
-		ib->buffer = cosmic_realloc(ib->buffer,ib->numberOfSlotsAllocated*sizeof(InstructionSingle));
-	}
-	ib->buffer[ib->numberOfSlotsTaken++]=instructionSingle;
-}
-
-// byteCodeEnd may be NULL. byteCodeEnd represents the position of the terminating zero
-InstructionBuffer decompressInstructionBuffer(const uint8_t* byteCodeStart,const uint8_t** byteCodeEnd){
+// decompressInstructionBuffer() expects validity and the terminating zero
+InstructionBuffer decompressInstructionBuffer(const uint8_t* byteCodeStart){
 	InstructionBuffer ib;
 	initInstructionBuffer(&ib);
 	const uint8_t* byteCode=byteCodeStart;
@@ -933,7 +1064,6 @@ InstructionBuffer decompressInstructionBuffer(const uint8_t* byteCodeStart,const
 		i+=decompressInstruction(byteCode+i,&IS);
 		addInstruction(&ib,IS);
 	}
-	if (byteCodeEnd!=NULL) *byteCodeEnd=byteCode+i;
 	return ib;
 }
 
@@ -1259,10 +1389,9 @@ void addPopArgPush2(InstructionBuffer* ib){
 
 
 /*
-addStructArgPush() is for if isActuallyAddressBecauseUnionOrStruct==true
-
-if isActuallyAddressBecauseUnionOrStruct==false, then this should not be called
-  and the argument should be treated as pushed as an argument. I don't think the optimizer will have a problem with that.
+addStructArgPush() is if isLValue==true
+otherwise, this should not be called and the argument should be treated as pushed as an argument. 
+I don't think the optimizer will have a problem with that.
 */
 void addStructArgPush(InstructionBuffer* ib, uint16_t size, bool isVolatile){
 	InstructionSingle IS;
@@ -1270,49 +1399,51 @@ void addStructArgPush(InstructionBuffer* ib, uint16_t size, bool isVolatile){
 	IS.arg.B2.a_0=3;
 	IS.arg.B2.a_1=4;
 	addInstruction(ib,IS);
-	IS.id=I_BL1_;
-	IS.arg.B2.a_0=6;
-	IS.arg.B2.a_1=2;
-	addInstruction(ib,IS);
 	while (size){
-		if (isVolatile) IS.id=I_MRWV;
-		else IS.id=I_MRWN;
-		IS.arg.B3.a_0=5;
-		IS.arg.B3.a_1=3;
-		IS.arg.B3.a_2=4;
+		size-=2;
+		IS.id=I_RL1_;
+		IS.arg.BW.a_0=6;
+		IS.arg.BW.a_1=size;
 		addInstruction(ib,IS);
 		IS.id=I_LAD1;
-		IS.arg.B5.a_0=3;
-		IS.arg.B5.a_1=4;
+		IS.arg.B5.a_0=7;
+		IS.arg.B5.a_1=8;
 		IS.arg.B5.a_2=3;
 		IS.arg.B5.a_3=4;
 		IS.arg.B5.a_4=6;
 		addInstruction(ib,IS);
+		if (isVolatile) IS.id=I_MRWV;
+		else IS.id=I_MRWN;
+		IS.arg.B3.a_0=5;
+		IS.arg.B3.a_1=7;
+		IS.arg.B3.a_2=8;
+		addInstruction(ib,IS);
 		IS.id=I_PUA1;
 		IS.arg.B1.a_0=5;
 		addInstruction(ib,IS);
-		size-=2;
 	}
 }
+
 
 
 // pops an rvalue struct from the stack. should have address pushed after struct
 // isVolatile obviously refers to the write operation.
 // when it is finished, the original address is pushed back to the stack
 void addStructStackAssign(InstructionBuffer* ib, uint16_t size, bool isVolatile){
+	uint16_t initSize=size;
 	InstructionSingle IS;
 	IS.id=I_POP2;
 	IS.arg.B2.a_0=3;
 	IS.arg.B2.a_1=4;
 	addInstruction(ib,IS);
 	while (size){
-		size-=2;
 		IS.id=I_POP1;
 		IS.arg.B1.a_0=5;
 		addInstruction(ib,IS);
 		IS.id=I_RL1_;
 		IS.arg.BW.a_0=6;
-		IS.arg.BW.a_1=size;
+		IS.arg.BW.a_1=initSize-size;
+		size-=2;
 		addInstruction(ib,IS);
 		IS.id=I_LAD1;
 		IS.arg.B5.a_0=7;

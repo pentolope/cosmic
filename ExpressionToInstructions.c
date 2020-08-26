@@ -206,8 +206,8 @@ void warnForTypeCastChangeQualifiersOrTypeStructure(
 	const char* typeString1NQ=stripQualifiersC(typeString1,&v1,&c1);
 	const char* typeString2NQ=stripQualifiersC(typeString2,&v2,&c2);
 	if (isForTypeCast&warnForQualifiers){
-		if ( v1&!v2) printInformativeMessageForExpression(false,"A volatile qualifier is being removed in this type",thisNode);
-		if (!v1& v2) printInformativeMessageForExpression(false,"A volatile qualifier is being added in this type",thisNode);
+		if ( v1&!v2&hasHadPointer) printInformativeMessageForExpression(false,"A volatile qualifier is being removed in this type",thisNode);
+		if (!v1& v2&hasHadPointer) printInformativeMessageForExpression(false,"A volatile qualifier is being added in this type",thisNode);
 		
 		//this check below may cause some annoying warnings, but I think it's actually a good warning to give
 		if ( c1&!c2&hasHadPointer) printInformativeMessageForExpression(false,"A const qualifier is being removed in this type",thisNode);
@@ -227,18 +227,26 @@ void warnForTypeCastChangeQualifiersOrTypeStructure(
 		}
 	}
 	if (isSU1 | isSU2) return;
-	const uint16_t tID1=getTypeIdForCast(typeString1NQ);
-	const uint16_t tID2=getTypeIdForCast(typeString2NQ);
+	const char* extraDecayedString1=NULL;
+	const char* extraDecayedString2=NULL;
+	const uint16_t tID1=(typeString1NQ[0]=='[')?getTypeIdForCast(extraDecayedString1=applyToTypeStringBaseArrayDecayToNew(typeString1NQ)):getTypeIdForCast(typeString1NQ);
+	const uint16_t tID2=(typeString2NQ[0]=='[')?getTypeIdForCast(extraDecayedString2=applyToTypeStringBaseArrayDecayToNew(typeString2NQ)):getTypeIdForCast(typeString2NQ);
 	//printf("w:%d:%d;\n",tID1,tID2);
 	if ((tID1==9 | tID1==8) & (tID2==9 | tID2==8)){
 		//printf("w->\n");
-		warnForTypeCastChangeQualifiersOrTypeStructure(thisNode,typeString1NQ+2,typeString2NQ+2,true,isForTypeCast,warnForQualifiers);
-		return;
-	}
-	if (hasHadPointer){
+		warnForTypeCastChangeQualifiersOrTypeStructure(
+			thisNode,
+			((extraDecayedString1==NULL)?typeString1NQ:extraDecayedString1)+2,
+			((extraDecayedString2==NULL)?typeString2NQ:extraDecayedString2)+2,
+			true,
+			isForTypeCast,
+			warnForQualifiers);
+	} else if (hasHadPointer){
 		if (isForTypeCast) printInformativeMessageForExpression(false,"Pointers to differing types are being type casted here",thisNode);
 		else printInformativeMessageForExpression(false,"Pointers to differing types are being compared here",thisNode);
 	}
+	if (extraDecayedString1!=NULL) cosmic_free((char*)extraDecayedString1);
+	if (extraDecayedString2!=NULL) cosmic_free((char*)extraDecayedString2);
 }
 
 /*
@@ -533,7 +541,9 @@ void pushAsParam(ExpressionTreeNode* thisNode,const char* typeStringTo){
 		thisNode->post.sizeOnStack+=(uint16_t)size;
 		if (thisNode->post.isLValue){
 			addStructArgPush(&thisNode->ib,size,thisNode->post.isLValueVolatile);
-		} // otherwise, the struct is already completely on the stack. The optimizer should be barely okay with not being told about this
+		} else {
+			// otherwise, the struct is already completely on the stack. The optimizer should be barely okay with not being told about this
+		}
 	} else {
 		applyTypeCast(thisNode,typeStringTo,15);
 		applyTypeCast(thisNode,singleTypicalIntegralTypePromote(typeStringTo,NULL),15); // should this and the previous warn?
@@ -674,13 +684,15 @@ struct AdvancedTypeInfo{
 };
 
 struct AdvancedTypeInfo genAdvancedTypeInfo(ExpressionTreeNode* thisNode){
-	genTypeStringNQ(thisNode);
 	struct AdvancedTypeInfo this={0};
 	this.node=thisNode;
 	this.post=&(thisNode->post);
-	this.isSU=isTypeStringOfStructOrUnion(this.post->typeStringNQ);
 	this.isPtr=this.post->typeStringNQ[0]=='*';
-	if (this.isPtr) this.tsDerefNQ=stripQualifiers(this.post->typeStringNQ+2,NULL,NULL);
+	if (this.isPtr) 
+		this.tsDerefNQ=stripQualifiers(this.post->typeStringNQ+2,NULL,NULL);
+	else 
+		this.isSU=isTypeStringOfStructOrUnion(this.post->typeStringNQ);
+	
 	if (!this.isSU&!this.isPtr){
 		this.itpr=getRankOfPromotedTypeString(this.post->typeString);
 		if (!this.itpr.didSucceed){
@@ -881,7 +893,7 @@ void applyAutoTypeConversion_Identifier(ExpressionTreeNode* thisNode){
 		thisNode->post.extraVal = gfep->labelID;
 		thisNode->post.typeString = applyToTypeStringRemoveIdentifierToNew(gfep->typeString);
 		
-		applyPrependWithInputReplace("const ",&thisNode->post.typeString); // is this really what I want to do here?
+		applyPrependWithInputReplace("const ",&thisNode->post.typeString);
 	} else {
 		assert(false);
 		exit(1);
@@ -970,6 +982,13 @@ void applyAutoTypeConversion_Typical(ExpressionTreeNode* tn){
 			ln->post.isLValue=false;
 		}
 		genTypeStringNQ(ln);
+		if (ln->post.typeStringNQ[0]=='('){
+			// qualifiers are effectively overridden because these are functions auto-transforming to pointers and I'm overriding the qualifiers because I know what a function pointer should be
+			ln->post.isLValue=false;
+			// oID is never 16 (the address-of operator doesn't have a left node)
+			applyPrependWithInputReplace("const * ",&ln->post.typeString);
+			genTypeStringNQ(ln);
+		}
 		lTS=&ln->post.typeString;
 		if (oID!=49) l=genAdvancedTypeInfo(ln);
 	}
@@ -983,6 +1002,16 @@ void applyAutoTypeConversion_Typical(ExpressionTreeNode* tn){
 				}
 			}
 			genTypeStringNQ(rn);
+			if (rn->post.typeStringNQ[0]=='('){
+				// qualifiers are effectively overridden because these are functions auto-transforming to pointers and I'm overriding the qualifiers because I know what a function pointer should be
+				rn->post.isLValueConst=true;
+				rn->post.isLValueVolatile=false;
+				if (oID!=16){
+					rn->post.isLValue=false;
+					applyPrependWithInputReplace("const * ",&rn->post.typeString);
+					genTypeStringNQ(rn);
+				}
+			}
 			rTS=&rn->post.typeString;
 			if (!(oID==49 | oID==16)) r=genAdvancedTypeInfo(rn);
 		}
@@ -1076,15 +1105,22 @@ void applyAutoTypeConversion_Typical(ExpressionTreeNode* tn){
 			applyRvaluePointerToLvalueTransform(rn);
 			*thisTSP=copyStringToHeapString(*rTS);
 			tp->isLValue=true;
-			tp->isLValueConst =    rn->post.isLValueConst;
+			tp->isLValueConst    = rn->post.isLValueConst;
 			tp->isLValueVolatile = rn->post.isLValueVolatile;
 		}
 		break;
 		case 16:{
 			etc_02(rn);
-			*thisTSP=strMerge2("* ",*rTS);
-			if (rn->post.isLValueConst) applyPrependWithInputReplace("const ",thisTSP);
-			if (rn->post.isLValueVolatile) applyPrependWithInputReplace("volatile ",thisTSP);
+			if (rn->post.typeStringNQ[0]=='['){
+				*thisTSP=copyStringToHeapString(*rTS);
+				tp->isLValue         = rn->post.isLValue;
+				tp->isLValueConst    = rn->post.isLValueConst;
+				tp->isLValueVolatile = rn->post.isLValueVolatile;
+			} else {
+				*thisTSP=strMerge2("* ",*rTS);
+				if (rn->post.isLValueConst) applyPrependWithInputReplace("const ",thisTSP);
+				if (rn->post.isLValueVolatile) applyPrependWithInputReplace("volatile ",thisTSP);
+			}
 		}
 		break;
 		case 18:
@@ -1391,6 +1427,17 @@ void applyAutoTypeConversion(ExpressionTreeNode* thisNode){
 		cosmic_free(expressionTreeGlobalBuffer.expressionTreeNodes[thisNode->pre.leftNode].post.typeString);
 	if (thisNode->pre.hasRightNode&!(oID==5 | oID==6 | oID==17))
 		cosmic_free(expressionTreeGlobalBuffer.expressionTreeNodes[thisNode->pre.rightNode].post.typeString);
+	if (thisNode->isRoot){
+		if (thisNode->post.typeStringNQ[0]=='('){
+			// qualifiers are effectively overridden because these are functions auto-transforming to pointers and I'm overriding the qualifiers because I know what a function pointer should be
+			thisNode->post.isLValue=false;
+			applyPrependWithInputReplace("const * ",&thisNode->post.typeString);
+			genTypeStringNQ(thisNode);
+			#ifdef EXP_TO_ASSEMBLY_DEBUG
+			printf("~~~>%s<%d,%d,%d,%d\n",thisNode->post.typeString,thisNode->operatorID,thisNode->post.isLValue,thisNode->post.isLValueVolatile,thisNode->post.isLValueConst);
+			#endif
+		}
+	}
 }
 
 
@@ -2435,6 +2482,7 @@ void expressionToAssemblyWithReturn(
 	ensureExpNodeInit(assignment);
 	initInstructionBuffer(&returnIdentifier->ib);
 	initInstructionBuffer(&assignment->ib);
+	assignment->isRoot = false; // it kinda is, but it doesn't matter
 	assignment->startIndexInString=(returnIdentifier->startIndexInString=previousRoot->startIndexInString);
 	assignment->endIndexInString=(returnIdentifier->endIndexInString=previousRoot->endIndexInString);
 	returnIdentifier->operatorID=59;

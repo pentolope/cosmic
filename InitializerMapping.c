@@ -561,6 +561,7 @@ void applySymbolicOperator(ExpressionTreeNode* thisNode){
 	switch (thisNode->operatorID){
 		case 10:
 		case 14:
+		case 16:
 			singleMergeIB(ib,ibRight);
 		break;
 		case 11:{
@@ -592,15 +593,36 @@ void applySymbolicOperator(ExpressionTreeNode* thisNode){
 		}
 		break;
 		case 21:{
-			dualMergeIB(ib,ibLeft,ibRight);
 			if (operatorTypeID==1){
+				dualMergeIB(ib,ibLeft,ibRight);
 				writeIS.id=I_SYD0;
+				addInstruction(ib,writeIS);
 			} else if (operatorTypeID==2){
+				dualMergeIB(ib,ibLeft,ibRight);
 				writeIS.id=I_SYW0;
+				addInstruction(ib,writeIS);
+			} else if (operatorTypeID==3){
+				dualMergeIB(ib,ibLeft,ibRight);
+				writeIS.id=I_SYCD;
+				writeIS.arg.D.a_0=extraVal;
+				addInstruction(ib,writeIS);
+				writeIS.id=I_SYD2;
+				addInstruction(ib,writeIS);
+				writeIS.id=I_SYD0;
+				addInstruction(ib,writeIS);
+			} else if (operatorTypeID==4){
+				dualMergeIB(ib,ibRight,ibLeft);
+				writeIS.id=I_SYCD;
+				writeIS.arg.D.a_0=extraVal;
+				addInstruction(ib,writeIS);
+				writeIS.id=I_SYD2;
+				addInstruction(ib,writeIS);
+				writeIS.id=I_SYD0;
+				addInstruction(ib,writeIS);
 			} else {
+				// should not happen
 				goto GiveHasNotAddedMessage;
 			}
-			addInstruction(ib,writeIS);
 		}
 		break;
 		case 22:{
@@ -650,7 +672,6 @@ void applySymbolicOperator(ExpressionTreeNode* thisNode){
 				writeIS.id=I_SYCL;
 				writeIS.arg.D.a_0=extraVal;
 				addInstruction(ib,writeIS);
-				printInformativeMessageForExpression(true,"Function pointers in static expressions are... possibly functional right now",thisNode);
 			}
 		}
 		break;
@@ -755,7 +776,7 @@ bool shouldAvoidWarningsForInitializerExpressionElement(ExpressionTreeNode* root
 }
 
 
-void expressionToConstantBase(struct ConstValueTypePair* cvtp,const char* typeStringCast, int16_t nodeIndex){ // potentialNoWarn is intended to be removed
+void expressionToConstantBase(struct ConstValueTypePair* cvtp, const char* typeStringCast, int16_t nodeIndex){
 	expressionToConstant(nodeIndex);
 	ExpressionTreeNode* thisNode=expressionTreeGlobalBuffer.expressionTreeNodes+nodeIndex;
 	applyTypeCast(thisNode,typeStringCast,15);
@@ -990,8 +1011,9 @@ uint8_t catagorizeInitializerMapDesignator(int32_t strStart){
 }
 
 int32_t initializerMapDesignator(int32_t strStart){
-	struct InitializerMapEntry ime={-1,-1,-1,strStart,strStart,
-		findDesignatorEndForInitializerMap(strStart),catagorizeInitializerMapDesignator(strStart),-1};
+	struct InitializerMapEntry ime={-1,-1,-1,strStart,strStart,0,0,-1};
+	ime.strEnd=findDesignatorEndForInitializerMap(strStart);
+	ime.typeOfEntry=catagorizeInitializerMapDesignator(strStart);
 	if (ime.typeOfEntry==7){
 		return initializerMapDesignator(ime.strEnd);
 	} else if (strStart==ime.strEnd){
@@ -1022,7 +1044,8 @@ uint8_t catagorizeInitializerMapTypical(int32_t index){
 
 int32_t initializerMapTypical(int32_t strStart){
 	strStart=emptyIndexAdvance(strStart);
-	struct InitializerMapEntry ime={-1,-1,-1,strStart,strStart,findTypicalEndForInitializerMap(strStart),0,-1};
+	struct InitializerMapEntry ime={-1,-1,-1,strStart,strStart,0,0,-1};
+	ime.strEnd=findTypicalEndForInitializerMap(strStart);
 	{
 	char strStartChar0=sourceContainer.string[strStart];
 	assert(!(strStartChar0==' ' | strStartChar0=='\n')); // bad starting place
@@ -1265,13 +1288,18 @@ void initializerImplementNonstaticExpression(
 			printInformativeMessageAtSourceContainerIndex(true,"Cannot initialize incomplete struct or union",ime->strStart,0);
 			exit(1);
 		}
+		
 		insert_IB_STPI(ib,stackOffset);
-		singleMergeIB(ib,&ib_stack_swp_22);
-		while (typeSize!=0){
-			singleMergeIB(ib,&ib_mem_word_copy_n_n);
-			typeSize-=2;
+		if (thisNode->post.isLValue){
+			singleMergeIB(ib,&ib_stack_swp_22);
+			while (typeSize!=0){
+				singleMergeIB(ib,&ib_mem_word_copy_n_n);
+				typeSize-=2;
+			}
+			addQuadVoidPop(ib);
+		} else {
+			addStructStackAssign(ib,typeSize,false);
 		}
-		addQuadVoidPop(ib);
 	} else {
 		assert(!(typeSize==0 | typeSize==3 | typeSize>4));
 		insert_IB_STPI(ib,stackOffset);
@@ -1791,7 +1819,7 @@ bool initializerImplementRoot(
 		typeSize+=typeSize&1;
 		if (isStatic){
 			if (isTypeStringOfStructOrUnion(localTypeString)){
-				printInformativeMessageAtSourceContainerIndex(true,"Initializing by expression to a struct or union of static storage\n    is not possible with the current implementation of constant expressions",ime->strStart,0);
+				printInformativeMessageAtSourceContainerIndex(true,"Initializing by expression to a struct or union of static storage\n    is not possible with the current implementation of static expressions",ime->strStart,0);
 				exit(1);
 			}
 			initMemoryOrganizerForInitializer(&mofi,typeSize);
@@ -1801,7 +1829,7 @@ bool initializerImplementRoot(
 			destroyInstructionBuffer(&ib_temp);
 			return true;
 		} else {
-			initializerImplementNonstaticExpression(root,ib,*typeStringPtr,false,false,false);
+			initializerImplementNonstaticExpression(root,ib,*typeStringPtr,0,false,false);
 			return false;
 		}
 	}

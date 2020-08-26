@@ -540,8 +540,8 @@ POP2 %4 %3
 POP2 %2 %C
 
 RL1_ %5 #8000
-XOR_ %2 %2 %5
-XOR_ %4 %4 %5
+XOR_ %3 %3 %5
+XOR_ %C %C %5
 
 BL1_ %5 $01
 SSUB %5 %4 %2
@@ -574,12 +574,12 @@ POP2 %4 %3
 POP2 %2 %C
 
 RL1_ %5 #8000
-XOR_ %2 %2 %5
-XOR_ %4 %4 %5
+XOR_ %3 %3 %5
+XOR_ %C %C %5
 
 BL1_ %5 $01
 SSUB %5 %2 %4
-SSUB %5 %C %2
+SSUB %5 %C %3
 PU1_ %5
 
 """,
@@ -608,8 +608,8 @@ POP2 %4 %3
 POP2 %2 %C
 
 RL1_ %5 #8000
-XOR_ %2 %2 %5
-XOR_ %4 %4 %5
+XOR_ %3 %3 %5
+XOR_ %C %C %5
 
 BL1_ %5 $01
 SSUB %5 %2 %4
@@ -642,8 +642,8 @@ POP2 %4 %3
 POP2 %2 %C
 
 RL1_ %5 #8000
-XOR_ %2 %2 %5
-XOR_ %4 %4 %5
+XOR_ %3 %3 %5
+XOR_ %C %C %5
 
 BL1_ %5 $01
 SSUB %5 %4 %2
@@ -695,7 +695,7 @@ POP2 %4 %3
 POP2 %2 %C
 BL1_ %5 $01
 SSUB %5 %2 %4
-SSUB %5 %C %2
+SSUB %5 %C %3
 PU1_ %5
 
 """,
@@ -850,20 +850,20 @@ LABL :00000000
 "IB_logic_or_with_jmp":"""
 
 INSR &0
-POP1 %C
+POP1 %B
 BL1_ %2 $01
-XOR_ %C %2 %C
-PU1_ %C
+XOR_ %C %2 %B
 SYRD %3 %4
 SYCL @00000000
 SYRE
+PHIS %B
 CJMP %3 %4 %C
 INSR &1
-POP2 %C %2
-BL1_ %2 $01
-XOR_ %C %2 %C
-PU1_ %C
+POP1 %B
+PHIS %B
 LABL :00000000
+PHIE %B
+PU1_ %B
 
 """,
 
@@ -943,9 +943,11 @@ PU2_ %B %A
 "IB_mem_byte_write_n":"""
 
 POP2 %D %3
-POP1 %2
-MWBN %2 %3
-PU1_ %2
+POP1 %4
+BL1_ %2 $FF
+AND_ %4 %4 %2
+MWBN %4 %3
+PU1_ %4
 
 """,
 
@@ -953,9 +955,11 @@ PU1_ %2
 "IB_mem_byte_write_v":"""
 
 POP2 %D %3
-POP1 %2
-MWBV %2 %3
-PU1_ %2
+POP1 %4
+BL1_ %2 $FF
+AND_ %4 %4 %2
+MWBV %4 %3
+PU1_ %4
 
 """,
 
@@ -1948,13 +1952,9 @@ for k in dictionaryOfInitializationContents.keys():
 
 namesToUse = filter(lambda e:e not in namesToSkipBecauseZero,dictionaryOfInitializationContents.keys())
 namesToUse = sorted(namesToUse)
-namesInRunSection=filter(lambda e:e.split('_')[:3]==['IB','intrinsic','back'],namesToUse)
 namesUnused=[
 'IB_stack_swp_12',
 ]
-
-f=open('GeneratedInstructionInitialization.c','w')
-f.write('\n')
 
 
 def genInitializerForSingleArgument(index,argUnion,arg,i):
@@ -1998,28 +1998,21 @@ def genFullInitization(k):
     return s
 
 
-f.write('#ifdef IS_BUILDING_RUN\n')
+
+f=open('GeneratedInstructionInitialization.c','w')
+f.write('\n')
 
 for k in namesToUse:
-    if k in namesInRunSection:
-        if not (k in namesUnused):
-            f.write(genFullInitization(k))
+    if not (k in namesUnused):
+        f.write(genFullInitization(k))
 
-f.write('#else\n')
-
-for k in namesToUse:
-    if not (k in namesInRunSection):
-        if not (k in namesUnused):
-            f.write(genFullInitization(k))
-
-f.write('#endif\n')
 f.close()
 
 f=open('GeneratedInstructionInsertion.c','w')
 
 
 for k in namesToUse:
-    if not (k in namesInRunSection):
+    if not (k in namesUnused) and k.split('_')[:3]!=['IB','intrinsic','back']:
         altName1 = 'ib_'+k[3:]
         splitInstructions = splitInstructionString(dictionaryOfInitializationContents[k])
         insertNumbers=[]
@@ -2035,7 +2028,7 @@ for k in namesToUse:
                 if not (numberOn in labelNumbers):
                     labelNumbers.append(numberOn)
         if len(insertNumbers)!=0 or len(labelNumbers)!=0:
-            f.write('void insert_'+k+'(InstructionBuffer* ib_ToAppendTo')
+            f.write('static void insert_'+k+'(InstructionBuffer* ib_ToAppendTo')
             for i in sorted(insertNumbers):
                 f.write(',const InstructionBuffer* ib_ToInsertFor'+str(i))
             for i in sorted(labelNumbers):
@@ -2086,43 +2079,46 @@ def genPrintoutCode():
     for j in l:
         p=getPref(j).split(' ')
         acc=''
-        acc+='case '+j+':printf("'+j[2:]
-        for pref in p[1:]:
-            acc+=' '
-            if pref in '%&':
-                acc+='%%%01X'
-            if pref=='$':
-                acc+='$%02X'
-            if pref=='#':
-                acc+='#%04X'
-            if pref in '!@:':
-                acc+=pref+'%04X%04X'
-        acc+='"'
-        structName=''
-        for pref in p[1:]:
-            if pref=='&':
-                structName+='B'
-            if pref=='%':
-                structName+='B'
-            if pref=='$':
-                structName+='B'
-            if pref=='#':
-                structName+='W'
-            if pref=='!':
-                structName+='D'
-            if pref=='@':
-                structName+='D'
-            if pref==':':
-                structName+='D'
-        if structName=='B'*len(structName):structName='B'+str(len(structName))
-        for i,pref in enumerate(p[1:]):
-            acc+=','
-            accessor='instructionSingle.arg.'+structName+'.a_'+str(i)
-            if pref in '&%$#':
-                acc+='(uint16_t)'+accessor
-            if pref in '!@:':
-                acc+='(uint16_t)('+accessor+'>>16),(uint16_t)'+accessor
-        acc+=');return;\n'
+        if j!='I_ERR_':
+            acc+='case '+j+':printf("'+j[2:]
+            for pref in p[1:]:
+                acc+=' '
+                if pref in '%&':
+                    acc+='%%%01X'
+                if pref=='$':
+                    acc+='$%02X'
+                if pref=='#':
+                    acc+='#%04X'
+                if pref in '!@:':
+                    acc+=pref+'%04X%04X'
+            acc+='"'
+            structName=''
+            for pref in p[1:]:
+                if pref=='&':
+                    structName+='B'
+                if pref=='%':
+                    structName+='B'
+                if pref=='$':
+                    structName+='B'
+                if pref=='#':
+                    structName+='W'
+                if pref=='!':
+                    structName+='D'
+                if pref=='@':
+                    structName+='D'
+                if pref==':':
+                    structName+='D'
+            if structName=='B'*len(structName):structName='B'+str(len(structName))
+            for i,pref in enumerate(p[1:]):
+                acc+=','
+                accessor='instructionSingle.arg.'+structName+'.a_'+str(i)
+                if pref in '&%$#':
+                    acc+='(uint16_t)'+accessor
+                if pref in '!@:':
+                    acc+='(uint16_t)('+accessor+'>>16),(uint16_t)'+accessor
+            acc+=');return;\n'
+        else:
+            acc+='case '+j+':return;'
         finalString+=acc
     finalString+='}\n}\n'
     f=open('PrintSingleInstruction.c','w')
@@ -2131,7 +2127,7 @@ def genPrintoutCode():
 
 genPrintoutCode()
 
-print '\nDone'
+print('\nCoreGeneration.py Finished')
 
 
 

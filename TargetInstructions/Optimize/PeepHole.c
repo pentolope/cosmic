@@ -539,7 +539,7 @@ const InsertionInstructionPacket IIP_arr_7F[] = {
 {I_POP1,0,16,16},
 {I_POP1,1,16,16},
 {I_AND_,0, 0, 1},
-{I_BL1_,1,16,16,1},
+{I_RL1_,1,16,16,0xFFFF},
 {I_XOR_,0, 0, 1}
 };
 
@@ -557,7 +557,7 @@ const InsertionInstructionPacket IIP_arr_80[] = {
 {I_POP1,0,16,16},
 {I_POP1,1,16,16},
 {I_OR__,0, 0, 1},
-{I_BL1_,1,16,16,1},
+{I_RL1_,1,16,16,0xFFFF},
 {I_XOR_,0, 0, 1}
 };
 
@@ -599,6 +599,7 @@ typedef struct ValueTraceEntriesPacket{
 
 
 ValueTraceEntriesPacket VTEP_arr[PH_VTEP_COUNT] = {
+
 {0,0,0,0,VTE_arr_00},
 {0,0,0,0,VTE_arr_01},
 {0,0,0,0,VTE_arr_02},
@@ -610,6 +611,7 @@ ValueTraceEntriesPacket VTEP_arr[PH_VTEP_COUNT] = {
 {0,2,0,2,VTE_arr_0C,IIP_arr_0C},
 {0,2,0,3,VTE_arr_0D,IIP_arr_0D},
 {0,0,0,0,NULL},
+
 {0,2,0,4,VTE_arr_0F,IIP_arr_0F},
 {0,4,1,7,VTE_arr_10},
 {0,5,1,7,VTE_arr_11},
@@ -641,7 +643,7 @@ ValueTraceEntriesPacket VTEP_arr[PH_VTEP_COUNT] = {
 {1,2,1,5,VTE_arr_7C,IIP_arr_7C},
 {1,0,0,0,VTE_arr_7D},
 {1,0,0,0,VTE_arr_7E},
-{0,2,1,5,VTE_arr_7F,IIP_arr_7F},
+{0,2,1,5,VTE_arr_7F,IIP_arr_7F},// 39
 {0,2,1,5,VTE_arr_80,IIP_arr_80},
 {0,0,0,0,VTE_arr_81},
 {0,0,0,0,VTE_arr_82},
@@ -725,6 +727,7 @@ printf("\npeephole source overflow!\n");
 #endif
 		return true;
 	}
+	thisSource->isSwapped=0;
 	thisSource->instr=currentIndex;
 	thisSource->nRegIN=0;
 	thisSource->regOUT=currentReg;
@@ -992,6 +995,7 @@ void insertNOP_InFrontOf(InstructionBuffer* ib, uint32_t destination){
 	IS.id=I_NOP_;
 	addInstruction(ib,IS);
 	applyReorderNoArea(ib,numberOfSlotsTaken,destination+1);
+	consolePrintBufferPoint(ib,destination+1,-1,3,"Reorder Complete [insertNOP_InFrontOf()]");
 }
 
 void insertNOP_InFrontOf_abstraction(ValueTraceEntriesApplicableRepeatedParams* vtearp, uint32_t target){
@@ -1008,18 +1012,26 @@ void insertNOP_InFrontOf_abstraction(ValueTraceEntriesApplicableRepeatedParams* 
 	insertNOP_InFrontOf(vtearp->ib,target);
 }
 
-void applyInitialPeepHoleTransform(ValueTraceEntriesApplicableRepeatedParams* vtearp){
+void applyInitialPeepHoleTransform(ValueTraceEntriesApplicableRepeatedParams* vtearp,uint32_t knownPrevTarget,uint8_t knownPrevReg){
 	ValueTraceEntry* thisSource=vtearp->source+vtearp->walkSource;
 	const ValueTraceEntry* vte=vtearp->template->vte+vtearp->walkTemplate;
 	InstructionInformation II;
 	fillInstructionInformation(&II,vtearp->ib,thisSource->instr);
 	while (vte->id==I_PEPH){
-		uint32_t target=thisSource->instr;
-		insertNOP_InFrontOf_abstraction(vtearp,target);
 		InstructionSingle IS;
-		const enum InstructionTypeID ids[2]={I_POP1,I_PU1_};
-		IS.id=ids[(vte->entryType&0xF0)==0x60];
-		IS.arg.B1.a_0=thisSource->regOUT;
+		{
+			const enum InstructionTypeID ids[2]={I_POP1,I_PU1_};
+			IS.id=ids[(vte->entryType&0xF0)==0x60];
+		}
+		uint32_t target;
+		if (knownPrevReg==0){
+			target=thisSource->instr;
+			IS.arg.B1.a_0=thisSource->regOUT;
+		} else {
+			target=knownPrevTarget-1;
+			IS.arg.B1.a_0=knownPrevReg;
+		}
+		insertNOP_InFrontOf_abstraction(vtearp,target);
 		vtearp->ib->buffer[target+1]=IS;
 		vtearp->pushPopRecord[vtearp->pushPopWalk++]=target+1;
 		vte=vtearp->template->vte+ ++vtearp->walkTemplate;
@@ -1039,7 +1051,8 @@ void applyInitialPeepHoleTransform(ValueTraceEntriesApplicableRepeatedParams* vt
 	uint8_t r;
 	while ((r=II.regIN[ri++])!=16){
 		assert((thisSource->entryType&0x02)==0x00);
-		applyInitialPeepHoleTransform(vtearp);
+		applyInitialPeepHoleTransform(vtearp,thisSource->instr,
+			thisSource->isSwapped?II.regIN[1^(ri-1)]:r);
 	}
 }
 

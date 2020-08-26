@@ -1,4 +1,22 @@
 
+#ifdef __COSMIC
+#define __STD_REAL
+#define __BUILDING_SIM_LOADER
+
+static unsigned long _exit_ret_address=0xFFFFFFF0;
+static unsigned int _exit_ret_val_ptr;
+#include <stdbool.h>
+#include <stdint.h>
+#include <assert.h>
+
+#include <stdlib.c>
+#include <stdio.c>
+#include <printf.c>
+#include <string.c>
+#endif
+
+
+
 #include "StatementWalk.c"
 #include "FinalizersAndFileIO.c"
 
@@ -20,6 +38,61 @@ void runPreprocessCompile(const char* startFilePath, const char* outFilePath, bo
 	destroyAllCompilerInfo();
 }
 
+void intrinsicBuild(){
+	compileSettings.optLevel=4;
+	globalLabelID = 0x2F;
+	runPreprocessCompile("TargetInstructions/ComplexIntrinsics/source.c","IntrinsicBuiltFiles/_intrinsics.bin",false);
+	printf("Compilation of \'source.c\' finished, inserting smaller intrinsics...\n");
+	struct BinContainer bc=loadFileContentsAsBinContainer("IntrinsicBuiltFiles/_intrinsics.bin");
+	quadMergeIB(&bc.functions,&ib_intrinsic_back_div32_u_u,&ib_intrinsic_back_mod32_u_u,&ib_intrinsic_back_div32_s_s,&ib_intrinsic_back_mod32_s_s);
+	dualMergeIB(&bc.functions,&ib_intrinsic_back_Lshift32,&ib_intrinsic_back_Rshift32);
+	CompressedInstructionBuffer cib0 = compressInstructionBuffer(&bc.functions);
+	CompressedInstructionBuffer cib1 = compressInstructionBuffer(&bc.staticData);
+	safe_fputc_file_path="IntrinsicBuiltFiles/_intrinsics_symbols.bin";
+	safe_fputc_file = fopen("IntrinsicBuiltFiles/_intrinsics_symbols.bin","wb");
+	if (safe_fputc_file==NULL) err_10_1_("Could not open required file for output");
+	safe_fputc((uint8_t)(bc.len_symbols));
+	safe_fputc((uint8_t)(bc.len_symbols>>8));
+	safe_fputc((uint8_t)(bc.len_symbols>>16));
+	safe_fputc((uint8_t)(bc.len_symbols>>24));
+	for (uint32_t i0=0;i0<bc.len_symbols;i0++){
+		struct SymbolEntry se=bc.symbols[i0];
+		safe_fputc((uint8_t)(se.label));
+		safe_fputc((uint8_t)(se.label>>8));
+		safe_fputc((uint8_t)(se.label>>16));
+		safe_fputc((uint8_t)(se.label>>24));
+		for (uint32_t i1=0;se.name[i1];i1++){
+			safe_fputc(se.name[i1]);
+		}
+		safe_fputc(se.type);
+		cosmic_free(se.name);
+	}
+	if (fclose(safe_fputc_file)!=0) err_10_1_("Could not close required file after writting");
+	
+	safe_fputc_file_path="IntrinsicBuiltFiles/_intrinsics_functions.bin";
+	safe_fputc_file = fopen("IntrinsicBuiltFiles/_intrinsics_functions.bin","wb");
+	if (safe_fputc_file==NULL) err_10_1_("Could not open required file for output");
+	for (uint32_t i=0;i<cib0.allocLen;i++){
+		safe_fputc(cib0.byteCode[i]);
+	}
+	if (fclose(safe_fputc_file)!=0) err_10_1_("Could not close required file after writting");
+	
+	safe_fputc_file_path="IntrinsicBuiltFiles/_intrinsics_static.bin";
+	safe_fputc_file = fopen("IntrinsicBuiltFiles/_intrinsics_static.bin","wb");
+	if (safe_fputc_file==NULL) err_10_1_("Could not open required file for output");
+	for (uint32_t i=0;i<cib1.allocLen;i++){
+		safe_fputc(cib1.byteCode[i]);
+	}
+	if (fclose(safe_fputc_file)!=0) err_10_1_("Could not close required file after writting");
+	
+	safe_fputc_file=NULL;
+	safe_fputc_file_path=NULL;
+	destroyInstructionBuffer(&bc.functions);
+	destroyInstructionBuffer(&bc.staticData);
+	cosmic_free(cib0.byteCode);
+	cosmic_free(cib1.byteCode);
+	cosmic_free(bc.symbols);
+}
 
 void runLink(const char* outPath,const char* in1Path,const char* in2Path){
 	if (doStringsMatch(in1Path,in2Path)) err_10_1_("Linking identical files is silly");
@@ -29,6 +102,7 @@ void runLink(const char* outPath,const char* in1Path,const char* in2Path){
 	printf("\nLink task done, but not finished. I have yet to write the rest.\n");
 	exit(0);
 }
+
 
 
 struct {
@@ -80,6 +154,12 @@ int main(int argc, char** argv){
 			mainArg.doTypicalCompile=false;
 		} else if (doStringsMatch(arg,"-nc")){
 			compileSettings.noColor=true;
+		} else if (doStringsMatch(arg,"-_intrinsicBuild")){
+			// -_intrinsicBuild will override anything else
+			printf("\nPerforming Intrinsic Build...\n");
+			intrinsicBuild();
+			printf("Intrinsic Build Completed Successfully\n");
+			return 0;
 		} else if (mainArg.in1Path==NULL){
 			mainArg.in1Path=arg;
 		} else if (mainArg.in2Path==NULL){
@@ -88,6 +168,7 @@ int main(int argc, char** argv){
 			err_10_1_("Command argument: Maxiumum of two input files may be specified");
 		}
 	}
+	
 	if (mainArg.expectOutNext) err_10_1_("Command argument: Expected output file path after \'-o\'");
 	if (mainArg.doTypicalCompile & mainArg.in2Path!=NULL) err_10_1_("Command argument: Maxiumum of one input files may be specified for compile task");
 	if (mainArg.doLink & mainArg.in2Path==NULL) err_10_1_("Command argument: Two input files required for link task");
@@ -101,7 +182,8 @@ int main(int argc, char** argv){
 	
 	if (mainArg.doTypicalCompile) runPreprocessCompile(mainArg.in1Path,mainArg.outPath,false);
 	if (mainArg.doLink) runLink(mainArg.outPath,mainArg.in1Path,mainArg.in2Path);
-	printf("\nTask completed successfully\n");
+	printf("\nTask Completed Successfully\n");
+	
 	//printf("%lu,%lu\n",(unsigned long)heap_track.max,(unsigned long)heap_track.size);
 	return 0;
 }

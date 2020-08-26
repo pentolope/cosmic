@@ -10,9 +10,7 @@
 #define INCLUDE_BACKEND
 #include "StatementWalk.c"
 #include "FinalizersAndFileIO.c"
-#define IS_BUILDING_RUN
-#include "TargetInstructions/GeneratedInstructionInitialization.c"
-#undef IS_BUILDING_RUN
+
 
 
 
@@ -29,6 +27,8 @@ struct GlobalSDL_Information{
 	uint16_t eventPullCountdown;
 	bool isSLD_initialized;
 	bool hasPixelBeenWritten;
+	bool hasPixelBeenWrittenSinceVisualDelay;
+	bool isVisualDelaying;
 } globalSDL_Information = {.windowSize = {320,200,3},.eventPullCountdown=1};
 
 
@@ -103,7 +103,13 @@ noreturn void bye(void){
 }
 
 void writePixelToScreenWithSDL(uint16_t a, uint8_t c){
-	if (a<(uint32_t)globalSDL_Information.windowSize.width*globalSDL_Information.windowSize.height && globalSDL_Information.pixelState[a]!=c){
+	if (a==0x0000FFFF){
+		if (!(globalSDL_Information.isVisualDelaying=c!=0) & globalSDL_Information.hasPixelBeenWrittenSinceVisualDelay){
+			const SDL_Rect rect={.x=1,.y=1,.h=globalSDL_Information.windowSize.height*globalSDL_Information.windowSize.sizeOfUnit,.w=globalSDL_Information.windowSize.width*globalSDL_Information.windowSize.sizeOfUnit};
+			SDL_UpdateWindowSurfaceRects(globalSDL_Information.window,&rect,1);
+			globalSDL_Information.hasPixelBeenWrittenSinceVisualDelay=false;
+		}
+	} else if (a<(uint32_t)globalSDL_Information.windowSize.width*globalSDL_Information.windowSize.height && globalSDL_Information.pixelState[a]!=c){
 		globalSDL_Information.pixelState[a]=c;
 		globalSDL_Information.hasPixelBeenWritten=true;
 		const uint8_t r=(255u/7u)*(7u&(unsigned)c/32u)+1u;
@@ -112,15 +118,16 @@ void writePixelToScreenWithSDL(uint16_t a, uint8_t c){
 		const SDL_Rect rect={.x=(a%320u)*globalSDL_Information.windowSize.sizeOfUnit+1,.y=((a/320u)%200u)*globalSDL_Information.windowSize.sizeOfUnit+1,.h=globalSDL_Information.windowSize.sizeOfUnit,.w=globalSDL_Information.windowSize.sizeOfUnit};
 		SDL_FillRect(globalSDL_Information.surfaceOnWindow,&rect,SDL_MapRGB(globalSDL_Information.surfaceOnWindow->format, r, g, b));
 		
-		SDL_UpdateWindowSurfaceRects(globalSDL_Information.window,&rect,1); // updating is slow... not much I can do about it though, it has to update after every pixel change
+		if (!globalSDL_Information.isVisualDelaying) SDL_UpdateWindowSurfaceRects(globalSDL_Information.window,&rect,1); // updating is the slow part
+		else globalSDL_Information.hasPixelBeenWrittenSinceVisualDelay=true;
 	}
 }
 
 void initializeSDL(){
-	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-        printf("Error initializing SDL: %s\n", SDL_GetError());
+	if (SDL_Init(SDL_INIT_VIDEO)!=0){
+		printf("Error initializing SDL: %s\n", SDL_GetError());
 		bye();
-    }
+	}
 	globalSDL_Information.window = SDL_CreateWindow("Sim",
 		SDL_WINDOWPOS_CENTERED,
 		SDL_WINDOWPOS_CENTERED,
@@ -180,21 +187,96 @@ void restoreMachineState(){
 	*machineState=*initialMachineState;
 }
 
+
+
 /*
 all special accesses are performed using byte operations [volatile may be needed] (unless otherwise specified). ranges are given as inclusive ranges
 
-GPU memory may be written to at 0x04000000->0x0400FFFF
+GPU memory may be written to at 0x04000000->0x0400FFFE
+For speed and visual purposes, the simulation's screen pixel changes can be visually delayed by writing a 1 to 0x0400FFFF, then an update may be triggered by writting a 0 to 0x0400FFFF
 
 Halt/Exit is achieved by WORD writing to 0x04010000 , the value is the return value.
 If main terminates, it will set the pc to 0x04010000, at which point the value at 0x0000FFFE will be interpreted as the return value.
 
-Opening a file may be done by writing mode to 0x04010001 , then writing path to 0x04020002 (null termination, simply write each byte to same address)
-  if successful, the reading at the location 0x04020003 will hold the value 1, otherwise it will hold the value 0
+Opening a file for reading or writing may be done by writing mode to 0x04020001 , then writing path to 0x04020002 (null termination, simply write each byte to same address)
+  if successful, reading at the location 0x04020003 will hold the value 1, otherwise it will hold the value 0
   closing a file may be done by writing a 0 to 0x04020003
   only one file may be opened at a time
-  Once a file is opened, it's contents are in the range 0x05000000->0x05FFFFFF and the length is stored in 0x04010006->0x04010009
+  Once a file is opened for reading, it's contents are in the range 0x05000000->0x05FFFFFF and the length [which may be word read/written] is at 0x04020006->0x04020009
+  Once a file is opened for writing, it's contents can be written to by writting to 0x05000000 repeatedly (there is no sense of position)
+
+[Debug only please] a character may be written to the simulator console by writting to 0x04030000 with the character
+
 
 */
+
+
+// currently, this will only work for reading
+struct FileAccessInfo{
+	struct StringBuilder name;
+	struct StringBuilder mode;
+	uint8_t* contents;
+	uint32_t length;
+	bool isRead;
+	FILE* outFile;
+} fileAccessInfo={.isRead=true};
+
+void triggerFileLoad(){
+	fileAccessInfo.length=0;
+	fileAccessInfo.contents=NULL;
+	fileAccessInfo.outFile=NULL;
+	fileAccessInfo.isRead=true;
+	char* filePath=stringBuilderToString(&fileAccessInfo.name);
+	char* fileMode=stringBuilderToString(&fileAccessInfo.mode);
+	stringBuilderClear(&fileAccessInfo.name);
+	stringBuilderClear(&fileAccessInfo.mode);
+	printf("\nfopen(\"%s\",\"%s\")->",filePath,fileMode);
+	FILE* inputFile = fopen(filePath,fileMode);
+	if (inputFile==NULL){
+		printf("NULL\n");
+		return;
+	}
+	printf("VALID\n");
+	if ((fileAccessInfo.isRead=!doStringsMatch(fileMode,"wb"))){
+		fpos_t startingPositionOfFile;
+		fgetpos(inputFile,&startingPositionOfFile);
+		while (fgetc(inputFile)!=EOF){
+			fileAccessInfo.length++;
+			if (fileAccessInfo.length>268435456L){ // 2**28
+				fclose(inputFile);
+				printf("%s",strMerge3("Error: Input file \"",filePath,"\" is too large"));
+				bye();
+			}
+		}
+		fsetpos(inputFile,&startingPositionOfFile);
+		fileAccessInfo.contents = cosmic_malloc(fileAccessInfo.length*sizeof(char));
+		for (int32_t i=0;i<fileAccessInfo.length;i++){
+			int c=fgetc(inputFile);
+			assert(c!=EOF);
+			fileAccessInfo.contents[i]=c;
+		}
+		fclose(inputFile);
+	} else {
+		fileAccessInfo.outFile=inputFile;
+	}
+	cosmic_free(filePath);
+	cosmic_free(fileMode);
+}
+
+void triggerFileClose(){
+	if (fileAccessInfo.isRead){
+		cosmic_free(fileAccessInfo.contents);
+	} else {
+		fclose(fileAccessInfo.outFile);
+	}
+	fileAccessInfo.outFile=NULL;
+	fileAccessInfo.contents=NULL;
+	fileAccessInfo.length=0;
+	printf("\nfclose()\n");
+}
+
+
+
 
 
 void handleCacheMiss(){
@@ -216,6 +298,12 @@ uint16_t readWord(uint32_t a){
 		bye();
 	}
 	if (aUD!=0){
+		if (a==0x04020006){
+			return (uint16_t)(fileAccessInfo.length>> 0);
+		}
+		if (a==0x04020008){
+			return (uint16_t)(fileAccessInfo.length>> 16);
+		}
 		makeColor(COLOR_TO_TEXT,COLOR_RED);
 		printf("Mem fault:word read out of bounds:%08X\n",a);
 		resetColor();
@@ -240,6 +328,33 @@ uint8_t readByte(uint32_t a){
 	uint32_t aU_=aU&((1LU<<15)-1);
 	uint32_t aUD=(aU-aU_)>>15;
 	if (aUD!=0){
+		if (a==0x04020003){
+			return fileAccessInfo.isRead?fileAccessInfo.contents!=NULL:fileAccessInfo.outFile!=NULL;
+		}
+		if (a>=0x05000000 & a<=0x05FFFFFF){
+			if (fileAccessInfo.contents==NULL | !fileAccessInfo.isRead){
+				makeColor(COLOR_TO_TEXT,COLOR_RED);
+				printf("Mem fault:byte read at file when no file is open for read:%08X\n",a);
+				resetColor();
+				stateDump();
+				bye();
+			}
+			if (a-0x05000000<fileAccessInfo.length){
+				//printf("{%08X:%02X}",a-0x05000000,fileAccessInfo.contents[a-0x05000000]);
+				if (!fileAccessInfo.isRead | fileAccessInfo.contents==NULL){
+					makeColor(COLOR_TO_TEXT,COLOR_RED);
+					printf("Mem fault:byte read at file when no file is open for read:%08X\n",a);
+					resetColor();
+					stateDump();
+					bye();
+				}
+				return fileAccessInfo.contents[a-0x05000000];
+			}
+			makeColor(COLOR_TO_TEXT,COLOR_RED);
+			printf("Mem warn:byte read at file out of bounds:%08X\n",a);
+			resetColor();
+			return -1;// EOF
+		}
 		makeColor(COLOR_TO_TEXT,COLOR_RED);
 		printf("Mem fault:byte read out of bounds:%08X\n",a);
 		resetColor();
@@ -298,8 +413,53 @@ void writeByte(uint32_t a,uint8_t b){
 	uint32_t aU_=aU&((1LU<<15)-1);
 	uint32_t aUD=(aU-aU_)>>15;
 	if (aUD!=0){
+		if (a==0x04030000){
+			printf("%c",b);
+			fflush(stdout);
+			return;
+		}
+		if (a==0x04020001){
+			stringBuilderAppendChar(&fileAccessInfo.mode,b);
+			return;
+		}
+		if (a==0x04020002){
+			stringBuilderAppendChar(&fileAccessInfo.name,b);
+			if (b==0){
+				triggerFileLoad();
+			}
+			return;
+		}
+		if (a==0x04020003){
+			if (b!=0){
+				makeColor(COLOR_TO_TEXT,COLOR_RED);
+				printf("Mem fault:byte write to file open detector is not 0:%08X\n",a);
+				resetColor();
+				stateDump();
+				bye();
+			}
+			triggerFileClose();
+			return;
+		}
 		if (a>=0x04000000 && a<=0x0400FFFF){
 			writePixelToScreenWithSDL(a-0x04000000,b);
+			return;
+		}
+		if (a==0x05000000){
+			if (fileAccessInfo.outFile==NULL | fileAccessInfo.isRead){
+				makeColor(COLOR_TO_TEXT,COLOR_RED);
+				printf("Mem fault:byte write at file when no file is open for write\n");
+				resetColor();
+				stateDump();
+				bye();
+			}
+			if (fputc(b,fileAccessInfo.outFile)!=b){
+				makeColor(COLOR_TO_TEXT,COLOR_RED);
+				printf("Sim fault:could not write byte:%02X\n",b);
+				resetColor();
+				stateDump();
+				bye();
+			}
+			fflush(fileAccessInfo.outFile);
 			return;
 		}
 		makeColor(COLOR_TO_TEXT,COLOR_RED);
@@ -496,8 +656,11 @@ void fullExecute(){
 			//printf("Over %08X:%08X\n",(unsigned int)machineState->pc,(unsigned int)instructionExecutionCount);
 		}
 		if (machineState->pc<0x00010000 | machineState->pc>=endOfExecutable){
-			printf("Error:Program Counter out of bounds %08X:%08X\n",(unsigned int)machineState->pc,(unsigned int)instructionExecutionCount);
-			bye();
+// this will need to be disabled when using the loader
+#if 0
+printf("Error:Program Counter out of bounds %08X:%08X\n",(unsigned int)machineState->pc,(unsigned int)instructionExecutionCount);
+bye();
+#endif
 		}
 		if ((machineState->sp&1)!=0){
 			printf("Error:Stack Pointer not in allignment (at general) %08X:%08X\n",(unsigned int)machineState->pc,(unsigned int)instructionExecutionCount);
@@ -539,12 +702,15 @@ void performTraceback(uint64_t iicTarget){
 	tracebackLevel--;
 }
 
+uint32_t numberOfLabels;
+uint32_t* labelNumbers;
+uint32_t* labelAddresses;
 
 
 
-uint32_t getLabelAddress(uint32_t labelToSearch,uint32_t labelTotal,uint32_t* labelNames,uint32_t* labelAddresses){
-	for (uint32_t i=0;i<labelTotal;i++){
-		if (labelNames[i]==labelToSearch) return labelAddresses[i];
+uint32_t getLabelAddress(uint32_t labelToSearch){
+	for (uint32_t i=0;i<numberOfLabels;i++){
+		if (labelNumbers[i]==labelToSearch) return labelAddresses[i];
 	}
 	printf("Unresolved Label %08X\n",labelToSearch);
 	bye();
@@ -575,6 +741,208 @@ uint16_t getIntrinsicID(enum InstructionTypeID id){
 	}
 	return 0;
 }
+
+
+static struct {
+	uint16_t vs[100]; // [value stack]
+	int16_t vsl; // [value stack location]
+	int16_t pvsl; // [previous value stack location]
+} symbolicStack;
+
+
+static void symbolicResolutionSingle(InstructionSingle* IS_temp){
+	if (symbolicStack.vsl<10){
+		printf("ByteCode corrupted, symbolic stack overflow\n");
+		bye();
+	}
+	symbolicStack.pvsl=symbolicStack.vsl;
+	bool wasLoad=false;
+	uint16_t inSize;
+	uint16_t outSize;
+	switch (IS_temp->id){
+		case I_SYRE:
+		case I_SYDE:
+		return;
+		case I_SYCB:
+		symbolicStack.vsl-=1;
+		symbolicStack.vs[symbolicStack.vsl  ]=IS_temp->arg.B1.a_0;
+		wasLoad=true;
+		break;
+		case I_SYCW:
+		symbolicStack.vsl-=1;
+		symbolicStack.vs[symbolicStack.vsl  ]=IS_temp->arg.W.a_0;
+		wasLoad=true;
+		break;
+		case I_SYCD:
+		symbolicStack.vsl-=2;
+		symbolicStack.vs[symbolicStack.vsl+1]=IS_temp->arg.D.a_0>>16;
+		symbolicStack.vs[symbolicStack.vsl+0]=IS_temp->arg.D.a_0>> 0;
+		wasLoad=true;
+		break;
+		case I_SYCL:
+		symbolicStack.vsl-=2;
+		{
+		uint32_t labelAddressesTemp = getLabelAddress(IS_temp->arg.D.a_0);
+		symbolicStack.vs[symbolicStack.vsl+1]=labelAddressesTemp>>16;
+		symbolicStack.vs[symbolicStack.vsl+0]=labelAddressesTemp>> 0;
+		}
+		wasLoad=true;
+		break;
+		case I_SYW0:
+		case I_SYW1:
+		case I_SYW2:
+		case I_SYW3:
+		case I_SYW4:
+		case I_SYW5:
+		case I_SYW6:
+		case I_SYW7:
+		case I_SYW8:
+		case I_SYW9:
+		case I_SBLW:
+		case I_SBRW:
+		case I_SCDW:
+		case I_SCDB:
+		inSize=2;
+		outSize=1;
+		break;
+		case I_SYD0:
+		case I_SYD1:
+		case I_SYD2:
+		case I_SYD3:
+		case I_SYD4:
+		case I_SYD5:
+		case I_SYD6:
+		case I_SYD7:
+		case I_SYD8:
+		case I_SYD9:
+		case I_SCQD:
+		inSize=4;
+		outSize=2;
+		break;
+		case I_SYQ0:
+		case I_SYQ1:
+		case I_SYQ2:
+		case I_SYQ3:
+		case I_SYQ4:
+		case I_SYQ5:
+		case I_SYQ6:
+		case I_SYQ7:
+		case I_SYQ8:
+		case I_SYQ9:
+		inSize=8;
+		outSize=4;
+		break;
+		case I_SBLD:
+		case I_SBRD:
+		inSize=3;
+		outSize=2;
+		break;
+		case I_SBLQ:
+		case I_SBRQ:
+		inSize=5;
+		outSize=4;
+		break;
+		case I_SCWD:
+		case I_SCZD:
+		inSize=1;
+		outSize=2;
+		break;
+		case I_SCDQ:
+		case I_SCZQ:
+		inSize=2;
+		outSize=4;
+		break;
+		case I_SCBW:
+		case I_SCWB:
+		inSize=1;
+		outSize=1;
+		break;
+		case I_SCQB:
+		inSize=4;
+		outSize=1;
+		break;
+		default:;assert(false);
+	}
+	if (!wasLoad){
+		symbolicStack.vsl+=inSize;
+		symbolicStack.vsl-=outSize;
+		if (symbolicStack.pvsl+inSize>100){
+			printf("ByteCode corrupted, symbolic stack underflow\n");
+			exit(1);
+		}
+		uint16_t vs_in[8];
+		uint32_t val_out; // todo: when updating to allow qword, change to uint64_t
+		for (uint16_t i=0;i<inSize;i++){
+			vs_in[i]=symbolicStack.vs[symbolicStack.pvsl+i];
+		}
+		switch (IS_temp->id){
+			case I_SYW0:val_out=vs_in[1]+vs_in[0];break;
+			case I_SYW1:val_out=vs_in[1]-vs_in[0];break;
+			case I_SYW2:val_out=vs_in[1]*vs_in[0];break;
+			case I_SYW3:val_out=(  signed)vs_in[1]/(  signed)vs_in[0];break;
+			case I_SYW4:val_out=(unsigned)vs_in[1]/(unsigned)vs_in[0];break;
+			case I_SYW5:val_out=(  signed)vs_in[1]%(  signed)vs_in[0];break;
+			case I_SYW6:val_out=(unsigned)vs_in[1]%(unsigned)vs_in[0];break;
+			case I_SYW7:val_out=vs_in[1]^vs_in[0];break;
+			case I_SYW8:val_out=vs_in[1]&vs_in[0];break;
+			case I_SYW9:val_out=vs_in[1]|vs_in[0];break;
+			case I_SBLW:val_out=(unsigned)vs_in[1]<<vs_in[0];break;
+			case I_SBRW:val_out=(unsigned)vs_in[1]>>vs_in[0];break;
+			case I_SCWB:val_out=vs_in[0]!=0u;break;
+			case I_SCDB:val_out=(vs_in[1]|vs_in[0])!=0u;break;
+			case I_SCQB:val_out=(vs_in[2]|vs_in[3]|vs_in[0]|vs_in[1])!=0u;break;
+			case I_SCZD:case I_SCDW:val_out=vs_in[0];break;
+			case I_SCBW:val_out=(((unsigned)vs_in[0]&0xA0u)*0x01FEu)|(unsigned)vs_in[0];break;
+			case I_SCWD:val_out=(((uint32_t)vs_in[0]&0xA000u)*(uint32_t)0x0001FFFELU)|(uint32_t)vs_in[0];break;
+			case I_SYD0:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16))+(((uint32_t)vs_in[0]<<0)|((uint32_t)vs_in[1]<<16));break;
+			case I_SYD1:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16))-(((uint32_t)vs_in[0]<<0)|((uint32_t)vs_in[1]<<16));break;
+			case I_SYD2:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16))*(((uint32_t)vs_in[0]<<0)|((uint32_t)vs_in[1]<<16));break;
+			case I_SYD3:val_out=((( int32_t)vs_in[2]<<0)|(( int32_t)vs_in[3]<<16))/((( int32_t)vs_in[0]<<0)|(( int32_t)vs_in[1]<<16));break;
+			case I_SYD4:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16))/(((uint32_t)vs_in[0]<<0)|((uint32_t)vs_in[1]<<16));break;
+			case I_SYD5:val_out=((( int32_t)vs_in[2]<<0)|(( int32_t)vs_in[3]<<16))%((( int32_t)vs_in[0]<<0)|(( int32_t)vs_in[1]<<16));break;
+			case I_SYD6:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16))%(((uint32_t)vs_in[0]<<0)|((uint32_t)vs_in[1]<<16));break;
+			case I_SYD7:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16))^(((uint32_t)vs_in[0]<<0)|((uint32_t)vs_in[1]<<16));break;
+			case I_SYD8:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16))&(((uint32_t)vs_in[0]<<0)|((uint32_t)vs_in[1]<<16));break;
+			case I_SYD9:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16))|(((uint32_t)vs_in[0]<<0)|((uint32_t)vs_in[1]<<16));break;
+			case I_SCQD:val_out=(((uint32_t)vs_in[2]<<0)|((uint32_t)vs_in[3]<<16));break;
+			case I_SBLD:val_out=(((uint32_t)vs_in[1]<<0)|((uint32_t)vs_in[2]<<16))<<vs_in[0];break;
+			case I_SBRD:val_out=(((uint32_t)vs_in[1]<<0)|((uint32_t)vs_in[2]<<16))>>vs_in[0];break;
+			
+			case I_SYQ0:
+			case I_SYQ1:
+			case I_SYQ2:
+			case I_SYQ3:
+			case I_SYQ4:
+			case I_SYQ5:
+			case I_SYQ6:
+			case I_SYQ7:
+			case I_SYQ8:
+			case I_SYQ9:
+			case I_SBLQ:
+			case I_SBRQ:
+			
+			case I_SCDQ:
+			case I_SCZQ:
+			assert(false);// qword not ready yet
+			
+			default:;assert(false);
+		}
+		switch (outSize){
+			case 1:
+			symbolicStack.vs[symbolicStack.vsl  ]=(uint16_t)val_out;
+			break;
+			case 2:
+			symbolicStack.vs[symbolicStack.vsl+1]=val_out>>16;
+			symbolicStack.vs[symbolicStack.vsl+0]=val_out>> 0;
+			break;
+			case 4:assert(false);// qword not ready yet [will have to use insertInstructionAt()]
+			
+			default:assert(false);
+		}
+	}
+}
+
+
 
 int main(int argc, char** argv){
 	if (argc<2){
@@ -657,14 +1025,13 @@ int main(int argc, char** argv){
 	destroyInstructionBuffer(&binContainer.staticData);
 	}
 	uint32_t labelCount=0;
-	uint32_t labelTotal;
 	for (uint32_t i=0;i<allData.numberOfSlotsTaken;i++){
 		enum InstructionTypeID id=allData.buffer[i].id;
 		if (id==I_LABL | id==I_FCST | id==I_JJMP) labelCount++;
 	}
-	labelTotal=labelCount;
-	uint32_t* labelNames=cosmic_malloc(labelTotal*sizeof(uint32_t));
-	uint32_t* labelAddresses=cosmic_malloc(labelTotal*sizeof(uint32_t));
+	numberOfLabels=labelCount;
+	labelNumbers=cosmic_malloc(numberOfLabels*sizeof(uint32_t));
+	labelAddresses=cosmic_malloc(numberOfLabels*sizeof(uint32_t));
 	if (printEachInstruction){
 		addressToInstructionTranslationLen=allData.numberOfSlotsTaken;
 		addressToInstructionTranslation=cosmic_malloc(addressToInstructionTranslationLen*sizeof(struct AddressInstructionPair));
@@ -683,19 +1050,19 @@ int main(int argc, char** argv){
 		}
 		storageAddress+=backendInstructionSize(IS);
 		if (IS.id==I_LABL){
-			labelNames[labelCount]=allData.buffer[i].arg.D.a_0;
+			labelNumbers[labelCount]=allData.buffer[i].arg.D.a_0;
 			labelAddresses[labelCount]=storageAddress;
-			//printf("%08X:%08X\n",labelNames[labelCount],labelAddresses[labelCount]);
+			//printf("%08X:%08X\n",labelNumbers[labelCount],labelAddresses[labelCount]);
 			labelCount++;
 		} else if (IS.id==I_JJMP){
-			labelNames[labelCount]=allData.buffer[i].arg.BBD.a_2;
+			labelNumbers[labelCount]=allData.buffer[i].arg.BBD.a_2;
 			labelAddresses[labelCount]=storageAddress;
-			//printf("%08X:%08X\n",labelNames[labelCount],labelAddresses[labelCount]);
+			//printf("%08X:%08X\n",labelNumbers[labelCount],labelAddresses[labelCount]);
 			labelCount++;
 		} else if (IS.id==I_FCST){
-			labelNames[labelCount]=allData.buffer[i].arg.BWD.a_2;
+			labelNumbers[labelCount]=allData.buffer[i].arg.BWD.a_2;
 			labelAddresses[labelCount]=storageAddress;
-			//printf("%08X:%08X\n",labelNames[labelCount],labelAddresses[labelCount]);
+			//printf("%08X:%08X\n",labelNumbers[labelCount],labelAddresses[labelCount]);
 			labelCount++;
 		} else if (IS.id==I_FCEN){
 			endOfExecutable=storageAddress;
@@ -712,15 +1079,16 @@ int main(int argc, char** argv){
 		uint16_t intrinsicID=getIntrinsicID(IS.id);
 		uint32_t symVal;
 		if (intrinsicID!=0){
-			symVal=getLabelAddress(intrinsicID,labelTotal,labelNames,labelAddresses);
+			symVal=getLabelAddress(intrinsicID);
 		} else {
+			/*
 			switch (IS.id){
 				case I_FCST:
 				func_stack_initial=IS.arg.BWD.a_0;
 				func_stack_size=IS.arg.BWD.a_1;
 				break;
 				case I_JTEN:
-				symVal=getLabelAddress(IS.arg.D.a_0,labelTotal,labelNames,labelAddresses);
+				symVal=getLabelAddress(IS.arg.D.a_0);
 				break;
 				case I_SYRD:
 				case I_SYDD:
@@ -731,7 +1099,7 @@ int main(int argc, char** argv){
 					printf("I don't wanna do that yet...");
 					bye();
 				}
-				symVal=getLabelAddress(IS_temp0.arg.D.a_0,labelTotal,labelNames,labelAddresses);
+				symVal=getLabelAddress(IS_temp0.arg.D.a_0);
 				}
 				break;
 				case I_SYDB:
@@ -742,14 +1110,73 @@ int main(int argc, char** argv){
 				case I_SYDQ:
 				printf("I don't wanna do that yet...");
 				bye();
+				
+				
 				default:;
+			}
+			*/
+			uint8_t symbolSizeBytes=0;
+			uint8_t symbolSizeWords=0;
+			switch (IS.id){
+				case I_FCST:
+				func_stack_initial=IS.arg.BWD.a_0;
+				func_stack_size=IS.arg.BWD.a_1;
+				break;
+				case I_JTEN:
+				symVal=getLabelAddress(IS.arg.D.a_0);
+				break;
+				case I_SYRD:
+				case I_SYDD:
+				symbolSizeBytes=4;
+				symbolSizeWords=2;
+				break;
+				case I_SYDB:
+				case I_SYRB:
+				symbolSizeBytes=1;
+				symbolSizeWords=1;
+				break;
+				case I_SYRW:
+				case I_SYDW:
+				symbolSizeBytes=2;
+				symbolSizeWords=1;
+				break;
+				case I_SYRQ:
+				case I_SYDQ:
+				symbolSizeBytes=8;
+				symbolSizeWords=4;
+				break;
+				default:;
+			}
+			if (symbolSizeWords!=0){
+				symbolicStack.vsl=100;
+				InstructionSingle IS_temp;
+				do {
+					++i;
+					if (i>=allData.numberOfSlotsTaken){
+						printf("ByteCode corrupted, end inside symbolic\n");
+						bye();
+					}
+					IS_temp=allData.buffer[i];
+					symbolicResolutionSingle(&IS_temp);
+				} while (IS_temp.id!=I_SYRE & IS_temp.id!=I_SYDE);
+				if (100-symbolicStack.vsl!=symbolSizeWords){
+					printf("ByteCode corrupted, symbolic result size mismatch\n");
+					bye();
+				}
+				switch (symbolSizeBytes){
+					case 1:symVal=(uint32_t)(symbolicStack.vs[99]&255);break;
+					case 2:symVal=(uint32_t)symbolicStack.vs[99];break;
+					case 4:symVal=((uint32_t)symbolicStack.vs[99]<<16)|symbolicStack.vs[98];break;
+					//case 8:break;
+					default:assert(false);
+				}
 			}
 		}
 		backendInstructionWrite(&temporaryStorageBufferWalk,symVal,func_stack_size,func_stack_initial,IS);
 	}
 	assert(temporaryStorageBufferWalk==(temporaryStorageBuffer+storageAddress));
-	uint32_t mainAddress=getLabelAddress(mainLabelNumber,labelTotal,labelNames,labelAddresses);
-	cosmic_free(labelNames);
+	uint32_t mainAddress=getLabelAddress(mainLabelNumber);
+	cosmic_free(labelNumbers);
 	cosmic_free(labelAddresses);
 	for (uint32_t i=1LU<<16;i<storageSize;i++){
 		initMemWrite(i,temporaryStorageBuffer[i]);
@@ -768,6 +1195,7 @@ int main(int argc, char** argv){
 	}
 	uint32_t prevStorageSize0=storageSize;
 	storageSize+=w;
+	storageSize+=storageSize&1;
 	uint32_t argvSim=storageSize;
 	int w2=0;
 	for (int i=1+printEachInstruction;i<argc;i++){
@@ -810,7 +1238,6 @@ int main(int argc, char** argv){
 	printf("Finished Normally. Return Value is `%d`\n",terminationValue);
 	bye();
 }
-
 
 
 

@@ -1,6 +1,6 @@
 
 
-// this should only be used by applyReorder() and insertInstructionAt()
+// this should only be used by applyReorder() , insertInstructionAt() , and insertNOP_InFrontOf()
 void applyReorderNoArea(InstructionBuffer* ib,const uint32_t target,const uint32_t destination){
 	if (target==destination) return;
 	InstructionSingle* buffer = ib->buffer;
@@ -11,12 +11,14 @@ void applyReorderNoArea(InstructionBuffer* ib,const uint32_t target,const uint32
 		while (destination!=walkIndex){
 			next = walkIndex+1;
 			buffer[walkIndex]=buffer[next];
+			consolePrintBufferPoint(ib,walkIndex,next,2,"Reordering Forwards");
 			walkIndex=next;
 		}
 	} else {
 		while (destination!=walkIndex){
 			next = walkIndex-1;
 			buffer[walkIndex]=buffer[next];
+			consolePrintBufferPoint(ib,walkIndex,next,2,"Reordering Backwards");
 			walkIndex=next;
 		}
 	}
@@ -40,6 +42,13 @@ void applyReorder(InstructionBuffer* ib,const uint32_t target,const uint32_t des
 }
 
 
+
+void insertInstructionAtNoNopSearch(InstructionBuffer* ib,const uint32_t destination,const InstructionSingle IS){
+	uint32_t target=ib->numberOfSlotsTaken;
+	addInstruction(ib,IS);
+	applyReorderNoArea(ib,target,destination);
+}
+
 /*
 this moves the instruction that is there to the next slot (newIndex==destination+1)
 this should be used sparingly
@@ -51,6 +60,7 @@ void insertInstructionAt(InstructionBuffer* ib,const uint32_t destination,const 
 	int32_t numberOfSlotsTaken = ib->numberOfSlotsTaken;
 	InstructionSingle* buffer = ib->buffer;
 	for (int32_t i=destination;i<numberOfSlotsTaken;i++){
+		consolePrintBufferPoint(ib,i,-1,0,"Finding NOP_ for insertInstructionAt()");
 		if (buffer[i].id==I_NOP_){
 			nopLocation=i;
 			break;
@@ -68,6 +78,23 @@ void insertInstructionAt(InstructionBuffer* ib,const uint32_t destination,const 
 }
 
 
+void createNopPocket(InstructionBuffer* ib, const uint32_t destination, const uint16_t size){
+	const InstructionSingle IS={.id=I_NOP_};
+	for (uint16_t i=0;i<size;i++){
+		addInstruction(ib,IS);
+	}
+	InstructionSingle*const buffer=ib->buffer;
+	const uint32_t end=destination+size;
+	uint32_t i=ib->numberOfSlotsTaken;
+	while (i--!=end){
+		buffer[i]=buffer[i-size];
+	}
+	i=destination+size;
+	while (i--!=destination){
+		buffer[i]=IS;
+	}
+}
+
 
 
 void doLabelRename(InstructionBuffer* ib, uint32_t from, uint32_t to){
@@ -75,7 +102,8 @@ void doLabelRename(InstructionBuffer* ib, uint32_t from, uint32_t to){
 	InstructionSingle* buffer = ib->buffer;
 	uint32_t i = ib->numberOfSlotsTaken;
 	while (i--!=0){
-		ISP = &(buffer[i]);
+		consolePrintBufferPoint(ib,i,-1,2,"Renaming Labels");
+		ISP = buffer+i;
 		enum InstructionTypeID id=ISP->id;
 		if (id==I_LABL | id==I_SYCL | id==I_JTEN | id==I_FCST){
 			if (ISP->arg.D.a_0==from) ISP->arg.D.a_0=to;
@@ -91,7 +119,7 @@ void doRegRename(InstructionBuffer* ib, uint32_t start, uint32_t end, uint8_t fr
 	InstructionSingle* ISP;
 	InstructionSingle* buffer = ib->buffer;
 	for (uint32_t i=start;i<=end;i++){
-		ISP = &(buffer[i]);
+		ISP = buffer+i;
 		switch (ISP->id){
 			case I_NOP_:
 			case I_SYCB:
@@ -259,12 +287,16 @@ void doRegRename(InstructionBuffer* ib, uint32_t start, uint32_t end, uint8_t fr
 			//case I_INSR:
 			//case I_ERR_:
 			//case I_DEPL:
+			case I_PHIS:
+			case I_PHIE:
+			if (ISP->arg.B1.a_0!=from) break;
 			default:
 			printInstructionBufferWithMessageAndNumber(ib,"here",i);
 			printf("Internal Error: invalid opcode during reg rename[%08X:%08X]{%01X->%01X}\n",start,end,from,to);
 			exit(1);
 			
 		}
+		consolePrintBufferPoint(ib,-1,i,2,"Renaming Registers");
 	}
 }
 
@@ -300,9 +332,11 @@ void removeNop(InstructionBuffer* ib){
 	uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
 	uint32_t i;
 	for (i=0;i<numberOfSlotsTaken;i++){
+		consolePrintBufferPoint(ib,i,-1,0,"Finding NOP_ for Removal");
 		if (buffer[i].id==I_NOP_){
 			uint32_t delta=1;
 			for (i++;i<numberOfSlotsTaken;i++){
+				consolePrintBufferPoint(ib,i,i-delta,2,"Removing NOP_");
 				if ((IS_i=&(buffer[i]))->id==I_NOP_){
 					delta++;
 				} else {
@@ -326,10 +360,12 @@ void contractPushPop(InstructionBuffer* ib){
 	uint32_t count=0;
 	for (uint32_t i0=0;i0<numberOfSlotsTaken;i0++){
 		enum InstructionTypeID id0 = (IS_i0=&(buffer[i0]))->id;
+		consolePrintBufferPoint(ib,i0,-1,0,"Finding Push/Pop for Contraction (1)");
 		if (id0==I_PU1_ | id0==I_POP1){
 			uint32_t i1;
 			for (i1=i0+1;i1<numberOfSlotsTaken;i1++){
 				enum InstructionTypeID id1 = (IS_i1=&(buffer[i1]))->id;
+				consolePrintBufferPoint(ib,i1,-1,0,"Finding Push/Pop for Contraction (2)");
 				if (id1==I_PU1_ | id1==I_POP1){
 					if (id0==id1){
 						if (i0+1==findLowerReorderBoundry(ib,i1)){
@@ -368,6 +404,7 @@ void expandPushPop(InstructionBuffer* ib){
 		uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
 		uint32_t nextSlotsTaken;
 		for (i=0;i<numberOfSlotsTaken;i++){
+			consolePrintBufferPoint(ib,i,-1,0,"Counting Push/Pop for Expansion");
 			id = buffer[i].id;
 			if (id==I_PU2_ | id==I_POP2) countOfExpansion++;
 		}
@@ -399,6 +436,7 @@ void expandPushPop(InstructionBuffer* ib){
 		} else {
 			buffer[iNext  ]=*IS_i;
 		}
+		consolePrintBufferPoint(ib,i,iNext,2,"Performing Push/Pop Expansion");
 	}
 }
 

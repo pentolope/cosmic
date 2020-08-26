@@ -102,8 +102,8 @@ struct BlockFrameArray{
 
 
 // this number is used to make unique numbers for assembly labels (one is added directly prior to each use)
-// it starts at 0x2F because labels below that are usually are reserved for several things
-uint32_t globalLabelID = 0x2F;
+// it starts at 0xFF because labels below that are usually are reserved for several things
+uint32_t globalLabelID = 0xFF;
 
 
 

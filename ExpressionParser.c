@@ -272,7 +272,7 @@ ID = token = details
 
 
 #ifdef COMPILE_EXP_DEBUG_PRINTOUT
-static inline bool isOperatorForExpressionTree(uint8_t oID);
+static inline bool isOperatorForExpressionTree(const uint8_t oID);
 void internalDebugForExpressionParser(){
 	printf("In progress results follow:\n");
 	for (int32_t i=0;i<expressionTokenArray.len;i++){
@@ -937,6 +937,7 @@ typedef struct {
 	bool hasNextChainElement; // used for function parameter chaining
 	bool isEndNode;
 	bool isArgumentTypeForSizeof; // if this node is a sizeof operator, this is true if the argument is a type rather then an expression
+	bool isRoot;
 	uint8_t operatorID; // copied from the token
 /*
 the following are newer pieces. They are typically initialized and handled by expressionToInstructions()
@@ -1099,6 +1100,7 @@ int16_t generateSpecificNodeForExpressionTree(int16_t targetIndex){
 	thisExpressionTreeNode->isEndNode = false; // will be changed to true if it is
 	thisExpressionTreeNode->hasNextChainElement = false; // will be changed to true if it is
 	thisExpressionTreeNode->isArgumentTypeForSizeof = false; // will be changed to true if it is
+	thisExpressionTreeNode->isRoot = false; //  will be changed to true if it is
 	thisExpressionTreeNode->operatorID = thisOperatorID;
 	thisExpressionTreeNode->startIndexInString = targetExpressionToken->tokenStart;
 	thisExpressionTreeNode->endIndexInString = targetExpressionToken->tokenEnd;
@@ -1328,6 +1330,7 @@ int16_t generateExpressionTree(){
 		flagPotentialSeperationsInRangeType2(0,tokenLen);
 		err_1111_("Expression tree for this expression could not be built, the expression is malformed",expressionTokenArray.tokens[0].tokenStart,expressionTokenArray.tokens[tokenLen-1].tokenEnd);
 	}
+	expressionTreeGlobalBuffer.expressionTreeNodes[rootIndex].isRoot = true;
 	return rootIndex;
 }
 
@@ -1660,6 +1663,7 @@ int16_t buildExpressionTreeToGlobalBufferAndReturnRootIndex(int32_t startIndexIn
 		expressionTreeNodeForSingle.endIndexInString = expressionTokenOfSingle.tokenEnd;
 		expressionTreeNodeForSingle.operatorID = expressionTokenOfSingle.operatorID;
 		expressionTreeNodeForSingle.isEndNode = true;
+		expressionTreeNodeForSingle.isRoot = true;
 		expressionTreeGlobalBuffer.expressionTreeNodes[treeIndexForSingle] = expressionTreeNodeForSingle;
 		genAllPreWalkData(treeIndexForSingle);
 		return treeIndexForSingle;
@@ -1672,7 +1676,7 @@ int16_t buildExpressionTreeToGlobalBufferAndReturnRootIndex(int32_t startIndexIn
 	cosmic_free(tempString);
 	}
 	printf("  Operation on tokens partially completed (1/3). Partial results follow:\n");
-	for (int16_t i=0;i<expressionTokenArray.length;i++){
+	for (int16_t i=0;i<expressionTokenArray.len;i++){
 		char *tokenStringContents = copyStringSegmentToHeap(
 			sourceContainer.string,
 			expressionTokenArray.tokens[i].tokenStart,
@@ -1697,7 +1701,7 @@ int16_t buildExpressionTreeToGlobalBufferAndReturnRootIndex(int32_t startIndexIn
 #ifdef COMPILE_EXP_DEBUG_PRINTOUT
 	
 	printf("  Operation on tokens partially completed (2/3). Partial results follow:\n");
-	for (int16_t i=0;i<expressionTokenArray.length;i++){
+	for (int16_t i=0;i<expressionTokenArray.len;i++){
 		char *tokenStringContents = copyStringSegmentToHeap(
 			sourceContainer.string,
 			expressionTokenArray.tokens[i].tokenStart,
@@ -1728,7 +1732,7 @@ int16_t buildExpressionTreeToGlobalBufferAndReturnRootIndex(int32_t startIndexIn
 #ifdef COMPILE_EXP_DEBUG_PRINTOUT
 	
 	printf("  Operation on tokens completed (3/3). Full results follow:\n");
-	for (int16_t i=0;i<expressionTokenArray.length;i++){
+	for (int16_t i=0;i<expressionTokenArray.len;i++){
 		char *tokenStringContents = copyStringSegmentToHeap(
 		sourceContainer.string,
 		expressionTokenArray.tokens[i].tokenStart,
@@ -1750,7 +1754,7 @@ int16_t buildExpressionTreeToGlobalBufferAndReturnRootIndex(int32_t startIndexIn
 	debugPrintOfExpressionTreeFromTarget(sourceContainer.string,rootIndex,0);
 	printf("\n  End of printout for this expression.\n\n");
 #endif
-
+	
 	genAllPreWalkData(rootIndex);
 	return rootIndex;
 }

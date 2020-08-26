@@ -1480,7 +1480,7 @@ void initMacros(){
 	
 	// __STDC__ and __STDC_VERSION__ are not done for right now
 	
-	macroListing.numberOfAllocatedSlotsInArray=4;
+	macroListing.numberOfAllocatedSlotsInArray=5;
 	macroListing.macros = cosmic_malloc(macroListing.numberOfAllocatedSlotsInArray*sizeof(Macro));
 	
 	Macro tempMacro={0};
@@ -1504,6 +1504,10 @@ void initMacros(){
 	tempMacro.result = copyStringToHeapString("0");
 	preDefinedMacros.lineMacroIndex = 3;
 	macroListing.macros[3]=tempMacro;
+	
+	tempMacro.definition = copyStringToHeapString("__COSMIC");
+	tempMacro.result = copyStringToHeapString("");
+	macroListing.macros[4]=tempMacro;
 }
 
 
@@ -1544,17 +1548,11 @@ bool doesMacroMatchStringRange(int32_t stringStartIndex, int32_t stringEndIndex,
 int16_t searchForMatchingMacro(int32_t preprocessTokenIndex,int32_t stringStartIndex){
 	if (stringStartIndex==-1) stringStartIndex = getIndexInStringAtStartOfPreprocessingToken(preprocessTokenIndex);
 	const char firstCharacter = sourceContainer.sourceChar[stringStartIndex].c;
-	const int32_t stringEndIndex = stringStartIndex+preprocessTokens.preprocessTokens[preprocessTokenIndex].length;
-	/*
 	if (!isLetter(firstCharacter)){
-		printf("Skipping:`");
-		for (int32_t i=stringStartIndex;i<stringEndIndex;i++){
-			printf("%c",sourceContainer.sourceChar[i].c);
-		}
-		printf("`\n");
+		// then it couldn't match any macro because none could start with a non-letter
 		return -1;
 	}
-	*/
+	const int32_t stringEndIndex = stringStartIndex+preprocessTokens.preprocessTokens[preprocessTokenIndex].length;
 	// test predefined macros
 	if (stringEndIndex-stringStartIndex==8){
 		bool isTime=true;
@@ -2168,6 +2166,7 @@ Macro formatDefineInSourceContainer(int32_t indexOfSpaceAfterDirective, int32_t 
 	}
 	bool hasResult = indexOfSeperationSpace!=-1;
 	if (!hasResult) indexOfSeperationSpace=indexOfNewlineThatEndsDirective;
+	assert(indexOfSeperationSpace!=-1);
 	int32_t startOfDefinition = indexOfSpaceAfterDirective+1;
 	int32_t indexAfterDefinition = indexOfSeperationSpace;
 	int32_t lengthOfDefinition = indexAfterDefinition-startOfDefinition; // this may technically be decreased due to spaces that will be removed after the copy

@@ -56,8 +56,8 @@ Instructions:
 2 - 1,0,0,1, - r0 / r1 -> r0 , r0 % r1 -> r1   (% is the remainder of the division)
 2 - 1,0,1,0, - call to address at r0,r1
 2 - 1,0,1,1, - ret
-2 - 1,1,0,0, - memory read byte into lower byte of r0 at %D,r1
-2 - 1,1,0,1, - memory write byte in  lower byte of r0 at %D,r1
+2 - 1,1,0,0, - memory read byte into lower byte of r0 at %D,r1  (upper byte of r0 is set to 0)
+2 - 1,1,0,1, - memory write byte in  lower byte of r0 at %D,r1  (upper byte of r0 is effectively ignored, however it should be 0)
 2 - 1,1,1,0, - jump to r0,r1 (must be aligned to word boundry)
 2 - 1,1,1,1, - SP - r0 -> SP , then SP -> r0
 

@@ -108,27 +108,50 @@ bool attemptJmpOpt(InstructionBuffer* ib){
 				IS=buffer[i];
 				if (i!=0 && buffer[i-1].id==I_LABL){
 					uint32_t to=buffer[i-1].arg.D.a_0;
-					uint32_t from=buffer[i].arg.D.a_0;
+					uint32_t from=IS.arg.D.a_0;
 					buffer[i].id=I_NOP_;
 					doLabelRename(ib,from,to);
 					didSucceedAtLeastOnce_1=true;
 					continue;
 				}
-				if (!doesLabelHaveUsage(ib,buffer[i].arg.D.a_0)){
-					buffer[i].id=I_NOP_;
-					didSucceedAtLeastOnce_1=true;
-					for (subI=i+1;subI<ib->numberOfSlotsTaken;subI++){
-						enum InstructionTypeID* idPtr=&(ib->buffer[subI].id);
-						if (*idPtr==I_PHIE) *idPtr=I_NOP_;
-						else break;
+				bool isUsageKnown=false;
+				if (!(i+1==ib->numberOfSlotsTaken || buffer[i+1].id!=I_RET_)){
+					// in this case, RET_ is directly after this LABL, so find any AJMP that jump here and convert them to RET_
+					uint32_t next=findNextJumpUsingLabel(ib,IS.arg.D.a_0,0);
+					while (next!=ib->numberOfSlotsTaken){
+						if (buffer[next].id==I_AJMP){
+							buffer[next].id=I_RET_;
+							didSucceedAtLeastOnce_1=true;
+							subI=next;
+							while (subI--!=0){
+								enum InstructionTypeID* idPtr=&(ib->buffer[subI].id);
+								if (*idPtr==I_PHIS) *idPtr=I_NOP_;
+								else break;
+							}
+						} else {
+							isUsageKnown=true;
+							// this indicates there there is definitely a usage, so (later on) there is no need to check if there is not a usage
+						}
+						next=findNextJumpUsingLabel(ib,IS.arg.D.a_0,next+1);
 					}
-					subI=i;
-					while (subI--!=0){
-						enum InstructionTypeID* idPtr=&(ib->buffer[subI].id);
-						if (*idPtr==I_PHIS) *idPtr=I_NOP_;
-						else break;
+				}
+				if (!isUsageKnown){
+					if (!doesLabelHaveUsage(ib,IS.arg.D.a_0)){
+						buffer[i].id=I_NOP_;
+						didSucceedAtLeastOnce_1=true;
+						for (subI=i+1;subI<ib->numberOfSlotsTaken;subI++){
+							enum InstructionTypeID* idPtr=&(ib->buffer[subI].id);
+							if (*idPtr==I_PHIE) *idPtr=I_NOP_;
+							else break;
+						}
+						subI=i;
+						while (subI--!=0){
+							enum InstructionTypeID* idPtr=&(ib->buffer[subI].id);
+							if (*idPtr==I_PHIS) *idPtr=I_NOP_;
+							else break;
+						}
+						continue;
 					}
-					continue;
 				}
 			}
 			if (id==I_AJMP | id==I_RET_ | id==I_JEND){
@@ -217,16 +240,14 @@ bool attemptConstOpt(InstructionBuffer* ib){
 #ifdef OPT_DEBUG_CONST
 printInstructionBufferWithMessageAndNumber(ib,"starting const opt",0);
 #endif
-	bool didSucceedAtLeastOnce_0=false;
-	bool didSucceedAtLeastOnce_1=false;
+	bool didSucceedAtLeastOnce=false;
 	bool isQuickEndTriggered=false;
 	uint32_t i;
 	while (true){
-		didSucceedAtLeastOnce_0|=didSucceedAtLeastOnce_1;
-		didSucceedAtLeastOnce_1=false;
 		InstructionSingle* buffer=ib->buffer;
 		InstructionInformation II;
 		{
+			consolePrintBufferGeneralMessageSet("Const Opt (Unused Pass)");
 			bool isRegValueUnused[17];
 			isRegValueUnused[ 2]=1;
 			isRegValueUnused[ 3]=1;
@@ -266,7 +287,7 @@ printInstructionBufferWithMessageAndNumber(ib,"starting const opt",0);
 					} else {
 						goto ExitForNoSpecial_0;
 					}
-					didSucceedAtLeastOnce_1=true;
+					didSucceedAtLeastOnce=true;
 					buffer[i]=writeIS;
 #ifdef OPT_DEBUG_CONST
 printInstructionBufferWithMessageAndNumber(ib,"const opt by special 0",i);
@@ -289,7 +310,7 @@ sanityCheck(ib);
 						writeIS.arg.B3.a_0=II.regOUT[0];
 						writeIS.arg.B3.a_1=II.regIN[0];
 					}
-					didSucceedAtLeastOnce_1=true;
+					didSucceedAtLeastOnce=true;
 					buffer[i]=writeIS;
 #ifdef OPT_DEBUG_CONST
 printInstructionBufferWithMessageAndNumber(ib,"const opt by special 1",i);
@@ -300,13 +321,14 @@ sanityCheck(ib);
 					goto UnusedResultLoopStart;
 				}
 				bool canRemove=
-					(II.regOUT[0]!=16 & !(II.doesMoveStack | II.isMemoryAccess)) && (
+					(II.regOUT[0]!=16 & !(II.doesMoveStack | 
+					(II.isMemoryAccess & (II.isMemoryAccessVolatile)))) && ( // this does depend on memory writes having no output, so they would already be not remove-able
 					isRegValueUnused[II.regOUT[0]] &
 					isRegValueUnused[II.regOUT[1]] &
 					isRegValueUnused[II.regOUT[2]] &
 					isRegValueUnused[II.regOUT[3]]);
 				if (canRemove){
-					didSucceedAtLeastOnce_1=true;
+					didSucceedAtLeastOnce=true;
 					buffer[i].id=I_NOP_; // by the way, this is fine for PHIE too
 					if (II.id==I_SYRB | II.id==I_SYRW | II.id==I_SYRD | II.id==I_SYRQ){
 						uint32_t iSub=i;
@@ -357,6 +379,7 @@ sanityCheck(ib);
 		}
 		if (isQuickEndTriggered) break; // in this case, running the passes below is not nessessary
 		{
+			consolePrintBufferGeneralMessageSet("Const Opt (Value is Constant Pass)");
 			bool isRegValueConst[17];
 			isRegValueConst[ 2]=0;
 			isRegValueConst[ 3]=0;
@@ -514,7 +537,7 @@ sanityCheck(ib);
 					break;
 					default:goto ConstifySwitchExit;
 					}
-					didSucceedAtLeastOnce_1=true;
+					didSucceedAtLeastOnce=true;
 					buffer[i]=writeIS_0;
 #ifdef OPT_DEBUG_CONST
 printInstructionBufferWithMessageAndNumber(ib,"const opt by result known",i);
@@ -746,16 +769,16 @@ printInstructionBufferWithMessageAndNumber(ib,"const opt by result known",i);
 					
 					ApplyPartialConst:;
 					switch (partialConstApplyCount){
+						case 2:
+						insertInstructionAt(ib,i+1,writeIS_1);
+						numberOfSlotsTaken=ib->numberOfSlotsTaken;
+						buffer=ib->buffer;
 						case 1:
 						buffer[i]=writeIS_0;
 						break;
-						case 2:
-						buffer[i]=writeIS_0;
-						insertInstructionAt(ib,i+1,writeIS_1);
-						buffer=ib->buffer;
-						break;
 						default:;assert(false);
 					}
+					didSucceedAtLeastOnce=true;
 					goto ConstifyLoopStart;
 					default:; // used to avoid warnings about missing enumeration values
 				}
@@ -778,50 +801,93 @@ printInstructionBufferWithMessageAndNumber(ib,"const opt by result known",i);
 				}
 			}
 		}
-		if (didSucceedAtLeastOnce_1) continue; // seperating RL2_ and RL1_->BL1_ don't need to happen yet if either of the two passes above succeed
 		{
-			InstructionSingle IS_0;
-			InstructionSingle IS_1;
-			IS_0.id=I_RL1_;
-			IS_1.id=I_RL1_;
-			isQuickEndTriggered=true;
-			i=ib->numberOfSlotsTaken;
-			while (i--!=0){
-				if (buffer[i].id==I_RL2_){
-					didSucceedAtLeastOnce_1=true;
-					InstructionSingle IS_this=buffer[i];
-					IS_0.arg.BW.a_0=IS_this.arg.BBD.a_0;
-					IS_1.arg.BW.a_0=IS_this.arg.BBD.a_1;
-					IS_0.arg.BW.a_1=IS_this.arg.BBD.a_2>> 0;
-					IS_1.arg.BW.a_1=IS_this.arg.BBD.a_2>>16;
-					buffer[i]=IS_0;
-					insertInstructionAt(ib,i,IS_1);
-					buffer=ib->buffer; // buffer pointer may have changed due to potential expansion by insertInstructionAt()
-#ifdef OPT_DEBUG_CONST
-printInstructionBufferWithMessageAndNumber(ib,"const opt by seperating RL2_",i);
-#endif
+			consolePrintBufferGeneralMessageSet("Const Opt (Const Type Pass)");
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
-				}
-			}
-			IS_0.id=I_BL1_;
+			InstructionSingle IS_0;
+			InstructionSingle IS_1;
+			InstructionSingle IS_2;
+			IS_1.id=I_BL1_;
+			isQuickEndTriggered=true;
 			i=ib->numberOfSlotsTaken;
+			uint32_t i2=ib->numberOfSlotsTaken;
+			uint32_t additionCount=0;
 			while (i--!=0){
-				if (buffer[i].id==I_RL1_){
-					IS_1=buffer[i];
-					if (IS_1.arg.BW.a_1<256){
-						IS_0.arg.B2.a_0=IS_1.arg.BW.a_0;
-						IS_0.arg.B2.a_1=IS_1.arg.BW.a_1;
-						buffer[i]=IS_0;
+				additionCount+=(buffer[i].id==I_RL2_);
+			}
+			if (additionCount!=0){
+				i=ib->numberOfSlotsTaken+additionCount;
+				if (i>=ib->numberOfSlotsAllocated){
+					// if expanding the buffer would be nessessary, then (if there is hope), try removing NOP_ before checking if buffer expansion is really needed.
+					if (didSucceedAtLeastOnce) removeNop(ib);
+					i=ib->numberOfSlotsTaken+additionCount;
+					if (i>=ib->numberOfSlotsAllocated){
+						ib->buffer = (buffer = cosmic_realloc(buffer,(ib->numberOfSlotsAllocated*=2)*sizeof(InstructionSingle)));
+					}
+				}
+				ib->numberOfSlotsTaken=i;
+				while (i2--,i--!=0){
+					assert(i>=i2);
+					IS_2=buffer[i2];
+					if (IS_2.id==I_RL2_){
+						consolePrintBufferPoint(ib,i,-1,2,"Const Opt Found Constant Load [Advanced Loop]");
+						assert(i!=0);
+						didSucceedAtLeastOnce=true;
+						IS_0.id=I_RL1_;
+						IS_0.arg.BW.a_0=IS_2.arg.BBD.a_0;
+						IS_0.arg.BW.a_1=IS_2.arg.BBD.a_2>> 0;
+						if (IS_0.arg.BW.a_1<256){
+							IS_0.arg.B2.a_1=IS_0.arg.BW.a_1;
+							IS_0.arg.B2.a_0=IS_2.arg.BBD.a_0;
+							IS_0.id=I_BL1_;
+						}
+						buffer[  i]=IS_0;
+						IS_0.id=I_RL1_;
+						IS_0.arg.BW.a_0=IS_2.arg.BBD.a_1;
+						IS_0.arg.BW.a_1=IS_2.arg.BBD.a_2>>16;
+						if (IS_0.arg.BW.a_1<256){
+							IS_0.arg.B2.a_1=IS_0.arg.BW.a_1;
+							IS_0.arg.B2.a_0=IS_2.arg.BBD.a_1;
+							IS_0.id=I_BL1_;
+						}
+						buffer[--i]=IS_0;
+					} else if (IS_2.id==I_RL1_ & IS_2.arg.BW.a_1<256){
+						consolePrintBufferPoint(ib,i,-1,2,"Const Opt Found Constant Load [Advanced Loop]");
+						didSucceedAtLeastOnce=true;
+						IS_1.arg.B2.a_0=IS_2.arg.BW.a_0;
+						IS_1.arg.B2.a_1=IS_2.arg.BW.a_1;
+						buffer[  i]=IS_1;
+					} else {
+						buffer[  i]=IS_2;
+					}
+				}
+			} else {
+				i=ib->numberOfSlotsTaken;
+				while (i--!=0){
+					InstructionSingle*const IS_ptr = buffer+i;
+					if (IS_ptr->id==I_RL1_){
+						if (IS_ptr->arg.BW.a_1<256){
+							consolePrintBufferPoint(ib,i,-1,1,"Const Opt Found Constant Load [Simple Loop]");
+							didSucceedAtLeastOnce=true;
+							const uint8_t r=IS_ptr->arg.BW.a_0;
+							const uint8_t v=IS_ptr->arg.BW.a_1;
+							IS_ptr->id=I_BL1_;
+							IS_ptr->arg.B2.a_0=r;
+							IS_ptr->arg.B2.a_1=v;
+						}
 					}
 				}
 			}
+#ifdef OPT_DEBUG_SANITY
+sanityCheck(ib);
+#endif
 		}
-		if (!didSucceedAtLeastOnce_1) break;
 	}
-	if (didSucceedAtLeastOnce_0) removeNop(ib);
-	return didSucceedAtLeastOnce_0;
+	consolePrintBufferGeneralMessageSet("");
+	if (didSucceedAtLeastOnce) removeNop(ib);
+	return didSucceedAtLeastOnce;
 }
 
 
@@ -833,6 +899,7 @@ bool attemptMovPushPopOpt(InstructionBuffer* ib){
 	uint32_t i0=numberOfSlotsTaken;
 	while (i0--!=0){
 		LoopStart:;
+		consolePrintBufferGeneralMessageSet("Push/Pop/Mov Reduction");
 		InstructionSingle* IS_i0 = ib->buffer+i0;
 		enum InstructionTypeID id0 = IS_i0->id;
 		if (id0==I_MOV_){
@@ -846,6 +913,8 @@ bool attemptMovPushPopOpt(InstructionBuffer* ib){
 			
 			This case was spotted without any instructions inbetween, 
 			but the analysis would get more complicated if there were any instructions in between.
+			
+			I made a primitive check for this sort of case when there are no instructions in between that runs after normal mov opt.
 			*/
 			bool didThisReduceSucceed=false;
 			uint8_t rFrom = IS_i0->arg.B2.a_1;
@@ -859,6 +928,8 @@ sanityCheck(ib);
 				didSucceedAtLeastOnce=true;
 				didThisReduceSucceed=true;
 			} else {
+				consolePrintBufferPoint(ib,i0,-1,4,"MOV_ Reduction Pre-Scan Starting for this MOV_");
+				consolePrintBufferGeneralMessageSet("Push/Pop/Mov Reduction [Performing MOV_ Pre-Scan]");
 				InstructionInformation II_1;
 				bool isToWritten = false;
 				bool isFromWritten = false;
@@ -947,6 +1018,8 @@ sanityCheck(ib);
 						}
 					}
 				}
+				consolePrintBufferPoint(ib,i0,-1,4,"MOV_ reduction Pre-Scan Finished");
+				consolePrintBufferGeneralMessageSet("Push/Pop/Mov Reduction [After MOV_ Pre-Scan]");
 				if (!isToUsed){
 					// if what it is going to is not used then there is no need to move anything
 					IS_i0->id=I_NOP_;
@@ -972,29 +1045,35 @@ sanityCheck(ib);
 					}
 				}
 				if (!isFromUsed & !didThisReduceSucceed){
-					uint32_t backwardsRenameStart = i0;
 					bool didFindFailingUsage = false;
-					while (backwardsRenameStart!=0 && isValueInRegUsedAfterTarget(ib,backwardsRenameStart-1,rFrom,NULL)){
-						--backwardsRenameStart;
+					uint32_t backwardsRenameStart = i0;
+					if (isValueInRegUsedAfterTarget(ib,backwardsRenameStart-1,rFrom,NULL)){
 						fillInstructionInformation(&II_1,ib,backwardsRenameStart);
-						if ((II_1.usesReg_D & rFrom==13) | (II_1.usesReg_E & rFrom==14)){
-							didFindFailingUsage = true; // can't rename
-							break;
-						}
-						if (doesRegListContain(II_1.regIN,rTo) || doesRegListContain(II_1.regOUT,rTo)){
-							//printf("{mov may call attemptRegRename at place 2 start}\n");
-							if (!II_1.noRename && attemptRegRename(ib,backwardsRenameStart,rTo,16)){
+						while (backwardsRenameStart!=0){
+							if ((II_1.doesDestroyReg | II_1.stopLinearRegTrace) | (doesRegListContain(II_1.regIN,rFrom) | doesRegListContain(II_1.regOUT,rFrom))){
+								if (!isValueInRegUsedAfterTarget(ib,backwardsRenameStart-1,rFrom,NULL)) break;
+							}
+							--backwardsRenameStart;
+							fillInstructionInformation(&II_1,ib,backwardsRenameStart);
+							if ((II_1.usesReg_D & rFrom==13) | (II_1.usesReg_E & rFrom==14)){
+								didFindFailingUsage = true; // can't rename
+								break;
+							}
+							if (doesRegListContain(II_1.regIN,rTo) | doesRegListContain(II_1.regOUT,rTo)){
+								//printf("{mov may call attemptRegRename at place 2 start}\n");
+								if (!II_1.noRename && attemptRegRename(ib,backwardsRenameStart,rTo,16)){
 #ifdef OPT_DEBUG_PUSH_POP_MOV
 printInstructionBufferWithMessageAndNumber(ib,"mov rename to attempt to reduce",i0);
 #endif
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
-								goto LoopStart; // if this rename succeeds, then try this instruction again from the start
+									goto LoopStart; // if this rename succeeds, then try this instruction again from the start
+								}
+								//printf("{mov may call attemptRegRename at place 2 end}\n");
+								didFindFailingUsage = true;
+								break;
 							}
-							//printf("{mov may call attemptRegRename at place 2 end}\n");
-							didFindFailingUsage = true;
-							break;
 						}
 					}
 					if (!didFindFailingUsage){
@@ -1077,6 +1156,8 @@ sanityCheck(ib);
 				}
 			}
 		} else if (id0==I_PU1_){
+			consolePrintBufferPoint(ib,i0,-1,4,"PU1_ Reduction Pre-Scan Starting for this PU1_");
+			consolePrintBufferGeneralMessageSet("Push/Pop/Mov Reduction [Performing PU1_ Pre-Scan]");
 			uint32_t i1;
 			bool didFind=false;
 			bool hitImpossible=false;
@@ -1092,6 +1173,8 @@ sanityCheck(ib);
 					break;
 				} 
 			}
+			consolePrintBufferPoint(ib,i0,-1,4,"PU1_ reduction Pre-Scan Finished");
+			consolePrintBufferGeneralMessageSet("Push/Pop/Mov Reduction [After PU1_ Pre-Scan]");
 			if (didFind){
 				uint32_t lowerBoundry=findLowerReorderBoundry(ib,i1);
 				uint8_t rTo;
@@ -1177,109 +1260,52 @@ sanityCheck(ib);
 	if (didSucceedAtLeastOnce){
 		removeNop(ib);
 	}
+	numberOfSlotsTaken=ib->numberOfSlotsTaken;
+	InstructionSingle* IS_walk0 = ib->buffer;
+	InstructionSingle* IS_walk1;
+	for (uint32_t i=1;i<numberOfSlotsTaken;i++){
+		IS_walk1 = IS_walk0++;
+		if (IS_walk1->id==I_MOV_ & IS_walk0->id==I_MOV_ & IS_walk1->arg.B2.a_0==IS_walk0->arg.B2.a_1 & IS_walk1->arg.B2.a_1==IS_walk0->arg.B2.a_0){
+			consolePrintBufferPoint(ib,i,-1,1,"MOV_ Reduction By Primitive Check");
+			IS_walk0->id=I_NOP_;
+			didSucceedAtLeastOnce=true;
+		}
+	}
+	consolePrintBufferGeneralMessageSet("");
 	return didSucceedAtLeastOnce;
 }
 
 
-bool attemptStackMemoryOpt(InstructionBuffer* ib){
-	bool didSucceedAtLeastOnce=false;
+
+// no need for change detection, it always does everything it can and does not effect other passes
+void applySTPAtoSTPSopt(InstructionBuffer* ib){
+	const uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
+	InstructionSingle* IS_ptr0=ib->buffer;
+	InstructionSingle* IS_ptr1;
+	InstructionSingle IS;
 	bool isStackSizeKnown=false;
-	uint8_t target_1;
-	uint16_t stackSize;
-	uint16_t offsetValue;
-	uint32_t i0;
-	uint32_t i1;
-	uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
-	InstructionSingle* buffer=ib->buffer;
-	InstructionInformation II_0;
-	InstructionInformation II_1;
-	InstructionSingle IS_BL1;
-	IS_BL1.id=I_BL1_;
-	IS_BL1.arg.B2.a_1=0;
-	InstructionSingle IS_temp;
-	for (i0=0;i0<numberOfSlotsTaken;i0++){
-		enum InstructionTypeID id=buffer[i0].id;
-		if (id==I_FCST | id==I_FCEN){
+	uint16_t stackSize=0;
+	for (uint32_t i=0;i<numberOfSlotsTaken;i++){
+		switch ((IS_ptr1=IS_ptr0++)->id){
+			case I_STPA:;
+			// this out of bounds check is only valid if the function is not a varadic function
+			/*
+			if (stackSize<IS_ptr1->arg.BW.a_1 && !compileSettings.hasGivenOutOfBoundsStackAccessWarning){
+				compileSettings.hasGivenOutOfBoundsStackAccessWarning=true;
+err_00__0("Optimizer detected out of bounds memory access on stack\n  no source location avalible\n  future warnings of this type will be suppressed");
+			}
+			*/
+			if (isStackSizeKnown & ((stackSize-IS_ptr1->arg.BW.a_1)&0xFF00)==0) IS_ptr1->id=I_STPS;
+			break;
+			case I_FCST:
+			isStackSizeKnown=(IS_ptr1->arg.BWD.a_0!=0);
+			stackSize=IS_ptr1->arg.BWD.a_1;
+			break;
+			case I_FCEN:
 			isStackSizeKnown=false;
-			if (id==I_FCST){
-				IS_temp=buffer[i0];
-				isStackSizeKnown=(IS_temp.arg.BWD.a_0!=0);
-				stackSize=IS_temp.arg.BWD.a_1;
-			}
-		} else if (
-				id==I_MWWV |
-				id==I_MWWN |
-				id==I_MRWV |
-				id==I_MRWN |
-				id==I_MWBV |
-				id==I_MWBN |
-				id==I_MRBV |
-				id==I_MRBN){
-			
-			i1=i0;
-			fillInstructionInformation(&II_0,ib,i0);
-			IS_BL1.arg.B2.a_0=(target_1=II_0.regIN[1]);
-			while (true){
-				assert(i1!=0);
-				i1--;
-				fillInstructionInformation(&II_1,ib,i1);
-				if (doesRegListContain(II_1.regOUT,target_1)){
-					if (II_1.id==I_MOV_){
-						target_1=II_1.regIN[0];
-					} else {
-						if (II_1.id==I_LAD2 & target_1==II_1.regOUT[1]){
-							insertInstructionAt(ib,i1+1,IS_BL1);
-							i0--;
-							didSucceedAtLeastOnce=true;
-							buffer=ib->buffer;
-							numberOfSlotsTaken=ib->numberOfSlotsTaken;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-							break;
-						} else if (II_1.id==I_BL1_ & !II_0.usesReg_D & isStackSizeKnown){
-							// `!II_0.usesReg_D` is to check if the memory operation is not a byte instruction
-							if (buffer[i1].arg.B2.a_1==0){
-								// i1, II_1, target_1  are now going to be used for a different loop
-								i1=i0;
-								target_1=II_0.regIN[0];
-								while (true){
-									assert(i1!=0);
-									i1--;
-									fillInstructionInformation(&II_1,ib,i1);
-									if (doesRegListContain(II_1.regOUT,target_1)){
-										if (II_1.id==I_MOV_){
-											target_1=II_1.regIN[0];
-										} else {
-											if (II_1.id==I_STPA | II_1.id==I_STPS){
-												offsetValue=stackSize-buffer[i1].arg.BW.a_1;
-												if (!((offsetValue&1) | (offsetValue>510U))){
-													if      (II_0.id==I_MWWN) IS_temp.id=I_STWN, IS_temp.arg.B2.a_0=II_0.regIN[2];
-													else if (II_0.id==I_MRWN) IS_temp.id=I_STRN, IS_temp.arg.B2.a_0=II_0.regOUT[0];
-													else if (II_0.id==I_MWWV) IS_temp.id=I_STWV, IS_temp.arg.B2.a_0=II_0.regIN[2];
-													else if (II_0.id==I_MRWV) IS_temp.id=I_STRV, IS_temp.arg.B2.a_0=II_0.regOUT[0];
-													else assert(false);
-													IS_temp.arg.B2.a_1=offsetValue/2U;
-													buffer[i0]=IS_temp;
-													didSucceedAtLeastOnce=true;
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-												}
-											}
-											break;
-										}
-									}
-								}
-							}
-						}
-						break;
-					}
-				}
-			}
+			default:;
 		}
 	}
-	return didSucceedAtLeastOnce;
 }
 
 
@@ -1413,89 +1439,14 @@ sanityCheck(ib);
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
+		
+		
+		
 		return didMovSucceed;
 	}
 	return false;
 }
 
-
-// no need for change detection, it always does everything it can and does not effect other passes
-void applySTPAtoSTPSopt(InstructionBuffer* ib){
-	uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
-	InstructionSingle* IS_ptr0=ib->buffer;
-	InstructionSingle* IS_ptr1;
-	InstructionSingle IS;
-	bool isStackSizeKnown=false;
-	uint16_t stackSize=0;
-	for (uint32_t i=0;i<numberOfSlotsTaken;i++){
-		switch ((IS_ptr1=IS_ptr0++)->id){
-			case I_STPA:;
-			// this out of bounds check is only valid if the function is not a varadic function
-			/*
-			if (stackSize<IS_ptr1->arg.BW.a_1 && !compileSettings.hasGivenOutOfBoundsStackAccessWarning){
-				compileSettings.hasGivenOutOfBoundsStackAccessWarning=true;
-err_00__0("Optimizer detected out of bounds memory access on stack\n  no source location avalible\n  future warnings of this type will be suppressed");
-			}
-			*/
-			if (isStackSizeKnown & ((stackSize-IS_ptr1->arg.BW.a_1)&0xFF00)==0) IS_ptr1->id=I_STPS;
-			break;
-			case I_FCST:
-			isStackSizeKnown=(IS_ptr1->arg.BWD.a_0!=0);
-			stackSize=IS_ptr1->arg.BWD.a_1;
-			break;
-			case I_FCEN:
-			isStackSizeKnown=false;
-			default:;
-		}
-	}
-}
-
-
-bool attemptSTPoffsetOpt(InstructionBuffer* ib){
-	InstructionInformation II_0;
-	InstructionSingle IS_stp;
-	InstructionSingle* buffer=ib->buffer;
-	IS_stp.id=I_STPA;
-	bool didSucceedAtLeastOnce=false;
-	uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
-	uint32_t i0=numberOfSlotsTaken;
-	while (i0--!=0){
-		if (buffer[i0].id==I_ADDN){
-			fillInstructionInformation(&II_0,ib,i0);
-			uint16_t valTraceRaw0;
-			bool traceRaw0;
-			uint16_t valTraceRaw1;
-			bool traceRaw1;
-			
-			traceRaw0=getValueInRegisterIfTraceableToRawConstants(ib,i0-1,II_0.regIN[0],&valTraceRaw0);
-			traceRaw1=getValueInRegisterIfTraceableToRawConstants(ib,i0-1,II_0.regIN[1],&valTraceRaw1);
-			if (!traceRaw0 & !traceRaw1) continue;
-			if (traceRaw0 ^ traceRaw1){
-				uint16_t valTraceStp;
-				uint16_t valTraceRaw=traceRaw1?valTraceRaw1:valTraceRaw0;
-				bool traceStp = getValueInSTPifTracableToSTP(ib,i0-1,(traceRaw1?II_0.regIN[0]:II_0.regIN[1]),&valTraceStp);
-				if (traceStp){
-					if (valTraceStp>=valTraceRaw){
-						IS_stp.arg.BW.a_1=valTraceStp-valTraceRaw;
-						IS_stp.arg.BW.a_0=II_0.regOUT[0];
-						didSucceedAtLeastOnce=true;
-						buffer[i0]=IS_stp;
-						
-#ifdef OPT_DEBUG_SANITY
-sanityCheck(ib);
-#endif
-					} else if (!compileSettings.hasGivenOutOfBoundsStackAccessWarning){
-						compileSettings.hasGivenOutOfBoundsStackAccessWarning=true;
-err_00__0("Optimizer detected out of bounds memory access on stack\n  no source location avalible\n  future warnings of this type will be suppressed");
-					}
-				}
-			} else if (traceRaw0 & traceRaw1){
-				// could do some of const opt's job here, it's easy...
-			}
-		}
-	}
-	return didSucceedAtLeastOnce;
-}
 
 
 bool attemptRepeatedConstantOpt(InstructionBuffer* ib){
@@ -1542,6 +1493,7 @@ bool attemptRepeatedConstantOpt(InstructionBuffer* ib){
 				uint8_t r2=repeatedConstInfo.II_0.regOUT[0];
 				uint8_t r3=r0!=r2?r0:r1;
 				assert(r0!=r2 | r1!=r2); // this transform would be invalid if this fails, but I don't think that should fail
+				createNopPocket(ib,repeatedConstInfo.i0+1,3);
 				if (repeatedConstInfo.id==I_MULS){
 					writeIS.arg.B2.a_0=r2;
 					writeIS.arg.B2.a_1=r3;
@@ -1600,6 +1552,8 @@ sanityCheck(ib);
 					if (extraReg==16){
 						break; // break the switch, causing the for loop to continue. This optimization cannot be performed in that case, as there are no temporary registers to use and one is needed
 					}
+					createNopPocket(ib,repeatedConstInfo.i0+1,5);
+					
 					writeIS.id=I_LAD0;
 					writeIS.arg.B6.a_0=repeatedConstInfo.II_0.regOUT[0];
 					writeIS.arg.B6.a_1=repeatedConstInfo.II_0.regOUT[1];
@@ -1615,12 +1569,19 @@ sanityCheck(ib);
 					writeIS.arg.BBD.a_2=cvLarge;
 					insertInstructionAt(ib,repeatedConstInfo.i0,writeIS);
 				} else if (does0have2ConstInputRegisters){
+					createNopPocket(ib,repeatedConstInfo.i0+1,5);
+					
+					
 					writeIS.id=I_RL2_;
 					writeIS.arg.BBD.a_0=repeatedConstInfo.normalizedReg0[2];
 					writeIS.arg.BBD.a_1=repeatedConstInfo.normalizedReg0[3];
 					writeIS.arg.BBD.a_2=cvLarge;
 					insertInstructionAt(ib,repeatedConstInfo.i0,writeIS);
 				} else {
+					createNopPocket(ib,repeatedConstInfo.i0+1,5);
+					
+					
+					
 					assert((cvLarge&0xFFFF0000LU)==0);
 					writeIS.id=I_RL1_;
 					writeIS.arg.BW.a_0=repeatedConstInfo.normalizedReg0[2];
@@ -1650,6 +1611,12 @@ sanityCheck(ib);
 sanityCheck(ib);
 #endif
 			}
+			break;
+			case I_LAD2:
+			break;
+			case I_SSUB:
+			
+			break;
 			default:;
 		}
 	}
@@ -1660,6 +1627,7 @@ sanityCheck(ib);
 
 // this cannot be checked for success, it will often cause infinite loops if you tried
 void applyTightOpt(InstructionBuffer* ib){
+	InstructionSingle* buffer=ib->buffer;
 	uint32_t i=ib->numberOfSlotsTaken;
 	uint32_t upperReorderBoundry;
 #ifdef OPT_DEBUG_SANITY
@@ -1670,16 +1638,26 @@ sanityCheck(ib);
 		fillInstructionInformation(&II,ib,i);
 		if (!II.isSymbolicInternal & II.id!=I_SYRB & II.id!=I_SYRW & II.id!=I_SYRD & II.id!=I_SYRQ){
 			upperReorderBoundry=findUpperReorderBoundry(ib,i);
-			if (upperReorderBoundry!=i) applyReorder(ib,i,upperReorderBoundry);
+			for (uint32_t i2=i+1;i2<upperReorderBoundry;i2++){
+				enum InstructionTypeID id=ib->buffer[i2].id;
+				if (id==I_SYRB | id==I_SYRW | id==I_SYRD | id==I_SYRQ){
+					// SYRB,SYRW,SYRD,I_SYRQ have priority, so nothing should pass them here. It makes their pass harder
+					upperReorderBoundry=i2-1;
+					break;
+				}
+			}
+			if (upperReorderBoundry!=i){
+				applyReorder(ib,i,upperReorderBoundry);
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
+			}
 		}
 	}
 #ifdef OPT_DEBUG_GENERAL_ACTIVE
 	printf(".");
 #endif
-	// SYRB,SYRW,SYRD,I_SYRQ have priority, so they get a seperate pass after the other reorder pass
+	// SYRB,SYRW,SYRD,I_SYRQ have priority, so they get a second pass after the first reorder pass
 	i=ib->numberOfSlotsTaken;
 	while (i--!=0){
 		enum InstructionTypeID id=ib->buffer[i].id;
@@ -1694,6 +1672,193 @@ sanityCheck(ib);
 }
 
 
+
+bool attemptSTPoffsetOpt_sub(InstructionBuffer* ib,uint32_t i0){
+	InstructionInformation II_0;
+	InstructionSingle IS_stp;
+	InstructionSingle* buffer=ib->buffer;
+	IS_stp.id=I_STPA;
+	fillInstructionInformation(&II_0,ib,i0);
+	assert(II_0.id==I_ADDN); // if not then this is called wrong
+	uint16_t valTraceRaw0;
+	bool traceRaw0;
+	uint16_t valTraceRaw1;
+	bool traceRaw1;
+	
+	traceRaw0=getValueInRegisterIfTraceableToRawConstants(ib,i0-1,II_0.regIN[0],&valTraceRaw0);
+	traceRaw1=getValueInRegisterIfTraceableToRawConstants(ib,i0-1,II_0.regIN[1],&valTraceRaw1);
+	if (!traceRaw0 & !traceRaw1) return false;
+	if (traceRaw0 ^ traceRaw1){
+		uint16_t valTraceStp;
+		uint16_t valTraceRaw=traceRaw1?valTraceRaw1:valTraceRaw0;
+		bool traceStp = getValueInSTPifTracableToSTP(ib,i0-1,(traceRaw1?II_0.regIN[0]:II_0.regIN[1]),&valTraceStp);
+		if (traceStp){
+			if (valTraceStp>=valTraceRaw){
+				IS_stp.arg.BW.a_1=valTraceStp-valTraceRaw;
+				IS_stp.arg.BW.a_0=II_0.regOUT[0];
+				buffer[i0]=IS_stp;
+				
+#ifdef OPT_DEBUG_SANITY
+sanityCheck(ib);
+#endif
+				return true;
+			} else if (!compileSettings.hasGivenOutOfBoundsStackAccessWarning){
+				compileSettings.hasGivenOutOfBoundsStackAccessWarning=true;
+err_00__0("Optimizer detected out of bounds memory access on stack\n  no source location avalible\n  future warnings of this type will be suppressed");
+			}
+		}
+	}
+	return false;
+}
+
+
+bool attemptStackMemoryInstructionOpt(InstructionBuffer* ib){
+	bool didSucceedAtLeastOnce=false;
+	bool isStackSizeKnown=false;
+	uint8_t target_1;
+	uint16_t stackSize;
+	uint16_t offsetValue;
+	uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
+	uint32_t i0=numberOfSlotsTaken;
+	uint32_t i1;
+	uint32_t nopAdditionCount=0;
+	InstructionSingle IS_temp;
+	InstructionSingle* buffer=ib->buffer;
+	{
+		while (i0--!=0){
+			if (buffer[i0].id==I_ADDN){
+				didSucceedAtLeastOnce|=attemptSTPoffsetOpt_sub(ib,i0);
+			}
+		}
+		i0=numberOfSlotsTaken;
+		while (i0--!=0){
+			nopAdditionCount+=(buffer[i0].id==I_LAD1 | buffer[i0].id==I_LAD2);
+		}
+		if (nopAdditionCount!=0 & nopAdditionCount+numberOfSlotsTaken<ib->numberOfSlotsAllocated){
+			// this is not needed anyway, so if realloc would be needed then nevermind. It just might be a little slower in that rare case
+			i0=numberOfSlotsTaken;
+			i1=(ib->numberOfSlotsTaken=(numberOfSlotsTaken=nopAdditionCount+ib->numberOfSlotsTaken));
+			while (i0--,i1--!=0){
+				consolePrintBufferPoint(ib,i0,i1,2,"NOP_ padding for attemptStackMemoryInstructionOpt()");
+				assert(i1>=i0);
+				// todo: add break here if equal, there is no need to keep going
+				IS_temp=buffer[i0];
+				if (IS_temp.id==I_LAD1 | IS_temp.id==I_LAD2){
+					buffer[i1--].id=I_NOP_;
+				}
+				buffer[i1]=IS_temp;
+			}
+		}
+	}
+	InstructionInformation II_0;
+	InstructionInformation II_1;
+	InstructionSingle IS_BL1;
+	IS_BL1.id=I_BL1_;
+	IS_BL1.arg.B2.a_1=0;
+	for (i0=0;i0<numberOfSlotsTaken;i0++){
+		enum InstructionTypeID id=buffer[i0].id;
+		if (id==I_FCST | id==I_FCEN){
+			isStackSizeKnown=false;
+			if (id==I_FCST){
+				IS_temp=buffer[i0];
+				isStackSizeKnown=(IS_temp.arg.BWD.a_0!=0);
+				stackSize=IS_temp.arg.BWD.a_1;
+			}
+		} else if (
+				id==I_MWWV | id==I_MWWN |
+				id==I_MRWV | id==I_MRWN |
+				id==I_MWBV | id==I_MWBN |
+				id==I_MRBV | id==I_MRBN){
+			
+			i1=i0;
+			fillInstructionInformation(&II_0,ib,i0);
+			IS_BL1.arg.B2.a_0=(target_1=II_0.regIN[1]);
+			while (true){
+				assert(i1!=0);
+				i1--;
+				fillInstructionInformation(&II_1,ib,i1);
+				if (doesRegListContain(II_1.regOUT,target_1)){
+					if (II_1.id==I_MOV_){
+						target_1=II_1.regIN[0];
+					} else {
+						if (II_1.id==I_LAD2 & target_1==II_1.regOUT[1]){
+							insertInstructionAt(ib,i1+1,IS_BL1);
+							i0--;
+							didSucceedAtLeastOnce=true;
+							numberOfSlotsTaken=ib->numberOfSlotsTaken;
+							buffer=ib->buffer;
+							// new below
+							IS_temp.id=I_ADDN;
+							IS_temp.arg.B3.a_0=II_1.regOUT[0];
+							IS_temp.arg.B3.a_1=II_1.regIN[0];
+							IS_temp.arg.B3.a_2=II_1.regIN[1];
+							buffer[i1]=IS_temp;
+							
+#ifdef OPT_DEBUG_SANITY
+sanityCheck(ib);
+#endif
+							attemptSTPoffsetOpt_sub(ib,i1);
+							break;
+						} else if (II_1.id==I_LAD1 & target_1==II_1.regOUT[1]){
+							// this case happens surprisingly often, and it's good to not wait for const opt to do it
+							uint16_t valTrace;
+							if (getValueInRegisterIfTraceableToRawConstants(ib,i1-1,II_1.regIN[1],&valTrace)){
+								if (valTrace==0){
+									i0--;
+									didSucceedAtLeastOnce=true;
+									IS_temp.id=I_LAD2;
+									IS_temp.arg.B4.a_0=II_1.regOUT[0];
+									IS_temp.arg.B4.a_1=II_1.regOUT[1];
+									IS_temp.arg.B4.a_2=II_1.regIN[0];
+									IS_temp.arg.B4.a_3=II_1.regIN[2];
+									buffer[i1]=IS_temp;
+									break;
+								}
+							}
+						} else if (II_1.id==I_BL1_ & !II_0.usesReg_D & isStackSizeKnown){
+							// `!II_0.usesReg_D` is to check if the memory operation is not a byte instruction
+							if (buffer[i1].arg.B2.a_1==0){
+								// i1, II_1, target_1  are now going to be used for a different loop
+								i1=i0;
+								target_1=II_0.regIN[0];
+								while (true){
+									assert(i1!=0);
+									i1--;
+									fillInstructionInformation(&II_1,ib,i1);
+									if (doesRegListContain(II_1.regOUT,target_1)){
+										if (II_1.id==I_MOV_){
+											target_1=II_1.regIN[0];
+										} else {
+											if (II_1.id==I_STPA | II_1.id==I_STPS){
+												offsetValue=stackSize-buffer[i1].arg.BW.a_1;
+												if (!((offsetValue&1) | (offsetValue>510U))){
+													if      (II_0.id==I_MWWN) IS_temp.id=I_STWN, IS_temp.arg.B2.a_0=II_0.regIN[2];
+													else if (II_0.id==I_MRWN) IS_temp.id=I_STRN, IS_temp.arg.B2.a_0=II_0.regOUT[0];
+													else if (II_0.id==I_MWWV) IS_temp.id=I_STWV, IS_temp.arg.B2.a_0=II_0.regIN[2];
+													else if (II_0.id==I_MRWV) IS_temp.id=I_STRV, IS_temp.arg.B2.a_0=II_0.regOUT[0];
+													else assert(false);
+													IS_temp.arg.B2.a_1=offsetValue/2U;
+													buffer[i0]=IS_temp;
+													didSucceedAtLeastOnce=true;
+#ifdef OPT_DEBUG_SANITY
+sanityCheck(ib);
+#endif
+												}
+											}
+											break;
+										}
+									}
+								}
+							}
+						}
+						break;
+					}
+				}
+			}
+		}
+	}
+	return didSucceedAtLeastOnce;
+}
 
 
 bool attemptStackMemoryAccessReduction(InstructionBuffer* ib){
@@ -1711,6 +1876,20 @@ bool attemptStackMemoryAccessReduction(InstructionBuffer* ib){
 	InstructionInformation II_1;
 	InstructionSingle IS;
 	uint8_t regList[2];
+{
+	InstructionSingle*const buffer=ib->buffer;
+	i0=numberOfSlotsTaken;
+	while (i0--!=0){
+		const enum InstructionTypeID id=buffer[i0].id;
+		if (id==I_MWWN){
+			buffer[i0].arg.B3.mem_flag_upper_byte_unused=false;
+			buffer[i0].arg.B3.mem_flag_lower_byte_unused=false;
+		} else if (id==I_STWN){
+			buffer[i0].arg.B2.mem_flag_upper_byte_unused=false;
+			buffer[i0].arg.B2.mem_flag_lower_byte_unused=false;
+		}
+	}
+}
 	for (i0=0;i0<numberOfSlotsTaken;i0++){
 		fillInstructionInformation(&II_0,ib,i0);
 		if (II_0.id==I_FCST | II_0.id==I_FCEN){
@@ -1723,7 +1902,7 @@ bool attemptStackMemoryAccessReduction(InstructionBuffer* ib){
 		} else if (II_0.isMemoryAccess & !II_0.isMemoryAccessVolatile){
 			if (!isStackSizeKnown) continue;
 			if (attemptToGetStackInfoForMemoryAccess(ib,i0,&sdfma_0)){
-				if (!sdfma_0.isDiscrete) trueOffset_0=stackSize-sdfma_0.offset*2U;
+				if (!sdfma_0.isDiscrete) trueOffset_0=(unsigned)stackSize-(unsigned)sdfma_0.offset*2U;
 				else trueOffset_0=sdfma_0.offset;
 				trueOffset_0=stackSize-trueOffset_0;
 				i1=i0;
@@ -1733,20 +1912,24 @@ bool attemptStackMemoryAccessReduction(InstructionBuffer* ib){
 					fillInstructionInformation(&II_1,ib,i1);
 					if (II_1.isMemoryAccess){
 						if (attemptToGetStackInfoForMemoryAccess(ib,i1,&sdfma_1)){
-							if (!sdfma_1.isDiscrete) trueOffset_1=stackSize-sdfma_1.offset*2U;
+							if (!sdfma_1.isDiscrete) trueOffset_1=(unsigned)stackSize-(unsigned)sdfma_1.offset*2U;
 							else trueOffset_1=sdfma_1.offset;
 							trueOffset_1=stackSize-trueOffset_1;
 							//printf("%04X,%04X,(----)[%04X,%04X]\n",i1,i0,trueOffset_0,trueOffset_1);
-							bool isBaseEqual=(trueOffset_0&0xFFFE)==(trueOffset_1&0xFFFE);
+							bool isBaseEqual=((unsigned)trueOffset_0&0xFFFEu)==((unsigned)trueOffset_1&0xFFFEu);
 							bool isExactEqual=trueOffset_0==trueOffset_1;
 							if (isExactEqual | isBaseEqual){
 if (II_1.isMemoryAccessVolatile) break; // Let's just be totally safe with volatile, at least for now
+
+consolePrintBufferPoint(ib,i0,i1,4,"Found Memory Access Pair (Likely)");
+
+
 uint16_t state= 
-	sdfma_0.isWord*1U |
-	sdfma_1.isWord*2U |
-	sdfma_0.isRead*4U |
-	sdfma_1.isRead*8U |
-	isExactEqual*16U ;
+	(unsigned)sdfma_0.isWord*1U |
+	(unsigned)sdfma_1.isWord*2U |
+	(unsigned)sdfma_0.isRead*4U |
+	(unsigned)sdfma_1.isRead*8U |
+	(unsigned)isExactEqual*16U ;
 
 switch (state){
 // !isExactEqual
@@ -1757,16 +1940,39 @@ switch (state){
 	case 0x0C:
 	goto SwitchContinue; // no relation in memory, these are seperate bytes, so continue searching
 	
+	
+	case 0x03:
+	case 0x07:
+	case 0x0F:
+	if (!compileSettings.hasGivenMisalignedWordOnStackWarning){
+		compileSettings.hasGivenMisalignedWordOnStackWarning=true;
+		err_00__0("Optimizer detected misaligned memory access to a word\n  no source location avalible\n  future warnings of this type will be suppressed");
+	}
+	break;
+	
+	
 // !sdfma_0.isRead & !sdfma_1.isRead
 	case 0x01:
-	//printf("Method empty at %04X,%04X,(0x01)\n",i1,i0);
+	//printf("%04X,%04X,(0x01)\n",i1,i0);
+	//printInstructionBufferWithMessageAndNumber(ib,"Before:",0);
+	ib->buffer[i1].id=I_NOP_;
+	//printInstructionBufferWithMessageAndNumber(ib,"After:",0);
+#ifdef OPT_DEBUG_SANITY
+sanityCheck(ib);
+#endif
 	break;
 	case 0x02:
-	//printf("Method empty at %04X,%04X,(0x02)\n",i1,i0);
+	//printf("%04X,%04X,(0x02)\n",i1,i0);
+	//printInstructionBufferWithMessageAndNumber(ib,":",i1);
+	if (sdfma_1.isDiscrete){
+		assert(II_1.id==I_MWWN);
+		ib->buffer[i1].arg.B3.mem_flag_upper_byte_unused=true;
+	} else {
+		assert(II_1.id==I_STWN);
+		ib->buffer[i1].arg.B2.mem_flag_upper_byte_unused=true;
+	}
 	break;
-	case 0x03:
-	//printf("Method empty at %04X,%04X,(0x03)\n",i1,i0);
-	break;
+
 	
 //  sdfma_0.isRead & !sdfma_1.isRead
 	case 0x05:
@@ -1778,9 +1984,10 @@ switch (state){
 		if (findUnusedRegsInRange(ib,i1,i0,regList,1)){
 			didSucceedAtLeastOnce=true;
 			//printInstructionBufferWithMessageAndNumber(ib,"Before:",i1);
-			ib->buffer[i0].id=I_MOV_;
-			ib->buffer[i0].arg.B2.a_0=II_0.regOUT[0];
-			ib->buffer[i0].arg.B2.a_1=regList[0];
+			IS.id=I_MOV_;
+			IS.arg.B2.a_0=II_0.regOUT[0];
+			IS.arg.B2.a_1=regList[0];
+			ib->buffer[i0]=IS;
 			IS.id=I_BSWP;
 			IS.arg.B2.a_0=II_0.regOUT[0];
 			IS.arg.B2.a_1=II_0.regOUT[0];
@@ -1809,20 +2016,51 @@ sanityCheck(ib);
 		//printf("Reg method invalid! (0x06)\n");
 	}
 	break;
-	case 0x07:
-	//printf("Method empty at %04X,%04X,(0x07)\n",i1,i0);
-	break;
+
 	
 //  sdfma_0.isRead &  sdfma_1.isRead
 	case 0x0D:
 	//printf("Method empty at %04X,%04X,(0x0D)\n",i1,i0);
 	break;
 	case 0x0E:
-	//printf("Method empty at %04X,%04X,(0x0E)\n",i1,i0);
+	//printf("%04X,%04X,(0x0E)\n",i1,i0);
+	if (isRegMethodValid){
+		if (findUnusedRegsInRange(ib,i1,i0,regList,1)){
+			didSucceedAtLeastOnce=true;
+			//printInstructionBufferWithMessageAndNumber(ib,"Before:",i1);
+			IS.id=I_MOV_;
+			IS.arg.B2.a_0=II_0.regOUT[0];
+			IS.arg.B2.a_1=regList[0];
+			ib->buffer[i0]=IS;
+			IS.id=I_BSWP;
+			IS.arg.B2.a_0=II_0.regOUT[0];
+			IS.arg.B2.a_1=II_0.regOUT[0];
+			insertInstructionAt(ib,i0+1,IS);
+			IS.id=I_BL1_;
+			IS.arg.B2.a_0=regList[0];
+			IS.arg.B2.a_1=0xFF;
+			insertInstructionAt(ib,i0+2,IS);
+			IS.id=I_AND_;
+			IS.arg.B3.a_0=II_0.regOUT[0];
+			IS.arg.B3.a_1=II_0.regOUT[0];
+			IS.arg.B3.a_2=regList[0];
+			insertInstructionAt(ib,i0+3,IS);
+			IS.id=I_MOV_;
+			IS.arg.B2.a_0=regList[0];
+			IS.arg.B2.a_1=II_1.regOUT[0];
+			insertInstructionAt(ib,i1+1,IS);
+			//printInstructionBufferWithMessageAndNumber(ib,"After:",i0);
+#ifdef OPT_DEBUG_SANITY
+sanityCheck(ib);
+#endif
+		} else {
+			//printf("Couldn't find unused reg! (0x0E)\n");
+		}
+	} else {
+		//printf("Reg method invalid! (0x0E)\n");
+	}
 	break;
-	case 0x0F:
-	//printf("Method empty at %04X,%04X,(0x0F)\n",i1,i0);
-	break;
+
 
 	
 	
@@ -1848,10 +2086,15 @@ sanityCheck(ib);
 #endif
 	break;
 	case 0x12:
-	//printf("Method empty at %04X,%04X,(0x12)\n",i1,i0);
-	// this is the case of writting a word then a byte. 
-	// it isn't solved by simply removing of a write,
-	// because part of the word written is still in memory
+	//printf("%04X,%04X,(0x12)\n",i1,i0);
+	//printInstructionBufferWithMessageAndNumber(ib,":",i1);
+	if (sdfma_1.isDiscrete){
+		assert(II_1.id==I_MWWN);
+		ib->buffer[i1].arg.B3.mem_flag_lower_byte_unused=true;
+	} else {
+		assert(II_1.id==I_STWN);
+		ib->buffer[i1].arg.B2.mem_flag_lower_byte_unused=true;
+	}
 	break;
 	case 0x13:
 	didSucceedAtLeastOnce=true;
@@ -1866,7 +2109,29 @@ sanityCheck(ib);
 	
 //  sdfma_0.isRead & !sdfma_1.isRead
 	case 0x14:
-	//printf("Method empty at %04X,%04X,(0x14)\n",i1,i0);
+	//printf("%04X,%04X,(0x14)\n",i1,i0);
+	if (isRegMethodValid){
+		if (findUnusedRegsInRange(ib,i1,i0,regList,1)){
+			didSucceedAtLeastOnce=true;
+			//printInstructionBufferWithMessageAndNumber(ib,"Before:",0);
+			IS.id=I_MOV_;
+			IS.arg.B2.a_0=II_0.regOUT[0];
+			IS.arg.B2.a_1=regList[0];
+			ib->buffer[i0]=IS;
+			IS.id=I_MOV_;
+			IS.arg.B2.a_0=regList[0];
+			IS.arg.B2.a_1=II_1.regIN[2];
+			insertInstructionAt(ib,i1+1,IS);
+			//printInstructionBufferWithMessageAndNumber(ib,"After:",0);
+#ifdef OPT_DEBUG_SANITY
+sanityCheck(ib);
+#endif
+		} else {
+			//printf("Couldn't find unused reg! (0x14)\n");
+		}
+	} else {
+		//printf("Reg method invalid! (0x14)\n");
+	}
 	break;
 	case 0x15:
 	//printf("Method empty at %04X,%04X,(0x15)\n",i1,i0);
@@ -1877,9 +2142,10 @@ sanityCheck(ib);
 		if (findUnusedRegsInRange(ib,i1,i0,regList,1)){
 			didSucceedAtLeastOnce=true;
 			//printInstructionBufferWithMessageAndNumber(ib,"Before:",i1);
-			ib->buffer[i0].id=I_MOV_;
-			ib->buffer[i0].arg.B2.a_0=II_0.regOUT[0];
-			ib->buffer[i0].arg.B2.a_1=regList[0];
+			IS.id=I_MOV_;
+			IS.arg.B2.a_0=II_0.regOUT[0];
+			IS.arg.B2.a_1=regList[0];
+			ib->buffer[i0]=IS;
 			IS.id=I_BL1_;
 			IS.arg.B2.a_0=regList[0];
 			IS.arg.B2.a_1=0xFF;
@@ -1910,9 +2176,10 @@ sanityCheck(ib);
 		if (findUnusedRegsInRange(ib,i1,i0,regList,1)){
 			didSucceedAtLeastOnce=true;
 			//printInstructionBufferWithMessageAndNumber(ib,"Before:",0);
-			ib->buffer[i0].id=I_MOV_;
-			ib->buffer[i0].arg.B2.a_0=II_0.regOUT[0];
-			ib->buffer[i0].arg.B2.a_1=regList[0];
+			IS.id=I_MOV_;
+			IS.arg.B2.a_0=II_0.regOUT[0];
+			IS.arg.B2.a_1=regList[0];
+			ib->buffer[i0]=IS;
 			IS.id=I_MOV_;
 			IS.arg.B2.a_0=regList[0];
 			IS.arg.B2.a_1=sdfma_1.isDiscrete?II_1.regIN[2]:II_1.regIN[0];
@@ -1928,6 +2195,8 @@ sanityCheck(ib);
 		//printf("Reg method invalid! (0x17)\n");
 	}
 	break;
+	
+	
 //  sdfma_0.isRead &  sdfma_1.isRead
 	case 0x1C:
 	//printf("%04X,%04X,(0x1C)\n",i1,i0);
@@ -1935,9 +2204,10 @@ sanityCheck(ib);
 		if (findUnusedRegsInRange(ib,i1,i0,regList,1)){
 			didSucceedAtLeastOnce=true;
 			//printInstructionBufferWithMessageAndNumber(ib,"Before:",0);
-			ib->buffer[i0].id=I_MOV_;
-			ib->buffer[i0].arg.B2.a_0=II_0.regOUT[0];
-			ib->buffer[i0].arg.B2.a_1=regList[0];
+			IS.id=I_MOV_;
+			IS.arg.B2.a_0=II_0.regOUT[0];
+			IS.arg.B2.a_1=regList[0];
+			ib->buffer[i0]=IS;
 			IS.id=I_MOV_;
 			IS.arg.B2.a_0=regList[0];
 			IS.arg.B2.a_1=II_1.regOUT[0];
@@ -1957,7 +2227,38 @@ sanityCheck(ib);
 	//printf("Method empty at %04X,%04X,(0x1D)\n",i1,i0);
 	break;
 	case 0x1E:
-	//printf("Method empty at %04X,%04X,(0x1E)\n",i1,i0);
+	//printf("%04X,%04X,(0x1E)\n",i1,i0);
+	if (isRegMethodValid){
+		if (findUnusedRegsInRange(ib,i1,i0,regList,1)){
+			didSucceedAtLeastOnce=true;
+			//printInstructionBufferWithMessageAndNumber(ib,"Before:",i1);
+			IS.id=I_MOV_;
+			IS.arg.B2.a_0=II_0.regOUT[0];
+			IS.arg.B2.a_1=regList[0];
+			ib->buffer[i0]=IS;
+			IS.id=I_BL1_;
+			IS.arg.B2.a_0=regList[0];
+			IS.arg.B2.a_1=0xFF;
+			insertInstructionAt(ib,i0+1,IS);
+			IS.id=I_AND_;
+			IS.arg.B3.a_0=II_0.regOUT[0];
+			IS.arg.B3.a_1=II_0.regOUT[0];
+			IS.arg.B3.a_2=regList[0];
+			insertInstructionAt(ib,i0+2,IS);
+			IS.id=I_MOV_;
+			IS.arg.B2.a_0=regList[0];
+			IS.arg.B2.a_1=II_1.regOUT[0];
+			insertInstructionAt(ib,i1+1,IS);
+			//printInstructionBufferWithMessageAndNumber(ib,"After:",i0);
+#ifdef OPT_DEBUG_SANITY
+sanityCheck(ib);
+#endif
+		} else {
+			//printf("Couldn't find unused reg! (0x1E)\n");
+		}
+	} else {
+		//printf("Reg method invalid! (0x1E)\n");
+	}
 	break;
 	case 0x1F:
 	//printf("%04X,%04X,(0x1F)\n",i1,i0);
@@ -1965,9 +2266,10 @@ sanityCheck(ib);
 		if (findUnusedRegsInRange(ib,i1,i0,regList,1)){
 			didSucceedAtLeastOnce=true;
 			//printInstructionBufferWithMessageAndNumber(ib,"Before:",0);
-			ib->buffer[i0].id=I_MOV_;
-			ib->buffer[i0].arg.B2.a_0=II_0.regOUT[0];
-			ib->buffer[i0].arg.B2.a_1=regList[0];
+			IS.id=I_MOV_;
+			IS.arg.B2.a_0=II_0.regOUT[0];
+			IS.arg.B2.a_1=regList[0];
+			ib->buffer[i0]=IS;
 			IS.id=I_MOV_;
 			IS.arg.B2.a_0=regList[0];
 			IS.arg.B2.a_1=II_1.regOUT[0];
@@ -1986,7 +2288,14 @@ sanityCheck(ib);
 
 	
 // !sdfma_0.isRead & sdfma_1.isRead   (it's always useless)
-	case 0x09:case 0x0A:case 0x0B:case 0x18:case 0x19:case 0x1A:case 0x1B:break;
+	case 0x09:
+	case 0x0A:
+	case 0x0B:
+	case 0x18:
+	case 0x19:
+	case 0x1A:
+	case 0x1B:
+	break;
 	default:assert(false);
 }
 break;
@@ -2014,18 +2323,45 @@ break;
 #ifdef OPT_DEBUG_SANITY
 sanityCheck(ib);
 #endif
+{
+	InstructionSingle*const buffer=ib->buffer;
+	i0=numberOfSlotsTaken;
+	while (i0--!=0){
+		const enum InstructionTypeID id=buffer[i0].id;
+		if (id==I_MWWN){
+			if (buffer[i0].arg.B3.mem_flag_upper_byte_unused & buffer[i0].arg.B3.mem_flag_lower_byte_unused){
+				buffer[i0].id=I_NOP_;
+#ifdef OPT_DEBUG_SANITY
+sanityCheck(ib);
+#endif
+			}
+		} else if (id==I_STWN){
+			if (buffer[i0].arg.B2.mem_flag_upper_byte_unused & buffer[i0].arg.B2.mem_flag_lower_byte_unused){
+				buffer[i0].id=I_NOP_;
+#ifdef OPT_DEBUG_SANITY
+sanityCheck(ib);
+#endif
+			}
+		}
+	}
+}
 	return didSucceedAtLeastOnce;
 }
 
 
 
 
+bool attemptStackMemoryOpt(InstructionBuffer* ib){
+	bool didSucceedAtLeastOnce;
+	didSucceedAtLeastOnce =attemptStackMemoryInstructionOpt(ib);
+	didSucceedAtLeastOnce|=attemptStackMemoryAccessReduction(ib);
+	return didSucceedAtLeastOnce;
+}
 
 
 
 
-
-
+bool debugPHT;
 
 
 
@@ -2033,6 +2369,9 @@ bool attemptSinglePeepHoleTransform(ValueTraceEntriesApplicableRepeatedParams* v
 	uint8_t unusedReg[6]={16,16,16,16,16,16};
 	if (vtearp->template->nUnusedReg!=0){
 		if (!findUnusedRegsAfterTarget(vtearp->ib,vtearp->startIndex,unusedReg,vtearp->template->nUnusedReg)){
+			
+			debugPHT=false;
+			
 			return false;
 		}
 	}
@@ -2042,7 +2381,7 @@ sanityCheck(vtearp->ib);
 #endif
 	DualBoundPeephole dbph;
 	vtearp->walkSource=0;vtearp->walkTemplate=0;vtearp->pushPopWalk=0;
-	applyInitialPeepHoleTransform(vtearp);
+	applyInitialPeepHoleTransform(vtearp,0,0);
 	//printInstructionBufferWithMessageAndNumber(vtearp->ib,"Peephole (2/4)",vtearp->startIndex);
 	uint8_t sourceLength=vtearp->walkSource;
 	vtearp->walkSource=0;vtearp->walkTemplate=0;
@@ -2065,6 +2404,12 @@ sanityCheck(vtearp->ib);
 #endif
 	uint32_t i=dbph.upperBoundForUnusedOut;
 	InstructionInformation II;
+	
+	if (debugPHT){
+		debugPHT=false;
+		printInstructionBufferWithMessageAndNumber(vtearp->ib,"After",i);
+	}
+	
 	do {
 		fillInstructionInformation(&II,vtearp->ib,i);
 		if (!II.doesMoveStack & !II.isMemoryAccess & !II.isSymbolicInternal & II.id!=I_SYRB & II.id!=I_SYRW & II.id!=I_SYRD & II.id!=I_SYRQ){
@@ -2155,6 +2500,17 @@ printf("peephole opt now attempting to apply `%02X`\n",ph_template_i);
 #endif
 						vtearp.walkSource=0;
 						vtearp.walkTemplate=0;
+						static long ccc=0;
+						if (ph_template_i==99){
+							printf("%ld\n",ccc);
+							if (ccc++>=6){
+								continue;
+							}
+							if (ccc==6){
+								printInstructionBufferWithMessageAndNumber(ib,"Before",i);
+								debugPHT=true;
+							}
+						}
 						if (attemptSinglePeepHoleTransform(&vtearp)){
 							didSucceedAtLeastOnce=true;
 							goto MainLoop;
@@ -2208,8 +2564,110 @@ sanityCheck(ib);
 		}
 		MainLoop:;
 	}
+	if (didSucceedAtLeastOnce){
+		attemptMovPushPopOpt(ib);
+	}
 	return didSucceedAtLeastOnce;
 }
+
+
+
+
+
+bool performStreamlineOpt(InstructionBuffer* ib){
+	if (compileSettings.optLevel<=3){
+		return false;
+	}
+	return false; // I want more testing before I enable this, especially with PHIS,PHIE
+	
+	//printInstructionBufferWithMessageAndNumber(ib,"Before",0);
+	bool didSucceedAtLeastOnce=false;
+	uint32_t f_start;
+	const uint32_t b_end_pre=ib->numberOfSlotsTaken;
+	InstructionSingle* bufferNC = ib->buffer; //  this should only be used in the first for loop, in other cases it is possible for the pointer to change
+	for (uint32_t i0=0;i0<b_end_pre;i0++){
+		const enum InstructionTypeID id = bufferNC[i0].id;
+		if (id==I_FCST){
+			f_start=i0;
+		} else if (id==I_FCEN){
+			const uint32_t f_end=i0;
+			{
+				// buffer can only be cached here, because in other places addInstruction() may cause cosmic_realloc()
+				InstructionSingle*const bufferC=ib->buffer;
+				for (uint32_t iL=f_start;iL<f_end;iL++){
+					if (bufferC[iL].id==I_LABL){
+						bufferC[iL].arg.D.mark=false;
+					}
+				}
+			}
+			uint32_t i1=f_start;
+			for (;i1<f_end;i1++){
+				consolePrintBufferPoint(ib,i1,ib->numberOfSlotsTaken-1,2,"performStreamlineOpt part 1");
+				InstructionSingle* IS_ptr=&(ib->buffer[i1]);
+				bool isLabelStart;
+				if ((isLabelStart=(IS_ptr->id==I_LABL & !IS_ptr->arg.D.mark)) | (IS_ptr->id==I_FCST)){
+					for (uint32_t i2=i1;i2<f_end;i2++){
+						consolePrintBufferPoint(ib,i2,ib->numberOfSlotsTaken-1,2,"performStreamlineOpt part 2");
+						IS_ptr=&(ib->buffer[i2]);
+						if (IS_ptr->id==I_LABL){
+							if (!IS_ptr->arg.D.mark){
+								IS_ptr->arg.D.mark=true;
+								addInstruction(ib,*IS_ptr);
+							}
+						} else if (IS_ptr->id==I_AJMP){
+							uint32_t labelNumber;
+							uint32_t labelLocation;
+							if (traceJumpLabel(ib,i2,&labelNumber,NULL)){
+								labelLocation=findLabelLocation(ib,labelNumber);
+								if (ib->buffer[labelLocation].arg.D.mark){
+									addInstruction(ib,*IS_ptr);
+									break;
+								} else {
+									didSucceedAtLeastOnce=true;
+									i2=labelLocation;
+									IS_ptr=&(ib->buffer[i2]);
+									IS_ptr->arg.D.mark=true;
+									addInstruction(ib,*IS_ptr);
+								}
+							} else {
+								addInstruction(ib,*IS_ptr);
+								break;
+							}
+						} else {
+							addInstruction(ib,*IS_ptr);
+							if (IS_ptr->id==I_RET_ | IS_ptr->id==I_JEND){
+								break;
+							}
+						}
+					}
+				}
+			}
+			addInstruction(ib,ib->buffer[f_end]);
+			bufferNC=ib->buffer; // the buffer may have changed at this point, so the first for loop needs to now where it is
+		}
+	}
+	const uint32_t b_end_post=ib->numberOfSlotsTaken;
+	InstructionSingle*const bufferC=ib->buffer;
+	for (uint32_t i=b_end_pre;i<b_end_post;i++){
+		bufferC[i-b_end_pre]=bufferC[i];
+		consolePrintBufferPoint(ib,i-b_end_pre,i,2,"performStreamlineOpt part 3");
+	}
+	ib->numberOfSlotsTaken-=b_end_pre;
+	//printInstructionBufferWithMessageAndNumber(ib,"After",0);
+	consolePrintBufferPoint(ib,-1,-1,3,"performStreamlineOpt() finished");
+	// TODO: be able to handle what happens with PHIS and PHIE when things such as AJMPs are removed and when contents after LABL had to be added after the main walk
+	if (didSucceedAtLeastOnce){
+		//printInstructionBufferWithMessageAndNumber(ib,"After (YES)",0);
+		attemptConstOpt(ib);
+		attemptJmpOpt(ib);
+	} else {
+		//printInstructionBufferWithMessageAndNumber(ib,"After (NO )",0);
+	}
+	return didSucceedAtLeastOnce;
+}
+
+
+
 
 
 
@@ -2222,6 +2680,7 @@ sanityCheck(ib);
 
 // expandPushPop() should be run on the input before any of these functions is run
 void attemptAllActiveOptPhase1(InstructionBuffer* ib){
+	
 	uint16_t i=0;
 	bool v0=1;
 	bool v1=1;
@@ -2229,20 +2688,33 @@ void attemptAllActiveOptPhase1(InstructionBuffer* ib){
 		DEBUG_STATUS("mpp->","",1);
 		v0 = attemptMovPushPopOpt(ib);
 		DEBUG_STATUS("[YES]\n","[NO]\n",v0);
+		consolePrintBufferPoint(ib,-1,-1,3,"pass [mpp] complete");
 		if (!(v0|v1)) break;
 		DEBUG_STATUS("con->","",1);
 		v1 = attemptConstOpt(ib);
 		DEBUG_STATUS("[YES]\n","[NO]\n",v0);
+		consolePrintBufferPoint(ib,-1,-1,3,"pass [con] complete");
 		if (!(v0|v1)) break;
 		DEBUG_STATUS("tgh->","",1);
 		applyTightOpt(ib);
 		DEBUG_STATUS("[DONE]\n","",1);
+		consolePrintBufferPoint(ib,-1,-1,3,"pass [tgh] complete");
 		if (i++>1000){
 			printInstructionBufferWithMessageAndNumber(ib,"attemptAllActiveOptPhase1() took too long",0);
 			exit(0);
 		}
 	}
+	applySTPAtoSTPSopt(ib);
 	applyMovFromSmallConstOpt(ib);
+	consolePrintBufferPoint(ib,-1,-1,3,"phase 1 complete");
+	
+	/*
+	attemptMovPushPopOpt(ib);
+	attemptConstOpt(ib);
+	applyTightOpt(ib);
+	applySTPAtoSTPSopt(ib);
+	applyMovFromSmallConstOpt(ib);
+	*/
 }
 
 void attemptAllActiveOptPhase2(InstructionBuffer* ib){
@@ -2258,38 +2730,49 @@ void attemptAllActiveOptPhase2(InstructionBuffer* ib){
 	DEBUG_STATUS("jmp->","",1);
 	v7=attemptJmpOpt(ib);
 	DEBUG_STATUS("[YES]\n","[NO]\n",v7);
+	consolePrintBufferPoint(ib,-1,-1,3,"pass [jmp] complete");
 	while (1){
 		Start:;
-		DEBUG_STATUS("spo->","",1);
-		v0 = attemptSTPoffsetOpt(ib);
-		DEBUG_STATUS("[YES]\n","[NO]\n",v0);
-		if (!(v0|v1|v2|v3|v4|v5|v6)) break;
+		v0=0;
+		
 		DEBUG_STATUS("stm->","",1);
 		v1 = attemptStackMemoryOpt(ib);
 		DEBUG_STATUS("[YES]\n","[NO]\n",v1);
+		consolePrintBufferPoint(ib,-1,-1,3,"pass [stm] complete");
 		if (!(v0|v1|v2|v3|v4|v5|v6)) break;
-		DEBUG_STATUS("mar->","",1);
-		v2 = attemptStackMemoryAccessReduction(ib);
-		DEBUG_STATUS("[YES]\n","[NO]\n",v2);
-		if (!(v0|v1|v2|v3|v4|v5|v6)) break;
+		
+		v2=0;
+		
 		DEBUG_STATUS("rco->","",1);
 		v3 = attemptRepeatedConstantOpt(ib);
 		DEBUG_STATUS("[YES]\n","[NO]\n",v3);
+		consolePrintBufferPoint(ib,-1,-1,3,"pass [rco] complete");
+		
 		Middle:;
+		
 		DEBUG_STATUS("con->","",1);
 		v4 = attemptConstOpt(ib);
 		DEBUG_STATUS("[YES]\n","[NO]\n",v4);
+		consolePrintBufferPoint(ib,-1,-1,3,"pass [con] complete");
 		if (!(v0|v1|v2|v3|v4|v5|v6)) break;
-		DEBUG_STATUS("mpp->","",1);
-		v5 = attemptMovPushPopOpt(ib);
-		DEBUG_STATUS("[YES]\n","[NO]\n",v5);
-		if (!(v0|v1|v2|v3|v4|v5|v6)) break;
-		DEBUG_STATUS("dup->","",1);
-		v6 = attemptDupeConstOpt(ib);
-		DEBUG_STATUS("[YES]\n","[NO]\n",v6);
+		
+		removeNop(ib); // applyTightOpt() runs nicer if there are no NOP_s
 		DEBUG_STATUS("tgh->","",1);
 		applyTightOpt(ib);
 		DEBUG_STATUS("[DONE]\n","",1);
+		consolePrintBufferPoint(ib,-1,-1,3,"pass [tgh] complete");
+		
+		DEBUG_STATUS("mpp->","",1);
+		v5 = attemptMovPushPopOpt(ib);
+		DEBUG_STATUS("[YES]\n","[NO]\n",v5);
+		consolePrintBufferPoint(ib,-1,-1,3,"pass [mpp] complete");
+		if (!(v0|v1|v2|v3|v4|v5|v6)) break;
+		
+		DEBUG_STATUS("dup->","",1);
+		v6 = attemptDupeConstOpt(ib);
+		DEBUG_STATUS("[YES]\n","[NO]\n",v6);
+		consolePrintBufferPoint(ib,-1,-1,3,"pass [dup] complete");
+		
 		if (!(v0|v1|v2|v3|v4|v5|v6)) break;
 		if (i++>1000){
 			printInstructionBufferWithMessageAndNumber(ib,"attemptAllActiveOptPhase2() took too long",0);
@@ -2300,15 +2783,22 @@ void attemptAllActiveOptPhase2(InstructionBuffer* ib){
 		DEBUG_STATUS("pep->","",1);
 		v7 = attemptPeepHoleOpt(ib);
 		DEBUG_STATUS("[YES]\n","[NO]\n",v7);
+		consolePrintBufferPoint(ib,-1,-1,3,"pass [pep] complete");
 		if (v7) {v0=1;v1=1;v2=1;v3=1;v4=1;v5=1;v6=1;goto Middle;}
 	}
 	DEBUG_STATUS("jmp->","",1);
-	v7=attemptJmpOpt(ib);
+	v7 =attemptJmpOpt(ib);
+	v7|=performStreamlineOpt(ib);
 	DEBUG_STATUS("[YES]\n","[NO]\n",v7);
+	consolePrintBufferPoint(ib,-1,-1,3,"pass [jmp] complete");
 	if (v7) {v0=1;v1=1;v2=1;v3=1;v4=1;v5=1;v6=1;goto Start;}
 	applySTPAtoSTPSopt(ib);
 	applyMovFromSmallConstOpt(ib);
 	removeNop(ib); // not all passes do this, because some passes do not add many. this just ensures that they are all gone at the end
+	
+	
+	
+	consolePrintBufferPoint(ib,-1,-1,3,"phase 2 complete");
 }
 
 

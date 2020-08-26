@@ -464,14 +464,14 @@ DIVM - do first register divided by second register, as well as first register m
 SHFT - shift bits in second register down (to lower bits) by 1 bit, then store into first register (second register is not modified, the most significant bit of first register will be 0)
 BSWP - take word in second register, swap the byte order, then place result into first register (second register is not modified)
 
-MWWN - memory write word non-volatile - read  word   at [r1,r2] and place in r0
-MRWN - memory read  word non-volatile - write word into [r1,r2] with word in r0
-MWWV - memory write word volatile     - read  word   at [r1,r2] and place in r0
-MRWV - memory read  word volatile     - write word into [r1,r2] with word in r0
-MWBN - memory write byte non-volatile - read  byte   at [%D,r1] and place in lower byte of r0
-MRBN - memory read  byte non-volatile - write byte into [%D,r1] with byte in lower byte of r0
-MWBV - memory write byte volatile     - read  byte   at [%D,r1] and place in lower byte of r0
-MRBV - memory read  byte volatile     - write byte into [%D,r1] with byte in lower byte of r0
+MWWN - memory write word non-volatile - write word into [r1,r2] with word in r0
+MRWN - memory read  word non-volatile - read  word   at [r1,r2] and place in r0
+MWWV - memory write word volatile     - write word into [r1,r2] with word in r0
+MRWV - memory read  word volatile     - read  word   at [r1,r2] and place in r0
+MWBN - memory write byte non-volatile - write byte into [%D,r1] with byte in lower byte of r0  (upper byte of r0 must be 0)
+MRBN - memory read  byte non-volatile - read  byte   at [%D,r1] and place in lower byte of r0  (upper byte of r0 is set to 0)
+MWBV - memory write byte volatile     - write byte into [%D,r1] with byte in lower byte of r0  (upper byte of r0 must be 0)
+MRBV - memory read  byte volatile     - read  byte   at [%D,r1] and place in lower byte of r0  (upper byte of r0 is set to 0)
 
 LABL - marks a location. It points to whatever instruction is directly after it. This 'instruction' does not translate to an instruction on the backend.
 
