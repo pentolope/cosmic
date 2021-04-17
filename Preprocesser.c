@@ -1014,7 +1014,7 @@ void insertFileIntoSourceContainer(const char* fileName, int32_t characterIndexT
 		}
 	} else if (firstChar=='<' & lastChar=='>'){
 		hadBrackets=true;
-		char* newStr = strMerge2("StandardHeaders/",fileNameWithoutEdges);
+		char* newStr = strMerge3(directoryOfExecutable,"StandardHeaders/",fileNameWithoutEdges);
 		cosmic_free(fileNameWithoutEdges);
 		fileNameWithoutEdges=newStr;
 	} else {

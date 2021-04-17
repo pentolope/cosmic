@@ -201,7 +201,7 @@ typedef struct SourceContainer{
 } SourceContainer;
 SourceContainer sourceContainer;
 
-
+const char* directoryOfExecutable;
 
 
 bool doStringsMatch(const char*const string1,const char*const string2){

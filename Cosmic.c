@@ -122,6 +122,31 @@ struct {
 
 int main(int argc, char** argv){
 	checkArchitecture();
+	if (argc==0){
+		err_10_1_("It\'s the Operating System\'s fault");
+	}
+	{
+		char* directoryStr = copyStringToHeapString(argv[0]);
+		int32_t i=0;
+		char c;
+		// change any \ to / in directoryStr
+		while ((c=directoryStr[i++])){
+			if (c=='\\'){
+				directoryStr[i-1]='/';
+			}
+		}
+		i--;
+		// find last slash in directoryStr 
+		while (i!=0){
+			if (directoryStr[--i]=='/'){
+				++i;
+				break;
+			}
+		}
+		// and remove contents of string after the last slash, removing everything if there is no slash
+		directoryStr[i]=0;
+		directoryOfExecutable=directoryStr;
+	}
 	for (int argi=1;argi<argc;argi++){
 		const char* arg=argv[argi];
 		if (mainArg.expectOutNext){
