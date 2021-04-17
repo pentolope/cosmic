@@ -42,6 +42,7 @@ uint32_t addressToInstructionTranslationLen;
 
 uint64_t instructionExecutionCount;
 bool printEachInstruction;
+bool doFPGAbootGeneration;
 bool doCacheSim;
 bool isTerminationTriggered;
 uint16_t terminationValue;
@@ -952,7 +953,10 @@ int main(int argc, char** argv){
 	if (doStringsMatch(argv[1],"-p")){
 		printEachInstruction=true;
 	}
-	if (printEachInstruction && argc<3){
+	if (doStringsMatch(argv[1],"-fpga")){
+		doFPGAbootGeneration=true;
+	}
+	if ((printEachInstruction || doFPGAbootGeneration) && argc<3){
 		printf("No arguments given, you give me no reason to start\n");
 		exit(0);
 	}
@@ -964,7 +968,7 @@ int main(int argc, char** argv){
 	machineState->pc=1LU<<16;
 	machineState->sp=0xFFFE;
 	printf("Loading Binary...\n");
-	struct BinContainer binContainer=loadFileContentsAsBinContainer(argv[1+printEachInstruction]);
+	struct BinContainer binContainer=loadFileContentsAsBinContainer(argv[1+(printEachInstruction+doFPGAbootGeneration)]);
 	printf("Integrating Binary...\n");
 	uint32_t mainLabelNumber=0;
 	for (uint32_t i=0;i<binContainer.len_symbols;i++){
@@ -1081,40 +1085,6 @@ int main(int argc, char** argv){
 		if (intrinsicID!=0){
 			symVal=getLabelAddress(intrinsicID);
 		} else {
-			/*
-			switch (IS.id){
-				case I_FCST:
-				func_stack_initial=IS.arg.BWD.a_0;
-				func_stack_size=IS.arg.BWD.a_1;
-				break;
-				case I_JTEN:
-				symVal=getLabelAddress(IS.arg.D.a_0);
-				break;
-				case I_SYRD:
-				case I_SYDD:
-				{
-				InstructionSingle IS_temp0=allData.buffer[i+1];
-				InstructionSingle IS_temp1=allData.buffer[i+2];
-				if (IS_temp0.id!=I_SYCL | (IS_temp1.id!=I_SYRE & IS_temp1.id!=I_SYDE)){
-					printf("I don't wanna do that yet...");
-					bye();
-				}
-				symVal=getLabelAddress(IS_temp0.arg.D.a_0);
-				}
-				break;
-				case I_SYDB:
-				case I_SYRB:
-				case I_SYRW:
-				case I_SYDW:
-				case I_SYRQ:
-				case I_SYDQ:
-				printf("I don't wanna do that yet...");
-				bye();
-				
-				
-				default:;
-			}
-			*/
 			uint8_t symbolSizeBytes=0;
 			uint8_t symbolSizeWords=0;
 			switch (IS.id){
@@ -1174,68 +1144,113 @@ int main(int argc, char** argv){
 		}
 		backendInstructionWrite(&temporaryStorageBufferWalk,symVal,func_stack_size,func_stack_initial,IS);
 	}
-	assert(temporaryStorageBufferWalk==(temporaryStorageBuffer+storageAddress));
+	assert(temporaryStorageBufferWalk==(temporaryStorageBuffer+storageSize));
 	uint32_t mainAddress=getLabelAddress(mainLabelNumber);
 	cosmic_free(labelNumbers);
 	cosmic_free(labelAddresses);
-	for (uint32_t i=1LU<<16;i<storageSize;i++){
-		initMemWrite(i,temporaryStorageBuffer[i]);
-	}
-	cosmic_free(temporaryStorageBuffer);
-	destroyInstructionBuffer(&allData);
-	// now insert the arguments
-	int argcSim=(argc-printEachInstruction)-1;
-	int w=0;
-	for (int i=1+printEachInstruction;i<argc;i++){
-		for (int ii=0;argv[i][ii];ii++){
-			initMemWrite(storageSize+ w++,argv[i][ii]);
+	if (doFPGAbootGeneration){
+		FILE* fpga_boot_asm_file=NULL;
+		fpga_boot_asm_file=fopen("boot.asm","wb");
+		if (fpga_boot_asm_file==NULL){
+			goto failure_to_write_fpga_boot_asm_file;
 		}
-		initMemWrite(storageSize+ w++,0);
-		if ((w&1)!=0) initMemWrite(storageSize+ w++,0);
+		fprintf(fpga_boot_asm_file,"%s","\n.org !00010000\n");
+		for (uint32_t i=0;i<storageSize;i++){
+			fprintf(fpga_boot_asm_file,".datab $%02X\n",(unsigned int)(temporaryStorageBuffer[i]));
+		}
+		if ((storageSize & 1)!=0){
+			fprintf(fpga_boot_asm_file,".datab $00\n");
+		}
+		// storageSize should not be used beyond this point
+		fprintf(fpga_boot_asm_file,"%s","\n:00000000\n");
+		fprintf(fpga_boot_asm_file,"%s","LDLO %0 $00\n");
+		fprintf(fpga_boot_asm_file,"%s","SPSS %0\n");
+		fprintf(fpga_boot_asm_file,"%s","SPSS %0\n");
+		fprintf(fpga_boot_asm_file,"%s","LDLO %0 $02\n");
+		fprintf(fpga_boot_asm_file,"%s","SPSS %0\n"); // stack pointer is now reset to FFFE
+		fprintf(fpga_boot_asm_file,"%s","LDLO %0 $00\n");
+		fprintf(fpga_boot_asm_file,"%s","PUSH %0\n"); // set main return value to 0
+		fprintf(fpga_boot_asm_file,"%s","LDFU %0 #FFFE\n");
+		fprintf(fpga_boot_asm_file,"%s","PUSH %0\n"); // push stack address of main return value
+		fprintf(fpga_boot_asm_file,"%s","LDLO %0 $02\n");
+		fprintf(fpga_boot_asm_file,"%s","PUSH %0\n"); // push arg size
+		fprintf(fpga_boot_asm_file,"%s","LDLA %A %B @00000001\n"); // get the true storage size
+		fprintf(fpga_boot_asm_file,"%s","LDLO %D $02\n");
+		fprintf(fpga_boot_asm_file,"%s","LDLO %C $00\n");
+		fprintf(fpga_boot_asm_file,"%s","MWRW %A %C %C\n");
+		fprintf(fpga_boot_asm_file,"%s","MWRW %B %D %C\n"); // write storage size to place that malloc and related functions will find it
+		fprintf(fpga_boot_asm_file,"%s%04X\n","LDFU %A #",(unsigned int)(0xFFFF & mainAddress));
+		fprintf(fpga_boot_asm_file,"%s%04X\n","LDFU %B #",(unsigned int)(0xFFFF & (mainAddress >> 16))); // set up main address
+		fprintf(fpga_boot_asm_file,"%s","CALL %A %B\n"); // call main
+		fprintf(fpga_boot_asm_file,"%s","LDLA %A %B @00000000\n");
+		fprintf(fpga_boot_asm_file,"%s","AJMP %A %B\n"); // jump back to where boot starts (this is a fail safe, in general this main function shouldn't return anyway)
+		fprintf(fpga_boot_asm_file,"%s",":00000001\n"); // label to mark end
+		fprintf(fpga_boot_asm_file,"%s",".datab $00\n"); // an extra byte. probably not needed, but it's here anyway
+		if (fclose(fpga_boot_asm_file)!=0){
+			failure_to_write_fpga_boot_asm_file:;
+			printf("Failed to write \"boot.asm\" for the fpga\n");
+			bye();
+		}
+		printf("Wrote \"boot.asm\" for the fpga\n");
+	} else {
+		for (uint32_t i=1LU<<16;i<storageSize;i++){
+			initMemWrite(i,temporaryStorageBuffer[i]);
+		}
+		cosmic_free(temporaryStorageBuffer);
+		destroyInstructionBuffer(&allData);
+		// now insert the arguments
+		int argcSim=(argc-printEachInstruction)-1;
+		int w=0;
+		for (int i=1+printEachInstruction;i<argc;i++){
+			for (int ii=0;argv[i][ii];ii++){
+				initMemWrite(storageSize+ w++,argv[i][ii]);
+			}
+			initMemWrite(storageSize+ w++,0);
+			if ((w&1)!=0) initMemWrite(storageSize+ w++,0);
+		}
+		uint32_t prevStorageSize0=storageSize;
+		storageSize+=w;
+		storageSize+=storageSize&1;
+		uint32_t argvSim=storageSize;
+		int w2=0;
+		for (int i=1+printEachInstruction;i<argc;i++){
+			initMemWrite(storageSize+0,0xFF&((prevStorageSize0+w2)>> 0));
+			initMemWrite(storageSize+1,0xFF&((prevStorageSize0+w2)>> 8));
+			initMemWrite(storageSize+2,0xFF&((prevStorageSize0+w2)>>16));
+			initMemWrite(storageSize+3,0xFF&((prevStorageSize0+w2)>>24));
+			storageSize+=4;
+			for (int ii=0;argv[i][ii];ii++){w2++;}
+			w2++;
+			if ((w2&1)!=0) w2++;
+		}
+		// now set up low level requirments for running
+		initPush(0xFFFFu&(argvSim>>16));
+		initPush(0xFFFFu&(argvSim));
+		initPush(0xFFFFu&(argcSim));
+		initPush(0xFFFEu);// ret write address
+		initPush(0x0008);// arg size
+		initPush(0x0000);//%0
+		initPush(0x0000);//%1
+		initPush(0x0401);initPush(0x0000);//ret address dword
+		machineState->reg[0]=machineState->sp; //sp->%0
+		
+		// write end storageSize so malloc and friends can pick it up
+		initMemWrite(0,0xFF&(storageSize>> 0));
+		initMemWrite(1,0xFF&(storageSize>> 8));
+		initMemWrite(2,0xFF&(storageSize>>16));
+		initMemWrite(3,0xFF&(storageSize>>24));
+		
+		machineState->pc=mainAddress;// set pc to main address
+		createInitialMachineState();
+		}
+		printf("Starting SDL...\n");
+		initializeSDL();
+		printf("Running...\n");
+		fullExecute();
+		
+		
+		printf("Finished Normally. Return Value is `%d`\n",terminationValue);
 	}
-	uint32_t prevStorageSize0=storageSize;
-	storageSize+=w;
-	storageSize+=storageSize&1;
-	uint32_t argvSim=storageSize;
-	int w2=0;
-	for (int i=1+printEachInstruction;i<argc;i++){
-		initMemWrite(storageSize+0,0xFF&((prevStorageSize0+w2)>> 0));
-		initMemWrite(storageSize+1,0xFF&((prevStorageSize0+w2)>> 8));
-		initMemWrite(storageSize+2,0xFF&((prevStorageSize0+w2)>>16));
-		initMemWrite(storageSize+3,0xFF&((prevStorageSize0+w2)>>24));
-		storageSize+=4;
-		for (int ii=0;argv[i][ii];ii++){w2++;}
-		w2++;
-		if ((w2&1)!=0) w2++;
-	}
-	// now set up low level requirments for running
-	initPush(0xFFFFu&(argvSim>>16));
-	initPush(0xFFFFu&(argvSim));
-	initPush(0xFFFFu&(argcSim));
-	initPush(0xFFFEu);// ret write address
-	initPush(0x0008);// arg size
-	initPush(0x0000);//%0
-	initPush(0x0000);//%1
-	initPush(0x0401);initPush(0x0000);//ret address dword
-	machineState->reg[0]=machineState->sp; //sp->%0
-	
-	// write end storageSize so malloc and friends can pick it up
-	initMemWrite(0,0xFF&(storageSize>> 0));
-	initMemWrite(1,0xFF&(storageSize>> 8));
-	initMemWrite(2,0xFF&(storageSize>>16));
-	initMemWrite(3,0xFF&(storageSize>>24));
-	
-	machineState->pc=mainAddress;// set pc to main address
-	createInitialMachineState();
-	}
-	printf("Starting SDL...\n");
-	initializeSDL();
-	printf("Running...\n");
-	fullExecute();
-	
-	
-	
-	printf("Finished Normally. Return Value is `%d`\n",terminationValue);
 	bye();
 }
 

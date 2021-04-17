@@ -989,7 +989,7 @@ void loadFileContentsAsByteCode(const char* filePath){
 
 static void _exec_springboard1(){
 	// this is a very neat trick.
-	// after _exec_springboard returns, the loaded binary's main is run instead of going back to the loader's _exec_springboard0
+	// after _exec_springboard1 returns, the loaded binary's main is run instead of going back to the loader's _exec_springboard0
 	__FUNCTION_RET_INSTRUCTION_ADDRESS=mainAddress;
 }
 

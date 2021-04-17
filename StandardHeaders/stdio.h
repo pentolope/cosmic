@@ -14,7 +14,7 @@ typedef struct {
 	const char* path;
 	unsigned long position;
 	unsigned char mode_id;
-	bool ignorePosition;
+	_Bool ignorePosition;
 	
 	// should I make a buffer built in here?
 } FILE;

@@ -41,7 +41,7 @@
 //#define OPT_DEBUG_CONST
 //#define OPT_PEEPHOLE_PRINT_TREE
 
-//#define PRINT_EACH_FUNCTION // this prints the optimized instruction buffer for each function
+#define PRINT_EACH_FUNCTION // this prints the optimized instruction buffer for each function
 
 /*
 STATEMENT_DEBUG tells the statement walker to print every statement it reaches prior to processing it
