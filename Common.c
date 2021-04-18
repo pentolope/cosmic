@@ -227,6 +227,7 @@ char* copyStringToHeapString(const char*const string){
 }
 
 char* copyStringSegmentToHeap(const char*const string,const int32_t start,const int32_t end){
+	assert(end>=start);
 	int32_t length = end-start;
 	char* newString = cosmic_malloc(length+1);
 	for (int32_t i=0;i<length;i++){
@@ -248,6 +249,7 @@ bool isStringLengthLargerThan(const char*const string,const int32_t startIndex,c
 }
 
 bool specificStringEqualCheck(const char*const stringLarge,const int32_t startInStringLarge,const int32_t endInStringLarge,const char*const subStringToCheck){
+	assert(endInStringLarge>=startInStringLarge);
 	int32_t lengthOfSubString = strlen(subStringToCheck);
 	if (endInStringLarge-startInStringLarge!=lengthOfSubString || 
 			!isStringLengthLargerThan(stringLarge,startInStringLarge,lengthOfSubString-1)){

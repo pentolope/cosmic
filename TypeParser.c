@@ -814,6 +814,10 @@ char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* st
 					break;
 				}
 				++iTo;
+				if (i==iTo){
+					*errorValue=4;
+					return NULL;
+				}
 				// I'm doing this the lazy-ish way, I don't want to write a better one right now
 				char* temp0 = copyStringSegmentToHeap(stringInternal,0,segments[iTo].startInString);
 				char* temp1 = copyStringSegmentToHeap(stringInternal,segments[iTo].startInString,segments[i].startInString-1);
@@ -1447,6 +1451,8 @@ char* convertType(int32_t startIndex, int32_t endIndex){
 			printInformativeMessageAtSourceContainerIndex(true,"types cannot contain the character `\'` or `\"`",startIndex,endIndex);
 		} else if (errorValueForTypeNormalizer==3){
 			printInformativeMessageAtSourceContainerIndex(true,"types cannot contain nested array brackets",startIndex,endIndex);
+		} else if (errorValueForTypeNormalizer==4){
+			printInformativeMessageAtSourceContainerIndex(true,"failed to find the type to qualify as either const or volatile",startIndex,endIndex);
 		} else {
 			assert(false);
 		}
