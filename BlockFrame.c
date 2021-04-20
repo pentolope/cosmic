@@ -372,6 +372,7 @@ return value description:
  0 - global variable added without problems (can also mean that it wasn't added but was a permissable redeclaration after a tentative declaration)
  1 - identifier collision exists with non-variable
  2 - identifier collision exists with variable
+ 3 - sizeof failure
 */
 uint8_t addGlobalVariable(
 		const char* typeString,
@@ -382,6 +383,8 @@ uint8_t addGlobalVariable(
 		bool usedExtern,
 		bool hadInitializer){
 
+	if (staticLinkbackID!=0) goto HasStaticLinkback; // in this situation, this variable is accessible in a special way that should not have identifier check performed here
+	
 	bool doesIdentifierAlreadyExist;
 	uint32_t indexOfEntryIfIdentifierExists;
 	{
@@ -408,11 +411,10 @@ uint8_t addGlobalVariable(
 		// currently, this is not possible because tentative declarations are not supported.
 		// TODO
 	} else {
+		HasStaticLinkback:;
 		uint32_t thisSizeof = getSizeofForTypeString(typeString,false);
-		if (thisSizeof==0){
-			printf("sizeof failed while adding variable to global frame\n");
-			exit(1);
-		}
+		if (thisSizeof==0) return 3;
+		
 		thisSizeof+=thisSizeof&1; // word alligned sizeof
 		
 		if (blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots>=blockFrameArray.globalBlockFrame.numberOfAllocatedGlobalVariableEntrySlots){
@@ -618,12 +620,12 @@ void addVariableToBlockFrame(
 		struct IdentifierSearchResult isr;
 		searchForIdentifier(&isr,typeString,false,true,true,true,false);
 		if (isr.didExist){
-			bool isAcceptable=false;
+			bool isAcceptable;
 			// isr could be global because of static
 			if (isr.typeOfResult==IdentifierSearchResultIsVariable){
 				isAcceptable=isr.reference.variableReference.isGlobal || isr.reference.variableReference.blockFrameEntryIndex!=blockFrameArray.numberOfValidSlots-1;
 			} else {
-				isAcceptable=isr.reference.typeMemberReference.isGlobal || isr.reference.typeMemberReference. blockFrameEntryIndex!=blockFrameArray.numberOfValidSlots-1;
+				isAcceptable=isr.reference.typeMemberReference.isGlobal || isr.reference.typeMemberReference.blockFrameEntryIndex!=blockFrameArray.numberOfValidSlots-1;
 			}
 			if (isAcceptable){
 printInformativeMessageAtSourceContainerIndex(false,
@@ -662,10 +664,11 @@ exit(1);
 		blockFrameVariableEntryPtr->staticLinkbackID = thisStaticID;
 		
 		// the variable is now sufficently set up to call this function with no problems
-		addGlobalVariable(typeString,thisStaticID,++globalLabelID,indexOfDeclaration,true,false,true); 
+		uint8_t ret=addGlobalVariable(typeString,thisStaticID,++globalLabelID,indexOfDeclaration,true,false,true); 
 		// the global entry is added in addition to the auto scope entry.
 		// Also, because thisStaticID!=0, the global and local entry can't be accessed normally
 		// hasInitializer is true because then it will behave well with tentative declaration logic
+		assert(ret==0); // addGlobalVariable is expected to not fail here
 	} else {
 		if ((((uint32_t)blockFrameEntryPtr->addedStackValue)+((uint32_t)thisSizeof))>64000){
 			printf("size of that type is too large for the stack\n");

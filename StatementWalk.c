@@ -855,7 +855,6 @@ printInstructionBufferWithMessageAndNumber(&instructionBufferForFunction,typeStr
 						err_1101_("It seems that a variable was being declared at file scope,\n  but something went wrong when trying to figure out if it had an initalizer",gotoFailIndex);
 					}
 					int32_t indexOfSemicolon = endIndexForDeclaration;
-					uint8_t retValForAddingVariable = 0;
 					uint32_t labelID=++globalLabelID;
 					if (isInitializationBeingGiven){
 						indexOfSemicolon = findIndexOfTypicalStatementEnd(endIndexForDeclaration);
@@ -875,15 +874,16 @@ printInstructionBufferWithMessageAndNumber(&instructionBufferForFunction,typeStr
 						typeString=strMerge3(typeStringIdentifier," ",typeStringNI);
 						cosmic_free(typeStringIdentifier);
 						cosmic_free(typeStringNI);
-						retValForAddingVariable = addGlobalVariable(typeString,0,labelID,gotoFailIndex,hasStatic,hasExtern,true);
-					} else {
-						retValForAddingVariable = addGlobalVariable(typeString,0,labelID,gotoFailIndex,hasStatic,hasExtern,false);
-						addBlankStaticVariable(typeString);
 					}
-					if (retValForAddingVariable==1){
-						err_1101_("identifier collision at file scope for variable, a variable was already declared with the same identifier",gotoFailIndex);
-					} else if (retValForAddingVariable==2){
-						err_1101_("identifier collision at file scope for variable, a function was already declared with the same identifier",gotoFailIndex);
+					switch (addGlobalVariable(typeString,0,labelID,gotoFailIndex,hasStatic,hasExtern,isInitializationBeingGiven)){
+						case 1:err_1101_("identifier collision at file scope for variable, a variable was already declared with the same identifier",gotoFailIndex);
+						case 2:err_1101_("identifier collision at file scope for variable, a function was already declared with the same identifier",gotoFailIndex);
+						case 3:err_1101_("sizeof failed while adding variable at file scope",gotoFailIndex);
+						default:assert(false);
+						case 0:;
+					}
+					if (!isInitializationBeingGiven){
+						addBlankStaticVariable(typeString);
 					}
 				}
 			} else if (sourceContainer.string[endIndexForDeclaration]=='='){
