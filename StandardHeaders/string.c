@@ -92,7 +92,8 @@ static void strcpy(char* dest, const char* src){
 
 
 static char* strchr(const char* str,int character){
-	char c;
+	int c;
+	character=(char)character;
 	while (1){
 		c=*str;
 		if (c==character) return (char*)str;
