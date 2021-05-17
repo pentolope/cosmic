@@ -1073,7 +1073,6 @@ int main(int argc, char** argv){
 		}
 	}
 	uint32_t storageSize=storageAddress;
-	{
 	uint16_t func_stack_size;
 	uint8_t func_stack_initial;
 	uint8_t* temporaryStorageBuffer=cosmic_calloc(storageAddress,sizeof(uint8_t));
@@ -1150,7 +1149,7 @@ int main(int argc, char** argv){
 	cosmic_free(labelAddresses);
 	if (doFPGAbootGeneration){
 		FILE* fpga_boot_asm_file=NULL;
-		fpga_boot_asm_file=fopen("boot.asm","wb");
+		fpga_boot_asm_file=fopen("boot.asm","w");
 		if (fpga_boot_asm_file==NULL){
 			goto failure_to_write_fpga_boot_asm_file;
 		}
@@ -1242,7 +1241,7 @@ int main(int argc, char** argv){
 		
 		machineState->pc=mainAddress;// set pc to main address
 		createInitialMachineState();
-		}
+		
 		printf("Starting SDL...\n");
 		initializeSDL();
 		printf("Running...\n");
