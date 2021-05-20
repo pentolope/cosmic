@@ -1051,10 +1051,16 @@ char* breakDownTypeAndAdd(const char* typeString, bool addToGlobal){
 }
 
 char* fullTypeParseAndAdd(int32_t startIndex,int32_t endIndex,bool addToGlobal){
-	char* typeString_1 = convertType(startIndex,endIndex);
-	char* typeString_2 = breakDownTypeAndAdd(typeString_1,addToGlobal);
-	cosmic_free(typeString_1);
-	return typeString_2;
+	char** typeStrings = convertType(startIndex,endIndex);
+	char* typeStringLast = NULL;
+	for (int16_t i=0;typeStrings[i]!=NULL;i++){
+		cosmic_free(typeStringLast); // it's fine if typeStringLast is NULL
+		typeStringLast = breakDownTypeAndAdd(typeStrings[i],addToGlobal);
+		cosmic_free(typeStrings[i]);
+	}
+	assert(typeStringLast!=NULL);
+	cosmic_free(typeStrings);
+	return typeStringLast;
 }
 
 void ensureNoNewDefinitions(const char* typeString,int32_t startIndex,int32_t endIndex){
@@ -1066,117 +1072,17 @@ void ensureNoNewDefinitions(const char* typeString,int32_t startIndex,int32_t en
 }
 
 char* fullTypeParseAvoidAdd(int32_t startIndex,int32_t endIndex){
-	char* typeString_1 = convertType(startIndex,endIndex);
-	ensureNoNewDefinitions(typeString_1,startIndex,endIndex);
-	bool didAllocateAnotherString;
-	char* typeString_2 = resolveTypdefsInTypeString(typeString_1,&didAllocateAnotherString);
-	if (didAllocateAnotherString) cosmic_free(typeString_1);
-	ensureNoNewDefinitions(typeString_2,startIndex,endIndex);
-	return typeString_2;
+	char** typeStrings = convertType(startIndex,endIndex);
+	char* typeStringLast = NULL;
+	for (int16_t i=0;typeStrings[i]!=NULL;i++){
+		cosmic_free(typeStringLast); // it's fine if typeStringLast is NULL
+		ensureNoNewDefinitions(typeStrings[i],startIndex,endIndex);
+		bool didAllocateAnotherString;
+		typeStringLast = resolveTypdefsInTypeString(typeStrings[i],&didAllocateAnotherString);
+		if (didAllocateAnotherString) cosmic_free(typeStrings[i]);
+		ensureNoNewDefinitions(typeStringLast,startIndex,endIndex);
+	}
+	assert(typeStringLast!=NULL);
+	cosmic_free(typeStrings);
+	return typeStringLast;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
-
-
-void debugPrintOfBlockFrameArray(){
-	printf("===Starting debug print===\n");
-	printf("->Global:\n");
-	printf("--sizeOfGlobalVariables:%d:\n",(int)blockFrameArray.globalBlockFrame.sizeOfGlobalVariables);
-	printf("-->Variables (%d,%d):\n",(int)blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots,(int)blockFrameArray.globalBlockFrame.numberOfAllocatedGlobalVariableEntrySlots);
-	for (uint32_t j=0;j<blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots;j++){
-		struct GlobalVariableEntry* ptr = &(blockFrameArray.globalBlockFrame.globalVariableEntries[j]);
-		printf("---typeString:%s:\n",ptr->typeString);
-		printf("---labelID:%d:\n",(int)ptr->labelID);
-		printf("---staticLinkbackID:%d:\n",(int)ptr->staticLinkbackID);
-		printf("---thisSizeof:%d:\n",(int)ptr->thisSizeof);
-		printf("---usedStatic:%d:\n",(int)ptr->usedStatic);
-		printf("---usedExtern:%d:\n",(int)ptr->usedExtern);
-		printf("---hadInitializer:%d:\n",(int)ptr->hadInitializer);
-		printf("---isCurrentlyTentative:%d:\n",(int)ptr->isCurrentlyTentative);
-		printf("~~~\n");
-	}
-	printf("-->Types (%d,%d):\n",(int)blockFrameArray.globalBlockFrame.numberOfValidGlobalTypeEntrySlots,(int)blockFrameArray.globalBlockFrame.numberOfAllocatedGlobalTypeEntrySlots);
-	for (uint32_t j=0;j<blockFrameArray.globalBlockFrame.numberOfValidGlobalTypeEntrySlots;j++){
-		struct GlobalTypeEntry* ptr = &(blockFrameArray.globalBlockFrame.globalTypeEntries[j]);
-		printf("---name:%s:\n",ptr->name);
-		printf("---typeOfThis:%d:\n",(int)ptr->typeOfThis);
-		printf("---thisSizeof:%d:\n",(int)ptr->thisSizeof);
-		printf("---numberOfComponentEntries:%d:\n",(int)ptr->numberOfComponentEntries);
-		for (uint16_t k=0;k<ptr->numberOfComponentEntries;k++){
-			struct TypeComponentEntry* ptr2 = &(ptr->arrayOfComponentEntries[k]);
-			printf("-<>-typeString:%s:\n",ptr2->typeString);
-			printf("-<>-offset:%d:\n",(int)ptr2->offset);
-			printf("~~~~\n");
-		}
-		printf("~~~\n");
-	}
-	printf("-->Functions (%d,%d):\n",(int)blockFrameArray.globalBlockFrame.numberOfValidGlobalFunctionEntrySlots,(int)blockFrameArray.globalBlockFrame.numberOfAllocatedGlobalFunctionEntrySlots);
-	for (uint32_t j=0;j<blockFrameArray.globalBlockFrame.numberOfValidGlobalFunctionEntrySlots;j++){
-		struct GlobalFunctionEntry* ptr = &(blockFrameArray.globalBlockFrame.globalFunctionEntries[j]);
-		printf("---typeString:%s:\n",ptr->typeString);
-		printf("---labelID:%d:\n",(int)ptr->labelID);
-		printf("---hasBeenDefined:%d:\n",(int)ptr->hasBeenDefined);
-		printf("---usesVaArgs:%d:\n",(int)ptr->usesVaArgs);
-		printf("~~~\n");
-	}
-	printf("~~\n");
-	printf("->BlockFrames (%d,%d):\n",(int)blockFrameArray.numberOfValidSlots,(int)blockFrameArray.numberOfAllocatedSlots);
-	for (uint32_t i=0;i<blockFrameArray.numberOfValidSlots;i++){
-		struct BlockFrameEntry* entryPtr = &(blockFrameArray.entries[i]);
-		printf("--addedStackValue:%d:\n",(int)entryPtr->addedStackValue);
-		printf("-->Variables (%d,%d):\n",(int)entryPtr->numberOfValidVariableEntries,(int)entryPtr->numberOfAllocatedVariableEntries);
-		for (uint32_t j=0;j<entryPtr->numberOfValidVariableEntries;j++){
-			struct BlockFrameVariableEntry* ptr = &(entryPtr->variableEntries[j]);
-			printf("---typeString:%s:\n",ptr->typeString);
-			printf("---staticLinkbackID:%d:\n",(int)ptr->staticLinkbackID);
-			if (ptr->staticLinkbackID==0){
-				printf("---thisSizeof:%d:\n",(int)ptr->thisSizeof);
-				printf("---offsetInThisBlockFrame:%d:\n",(int)ptr->offsetInThisBlockFrame);
-				printf("---isRegister:%d:\n",(int)ptr->isRegister);
-			} else {
-				printf("---thisSizeof:irrelevant:");
-				printf("---offsetInThisBlockFrame:irrelevant:\n");
-				printf("---isRegister:irrelevant:\n");
-			}
-			printf("~~~\n");
-		}
-		printf("-->Types (%d):\n",(int)entryPtr->numberOfTypeEntries);
-		for (uint32_t j=0;j<entryPtr->numberOfTypeEntries;j++){
-			struct BlockFrameTypeEntry* ptr = &(entryPtr->typeEntries[j]);
-			printf("---name:%s:\n",ptr->name);
-			printf("---typeOfThis:%d:\n",(int)ptr->typeOfThis);
-			printf("---thisSizeof:%d:\n",(int)ptr->thisSizeof);
-			printf("---numberOfComponentEntries:%d:\n",(int)ptr->numberOfComponentEntries);
-			for (uint16_t k=0;k<ptr->numberOfComponentEntries;k++){
-				struct TypeComponentEntry* ptr2 = &(ptr->arrayOfComponentEntries[k]);
-				printf("-<>-typeString:%s:\n",ptr2->typeString);
-				printf("-<>-offset:%d:\n",(int)ptr2->offset);
-				printf("~~~~\n");
-			}
-			printf("~~~\n");
-		}
-		printf("~~\n");
-	}
-	printf("===Ending debug print===\n");
-}
-
-
-
-*/
-
-
-

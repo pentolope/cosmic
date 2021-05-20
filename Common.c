@@ -217,8 +217,8 @@ bool doStringsMatch(const char*const string1,const char*const string2){
 
 
 char* copyStringToHeapString(const char*const string){
-	int32_t length = strlen(string);
-	char* newString = cosmic_malloc(length+1);
+	const int32_t length = strlen(string);
+	char*const newString = cosmic_malloc(length+1);
 	for (int32_t i=0;i<length;i++){
 		newString[i]=string[i];
 	}
@@ -228,42 +228,14 @@ char* copyStringToHeapString(const char*const string){
 
 char* copyStringSegmentToHeap(const char*const string,const int32_t start,const int32_t end){
 	assert(end>=start);
-	int32_t length = end-start;
-	char* newString = cosmic_malloc(length+1);
+	const int32_t length = end-start;
+	char*const newString = cosmic_malloc(length+1);
 	for (int32_t i=0;i<length;i++){
 		newString[i]=string[i+start];
 	}
 	newString[length]=0;
 	return newString;
 }
-
-bool isStringLengthLargerThan(const char*const string,const int32_t startIndex,const int32_t amount){
-	int32_t amountLeft = amount;
-	for (int32_t i=startIndex;string[i];i++){
-		if (amountLeft==0){
-			return true;
-		}
-		amountLeft--;
-	}
-	return amountLeft==0;
-}
-
-bool specificStringEqualCheck(const char*const stringLarge,const int32_t startInStringLarge,const int32_t endInStringLarge,const char*const subStringToCheck){
-	assert(endInStringLarge>=startInStringLarge);
-	int32_t lengthOfSubString = strlen(subStringToCheck);
-	if (endInStringLarge-startInStringLarge!=lengthOfSubString || 
-			!isStringLengthLargerThan(stringLarge,startInStringLarge,lengthOfSubString-1)){
-		
-		return false;
-	}
-	for (int32_t i=0;i<lengthOfSubString;i++){
-		if (stringLarge[i+startInStringLarge]!=subStringToCheck[i]){
-			return false;
-		}
-	}
-	return true;
-}
-
 
 // lower letters are c>96 & c<123
 // upper letters are c>64 & c<91
@@ -272,13 +244,16 @@ bool specificStringEqualCheck(const char*const stringLarge,const int32_t startIn
 
 
 bool isSectionOfStringEquivalent(const char*const string1,const int32_t startIndexForString1,const char*const string2){
-	for (int32_t i=0;string2[i];i++){
-		char c = string1[i+startIndexForString1];
-		if (c==0 | c!=string2[i]){
-			return false;
-		}
-	}
-	return true;
+	const char*const string3=string1+startIndexForString1;
+	int32_t i=0;
+	char c1;
+	char c2;
+	do {
+		c1=string3[i];
+		c2=string2[i];
+		++i;
+	} while (!(c2==0 | c1==0 | c1!=c2));
+	return c2==0;
 }
 
 bool isSegmentAnywhereInString(const char*const stringSearchIn,const char*const stringSearchFor){
@@ -294,6 +269,14 @@ bool isSegmentAnywhereInString(const char*const stringSearchIn,const char*const 
 		}
 	}
 	return false;
+}
+
+bool specificStringEqualCheck(const char*const stringLarge,const int32_t startInStringLarge,const int32_t endInStringLarge,const char*const subStringToCheck){
+	assert(endInStringLarge>=startInStringLarge);
+	if (strlen(subStringToCheck)!=endInStringLarge-startInStringLarge){
+		return false;
+	}
+	return isSectionOfStringEquivalent(stringLarge,startInStringLarge,subStringToCheck);
 }
 
 // returns -1 if that space number doesn't exist
@@ -576,7 +559,7 @@ void writeHexInString(char* string, uint32_t numberToTranslate){
 		((char*)&numberToTranslate)[3]
 	};
 	assert(*((uint32_t*)byteArray)==numberToTranslate);
-	// if this assert fails, then the current computer's arcitecture is not compatible with this compiler
+	// if this assert fails, then the current computer's architecture is not compatible with this compiler
 	}
 	
 	for (unsigned int i=0;i<4u;i++){
@@ -602,11 +585,46 @@ uint32_t readHexInString(const char* string){
 }
 
 
+// only used by areEnclosementsValidInString()
+int32_t verifyEnclosementsMatchInStringSub(const char* string,int32_t index){
+	char end;
+	{
+	const char list[4]={')','>',']','}'};
+	end=list[(string[index]=='<')*1|(string[index]=='[')*2|(string[index]=='{')*3];
+	}
+	int32_t i=index;
+	char c;
+	while ((c=string[++i])){
+		if (c==end) return i;
+		if (c=='(' | c=='<' | c=='[' | c=='{'){
+			i=verifyEnclosementsMatchInStringSub(string,i);
+			if (i==-1) break;
+		} else if (c==')' | c=='>' | c==']' | c=='}'){
+			break;
+		}
+	}
+	return -1;
+}
+
+// returns true if ()<>[]{} all have a match, does not check for string literals
+bool areEnclosementsValidInString(const char* string){
+	int32_t i=-1;
+	char c;
+	while ((c=string[++i])){
+		if (c=='(' | c=='<' | c=='[' | c=='{'){
+			i=verifyEnclosementsMatchInStringSub(string,i);
+			if (i==-1) return false;
+		} else if (c==')' | c=='>' | c==']' | c=='}'){
+			return false;
+		}
+	}
+	return true;
+}
 
 
 // does not check for string literals, assumes input is valid
 int32_t getIndexOfMatchingEnclosement(const char* string,const int32_t index){
-	const char list[]={'(',')','<','>','[',']','{','}'};
+	const char list[8]={'(',')','<','>','[',']','{','}'};
 	int32_t i=index;
 	const char next=string[index];
 	const char type=(next==list[1])*1|(next==list[2])*2|(next==list[3])*3|(next==list[4])*4|(next==list[5])*5|(next==list[6])*6|(next==list[7])*7;
@@ -627,13 +645,13 @@ int32_t getIndexOfMatchingEnclosement(const char* string,const int32_t index){
 	exit(1);
 }
 
-int32_t emptyIndexRecede(int32_t strStart){
-	int32_t i=strStart+1;
+int32_t emptyIndexRecede(int32_t index){
+	int32_t i=index+1;
 	while (i!=0){
 		char c=sourceContainer.string[--i];
 		if (!(c==' ' | c=='\n')) return i;
 	}
-	err_1101_("Expected something before this point",strStart);
+	err_1101_("Expected something before this point",index);
 	return 0; // unreachable
 }
 

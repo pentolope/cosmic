@@ -63,8 +63,7 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 		}
 		if (isSectionOfStringEquivalent(stringInternal,0,"[ ")){
 			int32_t indexOfOtherBrace = getIndexOfMatchingEnclosement(stringInternal,0);
-			if (indexOfOtherBrace<0 | indexOfOtherBrace==2 | (indexOfOtherBrace+2)>=strlen(stringInternal)){
-				// indexOfOtherBrace<0 is if the bracket match failed
+			if (indexOfOtherBrace==2 | (indexOfOtherBrace+2)>=strlen(stringInternal)){
 				// indexOfOtherBrace==2 is if there is nothing inside the brackets
 				// (indexOfOtherBrace+2)>=strlen(stringInternal) is if there is nothing after the brackets
 				err_10_01(strMerge3(

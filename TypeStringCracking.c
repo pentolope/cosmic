@@ -65,7 +65,6 @@ void crackArraysAndEnum(char* string){
 	for (i0=0;string[i0];i0++){
 		if (string[i0]=='['){
 			i1=getIndexOfMatchingEnclosement(string,i0);
-			assert(i1!=-1); // type string corruption
 			string[i0  ]=26;
 			string[i0+1]='#';
 			string[i1  ]=26;
@@ -76,7 +75,6 @@ void crackArraysAndEnum(char* string){
 	for (i0=0;string[i0];i0++){
 		if (isSectionOfStringEquivalent(string,i0,"enum ")){
 			int32_t end=getIndexOfNthSpace(string+i0,1);
-			assert(end!=-1); // type string corruption
 			end+=i0;
 			string[i0  ]='i';
 			string[i0+1]='n';
@@ -213,7 +211,6 @@ char* advancedCrackedTypeToTypeString(char* crackedType){
 			while ((c=*crackedType)!=','){
 				assert(c!=0);
 				if (c=='('){
-					assert(getIndexOfMatchingEnclosement(crackedType,0)!=-1);
 					crackedType=getIndexOfMatchingEnclosement(crackedType,0)+crackedType;
 				} else if (c==')'){
 					crackedType--;
@@ -273,9 +270,7 @@ int32_t findUncrackedStructOrUnion(char* string){
 		int32_t p=i-2;
 		char c=string[i];
 		if (c=='('){
-			int32_t functionJump=getIndexOfMatchingEnclosement(string,i);
-			assert(functionJump!=-1);
-			i=functionJump;
+			i=getIndexOfMatchingEnclosement(string,i);
 		} else if ((
 			c=='s' && isSectionOfStringEquivalent(string,i,"struct ")) || (
 			c=='u' && isSectionOfStringEquivalent(string,i,"union "))){
@@ -384,7 +379,6 @@ void fixFunctionParamsSub(char** stringPtr){
 					prev=cur+1;
 				} else if (c=='('){
 					cur=getIndexOfMatchingEnclosement(t2,cur);
-					assert(cur!=-1);
 				}
 			}
 			cosmic_free(t2);

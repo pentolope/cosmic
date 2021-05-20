@@ -6,7 +6,7 @@
 /*
 NOTES:
 
- - bitfields are not implemented at all. Attempting to use them could cause weird behaviour, because there is nothing checking for them. ----------working on it
+ - bitfields are not implemented. There is some checking performed for them.
  - "const" and "volatile" will appear directly before the thing that is declared const or volatile.
  - in some rare cases, if the type does not have an identifier and it's a very complex type, 
      it may not recognize the starting point correctly, 
@@ -24,18 +24,20 @@ NOTES:
 
 
 /*
-this (or the next 2) is probably the function that you are looking for if you are looking for a public-like function that deals with parsing types.
-returns a new string on the heap of the result, which is seperated by spaces (without an ending space).
+convertType() Returns a new array of strings on the heap of the result.
+Each string has components that are seperated by spaces (without an ending space).
+The array is terminated with a NULL.
 struct, enum, union will preface the name (and the name may be followed by a bracket)
 "long int" does NOT become "int long", and other things of that sort (I got that working!)
 
-Remember, what comes out of here is not finished. It needs to have the structure declarations taken out and typedefs resolved by "breakDownTypeAndAdd()"
+Remember, what comes out of here is not finished. It needs to have the structure declarations taken out and typedefs resolved by "fullTypeParseAndAdd()" or "fullTypeParseAvoidAdd()" [ those functions call convertType() ]
 */
-char* convertType(int32_t startIndex, int32_t endIndex);
+char** convertType(int32_t startIndex, int32_t endIndex);
 
 /*
-finds the endIndex for a C style declaration, primarily for convertType(). Does not include the brackets for function declarations
-doesn't check must about the type declaration to see it's validity
+Finds the endIndex for a C style declaration, primarily for convertType().
+Does not include the brackets for function declarations.
+Doesn't check must about the type declaration to see it's validity.
 */
 int32_t findEndIndexForConvertType(int32_t startIndex){
 	bool wasCloseParenLast = false; // this isn't set to false for spaces and newlines when they are last
@@ -254,7 +256,7 @@ char* giveNumbersToSingleEnumList(char* string, int32_t indexOfEnum){
 }
 
 
-// the input string is potentially destroyed, and an output string is given (cosmic_realloc() may be used on the input string)
+// the input string is potentially destroyed, and an output string is given (effectively, cosmic_realloc() may be used on the input string)
 char* giveNumbersForAllEnumEnumerators(char* string){
 	int32_t length = strlen(string);
 	int32_t startIndex = 6;
@@ -264,7 +266,7 @@ char* giveNumbersForAllEnumEnumerators(char* string){
 				if (string[++i]!='{') break;
 				string = giveNumbersToSingleEnumList(string,i);
 				length = strlen(string);
-				startIndex = getIndexOfMatchingEnclosement(string,i); // this should happen
+				startIndex = getIndexOfMatchingEnclosement(string,i);
 				break;
 			}
 		}
@@ -276,7 +278,7 @@ char* giveNumbersForAllEnumEnumerators(char* string){
 					if (string[++i]!='{') break;
 					string = giveNumbersToSingleEnumList(string,i);
 					length = strlen(string);
-					mainIndex = getIndexOfMatchingEnclosement(string,i); // this should happen
+					mainIndex = getIndexOfMatchingEnclosement(string,i);
 					break;
 				}
 			}
@@ -284,9 +286,6 @@ char* giveNumbersForAllEnumEnumerators(char* string){
 	}
 	return string;
 }
-
-
-
 
 
 // the input string has cosmic_realloc() called on it, which is then returned
@@ -316,39 +315,46 @@ char* giveNameToSingleAnonymous(char* string, int32_t startIndexAtBracket, uint8
 }
 
 
-// the input string is potentially destroyed, and an output string is given (cosmic_realloc() may be used on the input string)
+// the input string is potentially destroyed, and an output string is given (effectively, cosmic_realloc() may be used on the input string)
 char* giveNamesToAllAnonymous(char* string){
-	int32_t length = strlen(string);
-	if (length>9 && specificStringEqualCheck(string,0,9,"struct { ")){
-		return giveNamesToAllAnonymous(giveNameToSingleAnonymous(string,7,0));
+	if (isSectionOfStringEquivalent(string,0,"struct { ")){
+		string=giveNameToSingleAnonymous(string,7,0);
 	}
-	if (length>8 && specificStringEqualCheck(string,0,8,"union { ")){
-		return giveNamesToAllAnonymous(giveNameToSingleAnonymous(string,6,1));
+	if (isSectionOfStringEquivalent(string,0,"union { ")){
+		string=giveNameToSingleAnonymous(string,6,1);
 	}
-	if (length>7 && specificStringEqualCheck(string,0,7,"enum { ")){
-		return giveNamesToAllAnonymous(giveNameToSingleAnonymous(string,5,2));
+	if (isSectionOfStringEquivalent(string,0,"enum { ")){
+		string=giveNameToSingleAnonymous(string,5,2);
 	}
 	// the above checks are for if the struct,union,enum part is at the very beginning, because those wouldn't be detected by the one below due to the space at the beginning
+	int32_t length = strlen(string);
 	for (int32_t i=10;i<length;i++){
 		// the first term in the if expression is there to speed it up
-		if (string[i-2]=='{' && specificStringEqualCheck(string,i-10,i," struct { ")){
-			return giveNamesToAllAnonymous(giveNameToSingleAnonymous(string,i-2,0));
+		if (string[i-2]=='{' && isSectionOfStringEquivalent(string,i-10," struct { ")){
+			string = giveNameToSingleAnonymous(string,i-2,0);
+			length = strlen(string);
+			i=9;
 		}
 	}
 	for (int32_t i=9;i<length;i++){
 		// the first term in the if expression is there to speed it up
-		if (string[i-2]=='{' && specificStringEqualCheck(string,i-9,i," union { ")){
-			return giveNamesToAllAnonymous(giveNameToSingleAnonymous(string,i-2,1));
+		if (string[i-2]=='{' && isSectionOfStringEquivalent(string,i-9," union { ")){
+			string = giveNameToSingleAnonymous(string,i-2,1);
+			length = strlen(string);
+			i=8;
 		}
 	}
 	for (int32_t i=8;i<length;i++){
 		// the first term in the if expression is there to speed it up
-		if (string[i-2]=='{' && specificStringEqualCheck(string,i-8,i," enum { ")){
-			return giveNamesToAllAnonymous(giveNameToSingleAnonymous(string,i-2,2));
+		if (string[i-2]=='{' && isSectionOfStringEquivalent(string,i-8," enum { ")){
+			string = giveNameToSingleAnonymous(string,i-2,2);
+			length = strlen(string);
+			i=7;
 		}
 	}
 	return string;
 }
+
 
 int32_t advancedSourceFindSub(char* string, int32_t sourceStart, int32_t sourceEnd){
 	int32_t i0=sourceStart;
@@ -387,7 +393,7 @@ bool advancedSourceFind(char* string, int32_t sourceStart, int32_t sourceEnd, in
 }
 
 
-// the input string is potentially destroyed, and an output string is given (cosmic_realloc() may be used on the input string)
+// the input string is potentially destroyed, and an output string is given (effectively, cosmic_realloc() may be used on the input string)
 char* resolveConstantExpressionInTypeString(char* string,int32_t sourceStart,int32_t sourceEnd){
 	ExpressionTreeGlobalBuffer pack;
 	for (int32_t i=0;string[i];i++){
@@ -432,6 +438,7 @@ char* resolveConstantExpressionInTypeString(char* string,int32_t sourceStart,int
 	unpackExpressionTreeGlobalBuffer(&pack);
 	return string;
 }
+
 
 
 // allocates a new string
@@ -833,7 +840,7 @@ char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* st
 	}
 	cosmic_free(segments);
 	// and nearly done with normalizing everything, just need to:
-	// 1. add unique names to anonymous struct, enum, union. 
+	// 1. add unique names to anonymous struct, enum, union
 	// 2. add values to any enum's enumerator-lists there may be
 	stringInternal = giveNamesToAllAnonymous(stringInternal);
 	stringInternal = giveNumbersForAllEnumEnumerators(stringInternal);
@@ -859,6 +866,7 @@ struct TypeTokenArray{
 	struct TypeToken* typeTokens;
 	int16_t* indexesForRearrangement;
 	int16_t tokenLength;
+	int16_t indexNext;
 	int16_t indexLength; // indexLength is the allocation length of indexesForRearrangement, but indexesForRearrangement may be terminated earlier by a -1
 };
 
@@ -866,15 +874,25 @@ struct TypeTokenArray typeTokenArray; // only one is needed at any time, so it i
 
 
 void writeIndexToNextSlotInTypeTokenArray(int16_t index){
-	for (int16_t i=0;i<typeTokenArray.indexLength;i++){
-		if (typeTokenArray.indexesForRearrangement[i]==-1){
-			typeTokenArray.indexesForRearrangement[i] = index;
-			return;
-		} else if (typeTokenArray.indexesForRearrangement[i]==index){
-			err_1101_("(Internal) failure to parse type (ID:4)",typeTokenArray.typeTokens[index].stringIndexStart);
-		}
+	assert(index!=-1);
+	if (typeTokenArray.indexNext<typeTokenArray.indexLength){
+		typeTokenArray.indexesForRearrangement[typeTokenArray.indexNext++]=index;
+		return;
 	}
-	err_1101_("(Internal) failure to parse type (ID:3)",typeTokenArray.typeTokens[index].stringIndexStart);
+	// by the way, the code below rarely executes
+	int16_t i;
+	const int16_t l=(typeTokenArray.indexLength+1)*2;
+	int16_t*const t=cosmic_malloc((typeTokenArray.indexLength+1)*(2*sizeof(int16_t)));
+	for (i=0;i<typeTokenArray.indexLength;i++){
+		t[i]=typeTokenArray.indexesForRearrangement[i];
+	}
+	t[typeTokenArray.indexNext++]=index;
+	for (i=typeTokenArray.indexLength+1;i<l;i++){
+		t[i]=-1;
+	}
+	cosmic_free(typeTokenArray.indexesForRearrangement);
+	typeTokenArray.indexLength=l;
+	typeTokenArray.indexesForRearrangement=t;
 }
 
 int16_t findStartForTypeTokens(int16_t boundStart, int16_t boundEnd){
@@ -956,7 +974,7 @@ int16_t findStartForTypeTokens(int16_t boundStart, int16_t boundEnd){
 	therefore, search for identifier or colon
 	*/
 	for (int16_t i=boundStart+doStartSkip*2;i<boundEnd;i++){
-		struct TypeToken *thisTypeTokenPtr = typeTokenArray.typeTokens+i;
+		struct TypeToken* thisTypeTokenPtr = typeTokenArray.typeTokens+i;
 		char firstCharacter=thisTypeTokenPtr->firstCharacter;
 		if (firstCharacter=='[' | firstCharacter=='{'){
 			i = thisTypeTokenPtr->enclosementMatch;
@@ -972,7 +990,7 @@ int16_t findStartForTypeTokens(int16_t boundStart, int16_t boundEnd){
 	int16_t amountOfEnclosementOnMostEnclosedToken = 0;
 	int16_t amountOfEnclosementOnThisToken = 0;
 	for (int16_t i=boundStart;i<boundEnd;i++){
-		struct TypeToken *thisTypeTokenPtr = typeTokenArray.typeTokens+i;
+		struct TypeToken* thisTypeTokenPtr = typeTokenArray.typeTokens+i;
 		if (thisTypeTokenPtr->firstCharacter=='['){
 			int16_t prev=i;
 			i = thisTypeTokenPtr->enclosementMatch;
@@ -1002,7 +1020,7 @@ int16_t findStartForTypeTokens(int16_t boundStart, int16_t boundEnd){
 	return mostInclosedToken;
 }
 
-void mainWalkForTypeTokens(int16_t, int16_t, int16_t, bool);
+void mainWalkForTypeTokens(int16_t, int16_t, int16_t, bool, int16_t, int16_t);
 void splitterStarterForTypeTokens(int16_t, char);
 
 void enumHandlerForTypeTokens(int16_t bracketIndex){
@@ -1071,11 +1089,14 @@ void bracketHandlerForMainWalkForTypeTokens(int16_t boundStart, int16_t bracketI
 		enumHandlerForTypeTokens(bracketIndex);
 	}
 	return;
-	Fail:
+	Fail:;
 	err_1101_("Invalid \'{\' in type, could not find appropriate matching keyword",typeTokenArray.typeTokens[bracketIndex].stringIndexStart);
 }
 
-void mainWalkForTypeTokens(int16_t boundStart, int16_t boundEnd, int16_t externalStart, bool doExternalStart){
+void mainWalkForTypeTokens(int16_t boundStart, int16_t boundEnd, int16_t externalStart, bool doExternalStart, int16_t startIdentifierSkipCount, int16_t backwardSkipToIndex){
+	int16_t startIdentifierSkipCountLeft=startIdentifierSkipCount;
+	int16_t backwardSkipToIndexFuture=backwardSkipToIndex;
+	int16_t startIndex;
 	if (boundStart+1==boundEnd){
 		writeIndexToNextSlotInTypeTokenArray(boundStart);
 		return;
@@ -1083,93 +1104,141 @@ void mainWalkForTypeTokens(int16_t boundStart, int16_t boundEnd, int16_t externa
 	if (boundStart+1>boundEnd){
 		err_1101_("(Internal) failure to parse type (ID:1)",typeTokenArray.typeTokens[boundStart].stringIndexStart);
 	}
+	bool ableToStartForward = false;
 	bool hasParenEnd = false;
-	int16_t startIndex;
-	if (doExternalStart){
-		startIndex = typeTokenArray.typeTokens[externalStart].enclosementMatch+1;
-	} else {
-		startIndex = findStartForTypeTokens(boundStart,boundEnd);
-	}
-	for (int16_t i=startIndex;i<boundEnd;i++){
-		char firstCharacter = typeTokenArray.typeTokens[i].firstCharacter;
-		if (firstCharacter=='*' & i!=startIndex){
-			int32_t stringIndexStart = typeTokenArray.typeTokens[i].stringIndexStart;
-			int32_t stringIndexEnd = typeTokenArray.typeTokens[i].stringIndexEnd;
-			err_1111_("Unexpected \'*\' while parsing type",stringIndexStart,stringIndexEnd);
-		}
-		if (firstCharacter==')'){
-			hasParenEnd=true;
-			break;
-		}
-		if (firstCharacter=='['){
-			i=squareBracketHandlerForTypeTokens(i);
-		} else if (firstCharacter=='('){
-			splitterStarterForTypeTokens(i,',');
-			i = typeTokenArray.typeTokens[i].enclosementMatch;
-		} else if (firstCharacter=='{'){
-			int16_t matchingIndex = typeTokenArray.typeTokens[i].enclosementMatch;
-			bracketHandlerForMainWalkForTypeTokens(boundStart,i);
-			i = matchingIndex;
-		} else {
-			writeIndexToNextSlotInTypeTokenArray(i);
-			if (firstCharacter==':'){
-				struct TypeToken* typeTokenPtrToNumber = typeTokenArray.typeTokens+(i+1);
-				if ((i+2!=boundEnd | doExternalStart) || !(typeTokenPtrToNumber->firstCharacter>='0' & typeTokenPtrToNumber->firstCharacter<='9')){
-					// typeTokenPtrToNumber is not known to be valid at the point of giving this error, so we can't use it, so typeTokenArray.typeTokens[i].stringIndexEnd is used instead
-					err_1101_("Bitfield size must be a single positive integer",typeTokenArray.typeTokens[i].stringIndexEnd);
+	bool needsFurtherSkip = false;
+	startIndex=doExternalStart?typeTokenArray.typeTokens[externalStart].enclosementMatch+1:findStartForTypeTokens(boundStart,boundEnd);
+	if (doExternalStart & startIdentifierSkipCount!=0){
+		for (int16_t i=findStartForTypeTokens(boundStart,boundEnd);i<startIndex;i++){
+			struct TypeToken* thisTypeTokenPtr = typeTokenArray.typeTokens+i;
+			char firstCharacter = thisTypeTokenPtr->firstCharacter;
+			if (firstCharacter==','){
+				if (--startIdentifierSkipCountLeft<0){
+					err_1101_("Failure to parse type, it seems like this comma is not placed correctly",thisTypeTokenPtr->stringIndexStart);
 				}
-				struct NumberParseResult numberParseResult;
-				parseNumber(&numberParseResult,sourceContainer.string,typeTokenPtrToNumber->stringIndexStart,typeTokenPtrToNumber->stringIndexEnd);
-				if (numberParseResult.errorCode!=0 | numberParseResult.typeOfNonDecimal==0){
-					err_1111_("Bitfield size must be a single positive integer",typeTokenPtrToNumber->stringIndexStart,typeTokenPtrToNumber->stringIndexEnd);
-				}
-				if (numberParseResult.valueUnion.value>16){
-					err_1111_("Bitfield size cannot be larger than 16 (\'int\' is 16 bits)",typeTokenPtrToNumber->stringIndexStart,typeTokenPtrToNumber->stringIndexEnd);
-				}
-				if (i!=startIndex & numberParseResult.valueUnion.value==0){
-					err_1111_("Bitfields of 0 size must have no identifier",typeTokenPtrToNumber->stringIndexStart,typeTokenPtrToNumber->stringIndexEnd);
-				}
-				writeIndexToNextSlotInTypeTokenArray(i+1);
-				break;
+			} else if (firstCharacter=='(' | firstCharacter=='[' | firstCharacter=='{'){
+				i = thisTypeTokenPtr->enclosementMatch;
+			} else if (firstCharacter==':'){
+				err_1101_("I do not support commas seperating bitfields at this time",thisTypeTokenPtr->stringIndexStart);
 			}
 		}
 	}
-	if (doExternalStart){
-		startIndex = externalStart-1;
-	} else {
-		startIndex = startIndex-1;
+	for (int16_t i=startIndex;i<boundEnd;i++){
+		struct TypeToken* thisTypeTokenPtr = typeTokenArray.typeTokens+i;
+		char firstCharacter = thisTypeTokenPtr->firstCharacter;
+		if (startIdentifierSkipCountLeft!=0){
+			if (firstCharacter==','){
+				if (--startIdentifierSkipCountLeft==0){
+					if (i+1>=boundEnd){
+						err_1101_("Failure to parse type, it seems like this comma is not placed correctly",thisTypeTokenPtr->stringIndexStart);
+					}
+					startIndex=findStartForTypeTokens(i+1,boundEnd);
+					i=startIndex-1;
+				}
+			} else if (firstCharacter=='(' | firstCharacter=='[' | firstCharacter=='{'){
+				i = thisTypeTokenPtr->enclosementMatch;
+			} else if (firstCharacter==':'){
+				err_1101_("I do not support commas seperating bitfields at this time",thisTypeTokenPtr->stringIndexStart);
+			}
+		} else {
+			if (firstCharacter==','){
+				needsFurtherSkip=true;
+				startIdentifierSkipCount++;
+				if (backwardSkipToIndexFuture==-1){
+					backwardSkipToIndexFuture=i-1;
+				}
+				break;
+			}
+			if (firstCharacter==')'){
+				hasParenEnd=true;
+				break;
+			}
+			ableToStartForward = true;
+			if (firstCharacter=='*' & i!=startIndex){
+				err_1111_("Unexpected \'*\' while parsing type",thisTypeTokenPtr->stringIndexStart,thisTypeTokenPtr->stringIndexEnd);
+			}
+			if (firstCharacter=='['){
+				i=squareBracketHandlerForTypeTokens(i);
+			} else if (firstCharacter=='('){
+				splitterStarterForTypeTokens(i,',');
+				i = thisTypeTokenPtr->enclosementMatch;
+			} else if (firstCharacter=='{'){
+				bracketHandlerForMainWalkForTypeTokens(boundStart,i);
+				i = thisTypeTokenPtr->enclosementMatch;
+			} else {
+				writeIndexToNextSlotInTypeTokenArray(i);
+				if (firstCharacter==':'){
+					struct TypeToken* typeTokenPtrToNumber = typeTokenArray.typeTokens+(i+1);
+					if ((i+2!=boundEnd | doExternalStart) || !(typeTokenPtrToNumber->firstCharacter>='0' & typeTokenPtrToNumber->firstCharacter<='9')){
+						// typeTokenPtrToNumber is not known to be valid at the point of giving this error, so we can't use it, so thisTypeTokenPtr->stringIndexEnd is used instead
+						err_1101_("Bitfield size must be a single positive integer \nI do not support commas seperating bitfields at this time",thisTypeTokenPtr->stringIndexEnd);
+					}
+					struct NumberParseResult numberParseResult;
+					parseNumber(&numberParseResult,sourceContainer.string,typeTokenPtrToNumber->stringIndexStart,typeTokenPtrToNumber->stringIndexEnd);
+					if (numberParseResult.errorCode!=0 | numberParseResult.typeOfNonDecimal==0){
+						err_1111_("Bitfield size must be a single positive integer",typeTokenPtrToNumber->stringIndexStart,typeTokenPtrToNumber->stringIndexEnd);
+					}
+					if (numberParseResult.valueUnion.value>16){
+						err_1111_("Bitfield size cannot be larger than 16 (\'int\' is 16 bits)",typeTokenPtrToNumber->stringIndexStart,typeTokenPtrToNumber->stringIndexEnd);
+					}
+					if (i!=startIndex & numberParseResult.valueUnion.value==0){
+						err_1111_("Bitfields of 0 size must have no identifier",typeTokenPtrToNumber->stringIndexStart,typeTokenPtrToNumber->stringIndexEnd);
+					}
+					writeIndexToNextSlotInTypeTokenArray(i+1);
+					break;
+				}
+			}
+		}
 	}
+	if (!ableToStartForward & !doExternalStart){
+		err_1101_("Failure to parse type, it seems like either a comma or identifier is misplaced near here",typeTokenArray.typeTokens[startIndex].stringIndexStart);
+	}
+	bool hasAppliedCommaSkip = false;
 	bool hasParenStart = false;
 	int16_t parenStartIndex;
+	startIndex=doExternalStart?externalStart-1:startIndex-1;
 	for (int16_t i=startIndex;i>=boundStart;i--){
-		char firstCharacter = typeTokenArray.typeTokens[i].firstCharacter;
+		struct TypeToken* thisTypeTokenPtr = typeTokenArray.typeTokens+i;
+		char firstCharacter = thisTypeTokenPtr->firstCharacter;
+		if (firstCharacter==','){
+			if (hasAppliedCommaSkip){
+				err_1101_("Failure to parse type (ID:4)",thisTypeTokenPtr->stringIndexStart);
+			} else if (backwardSkipToIndex==-1){
+				err_1101_("Failure to parse type (ID:5)",thisTypeTokenPtr->stringIndexStart);
+			} else {
+				hasAppliedCommaSkip = true;
+				i = backwardSkipToIndex;
+				continue;
+			}
+		}
 		if (firstCharacter=='('){
 			hasParenStart=true;
 			parenStartIndex=i;
 			break;
 		}
 		if (firstCharacter=='}'){
-			int16_t matchingIndex = typeTokenArray.typeTokens[i].enclosementMatch;
-			mainWalkForTypeTokens(boundStart,i+1,0,false);
+			mainWalkForTypeTokens(boundStart,i+1,0,false,0,-1);
 			break;
 		}
 		if (firstCharacter==']'){
 			i=squareBracketHandlerForTypeTokens(i);
-		} else if (firstCharacter==':') {
-			int32_t stringIndexStart = typeTokenArray.typeTokens[i].stringIndexStart;
-			int32_t stringIndexEnd = typeTokenArray.typeTokens[i].stringIndexEnd;
-			err_1111_("Unexpected \':\' while parsing type",stringIndexStart,stringIndexEnd);
+		} else if (firstCharacter==':'){
+			err_1111_("Unexpected \':\' while parsing type",thisTypeTokenPtr->stringIndexStart,thisTypeTokenPtr->stringIndexEnd);
 		} else {
 			writeIndexToNextSlotInTypeTokenArray(i);
 		}
 	}
 	if (hasParenStart | hasParenEnd){
 		if (hasParenStart & hasParenEnd){
-			mainWalkForTypeTokens(boundStart,boundEnd,parenStartIndex,true);
+			mainWalkForTypeTokens(boundStart,boundEnd,parenStartIndex,true,startIdentifierSkipCount,backwardSkipToIndexFuture);
 		} else {
 			// this error probably should never happen, regardless of input
 			err_1101_("(Internal) failure to parse type (ID:2)",typeTokenArray.typeTokens[boundStart].stringIndexStart);
 		}
+	}
+	if (needsFurtherSkip){
+		writeIndexToNextSlotInTypeTokenArray(-2);
+		mainWalkForTypeTokens(boundStart,boundEnd,0,false,startIdentifierSkipCount,backwardSkipToIndexFuture);
 	}
 }
 
@@ -1181,7 +1250,7 @@ void splitterStarterForTypeTokens(int16_t boundStart, char splittingChar){
 		for (int16_t i=boundStart+1;i<boundEnd;i++){
 			char c = typeTokenArray.typeTokens[i].firstCharacter;
 			if (c == splittingChar){
-				mainWalkForTypeTokens(previousStart,i,0,false);
+				mainWalkForTypeTokens(previousStart,i,0,false,0,-1);
 				previousStart = i+1;
 				writeIndexToNextSlotInTypeTokenArray(i);
 			} else if (c=='(' | c=='{'){
@@ -1189,7 +1258,7 @@ void splitterStarterForTypeTokens(int16_t boundStart, char splittingChar){
 			}
 		}
 		if (splittingChar==','){
-			mainWalkForTypeTokens(previousStart,boundEnd,0,false);
+			mainWalkForTypeTokens(previousStart,boundEnd,0,false,0,-1);
 		}
 	}
 	writeIndexToNextSlotInTypeTokenArray(boundEnd);
@@ -1257,6 +1326,7 @@ void typeTokenizeForAnalysis(int32_t startIndex, int32_t endIndex){
 	if (lengthCount==0){
 		err_1111_("Expected type declaration here",startIndex,endIndex);
 	}
+	typeTokenArray.indexNext=0;
 	typeTokenArray.tokenLength = lengthCount;
 	typeTokenArray.indexLength = lengthCount;
 	typeTokenArray.typeTokens = cosmic_malloc(sizeof(struct TypeToken)*lengthCount);
@@ -1414,133 +1484,167 @@ void typeTokenizeForAnalysis(int32_t startIndex, int32_t endIndex){
 }
 
 
-char* convertType(int32_t startIndex, int32_t endIndex){
+char** convertType(int32_t startIndex, int32_t endIndex){
 	typeTokenizeForAnalysis(startIndex,endIndex);
-	mainWalkForTypeTokens(0,typeTokenArray.tokenLength,0,false);
+	mainWalkForTypeTokens(0,typeTokenArray.tokenLength,0,false,0,-1);
 	// now we generate the string
-	int16_t walkingIndex = 0;
-	int32_t walkingCount = 0;
-	while (typeTokenArray.indexesForRearrangement[walkingIndex]!=-1){
-		struct TypeToken* thisTypeTokenPtr = typeTokenArray.typeTokens+typeTokenArray.indexesForRearrangement[walkingIndex];
-		walkingCount += (thisTypeTokenPtr->stringIndexEnd-thisTypeTokenPtr->stringIndexStart)+1;
-		if (++walkingIndex==typeTokenArray.indexLength) break;
-	}
-	char *resultString = cosmic_malloc(walkingCount);
-	int32_t endIndexForReturnString = walkingCount-1;
-	walkingIndex = 0;
-	walkingCount = 0;
-	while (typeTokenArray.indexesForRearrangement[walkingIndex]!=-1){
-		struct TypeToken thisTypeToken = typeTokenArray.typeTokens[typeTokenArray.indexesForRearrangement[walkingIndex]];
-		for (int32_t i=thisTypeToken.stringIndexStart;i<thisTypeToken.stringIndexEnd;i++){
-			resultString[walkingCount++]=sourceContainer.string[i];
+	int16_t splitCount=0;
+	char* resultString;
+	{
+		int16_t walkingIndex = 0;
+		int32_t walkingCount = 0;
+		int16_t valueIndex;
+		while ((valueIndex=typeTokenArray.indexesForRearrangement[walkingIndex])!=-1){
+			if (valueIndex==-2){
+				walkingCount += 2;
+			} else {
+				struct TypeToken* thisTypeTokenPtr = typeTokenArray.typeTokens+valueIndex;
+				walkingCount += (thisTypeTokenPtr->stringIndexEnd-thisTypeTokenPtr->stringIndexStart)+1;
+			}
+			if (++walkingIndex==typeTokenArray.indexLength) break;
 		}
-		resultString[walkingCount++]=' ';
-		if (++walkingIndex==typeTokenArray.indexLength) break;
-	}
-	resultString[endIndexForReturnString]=0;
-	cosmic_free(typeTokenArray.typeTokens);
-	cosmic_free(typeTokenArray.indexesForRearrangement);
-	uint16_t errorValueForTypeNormalizer;
-	//printf("\n1.`%s`\n",resultString);
-	char *normalizedResultString = checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(resultString,&errorValueForTypeNormalizer,startIndex,endIndex);
-	if (normalizedResultString==NULL){
-		if (errorValueForTypeNormalizer==1){
-			printInformativeMessageAtSourceContainerIndex(true,"type keywords cannot be out of proper order",startIndex,endIndex);
-		} else if (errorValueForTypeNormalizer==2){
-			// this case is now impossible to reach
-			printInformativeMessageAtSourceContainerIndex(true,"types cannot contain the character `\'` or `\"`",startIndex,endIndex);
-		} else if (errorValueForTypeNormalizer==3){
-			printInformativeMessageAtSourceContainerIndex(true,"types cannot contain nested array brackets",startIndex,endIndex);
-		} else if (errorValueForTypeNormalizer==4){
-			printInformativeMessageAtSourceContainerIndex(true,"failed to find the type to qualify as either const or volatile",startIndex,endIndex);
-		} else {
-			assert(false);
+		resultString = cosmic_malloc(walkingCount);
+		walkingIndex = 0;
+		walkingCount = 0;
+		int16_t encloseCount=0;
+		while ((valueIndex=typeTokenArray.indexesForRearrangement[walkingIndex])!=-1){
+			if (valueIndex==-2){
+				splitCount+=(encloseCount==0);
+				resultString[walkingCount++]=(encloseCount==0)?'@':';';
+			} else {
+				struct TypeToken thisTypeToken = typeTokenArray.typeTokens[valueIndex];
+				encloseCount+=(thisTypeToken.firstCharacter=='{');
+				encloseCount-=(thisTypeToken.firstCharacter=='}');
+				for (int32_t i=thisTypeToken.stringIndexStart;i<thisTypeToken.stringIndexEnd;i++){
+					resultString[walkingCount++]=sourceContainer.string[i];
+				}
+			}
+			resultString[walkingCount++]=' ';
+			if (++walkingIndex==typeTokenArray.indexLength) break;
 		}
-		exit(1);
+		resultString[walkingCount-1]=0;
+		cosmic_free(typeTokenArray.typeTokens);
+		cosmic_free(typeTokenArray.indexesForRearrangement);
 	}
-	//printf("2.`%s`\n\n",normalizedResultString);
-	assert(errorValueForTypeNormalizer==0);
-	cosmic_free(resultString);
-	return normalizedResultString;
-}
-
-// some old testing code is below. The code above has been updated many times since the test code below has been run
-#if 0
-void temp(char *s){
-	int32_t length;
-	for (length=0;s[length];length++){
+	if (!areEnclosementsValidInString(resultString)){
+		err_1111_("Type parsing failed due to something unusual with parentheses, brackets, or braces",startIndex,endIndex);
 	}
-	printf("\n$%s$\n^\n$%s$\n\n\n\n",convertType(s,0,length),s);
+	char** strArr0=cosmic_calloc((splitCount+2),sizeof(char*));
+	if (splitCount!=0){
+		int32_t j=0;
+		int32_t i=-1;
+		int32_t s;
+		int16_t n=0;
+		char c;
+		while ((c=resultString[++i])){
+			if (c=='@'){
+				s=i-j;
+				assert(s>0);
+				strArr0[n]=cosmic_malloc(s);
+				s--;
+				memcpy(strArr0[n],resultString+j,s);
+				strArr0[n][s]=0;
+				n++;
+				j=i+2;
+				i++;
+				assert(resultString[i]!=0);
+				assert(n<=splitCount);
+			}
+		}
+		s=(i-j)+1;
+		assert(s>0);
+		strArr0[n]=cosmic_malloc(s);
+		memcpy(strArr0[n],resultString+j,s);
+		cosmic_free(resultString);
+	} else {
+		uint16_t errorValueForTypeNormalizer;
+		if ((strArr0[0]=checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(resultString,&errorValueForTypeNormalizer,startIndex,endIndex))==NULL){
+			if (errorValueForTypeNormalizer==1){
+				err_1111_("Type keywords cannot be out of proper order",startIndex,endIndex);
+			} else if (errorValueForTypeNormalizer==2){
+				// this case is now impossible to reach
+				err_1111_("Types cannot contain the character `\'` or `\"`",startIndex,endIndex);
+			} else if (errorValueForTypeNormalizer==3){
+				err_1111_("Types cannot contain nested array brackets",startIndex,endIndex);
+			} else if (errorValueForTypeNormalizer==4){
+				err_1111_("Failed to find the type to qualify as either const or volatile",startIndex,endIndex);
+			} else {
+				assert(false);
+			}
+			exit(1);
+		}
+		cosmic_free(resultString);
+		return strArr0;
+	}
+	assert(strArr0[splitCount+1]==NULL);
+	// do not use resultString beyond this point
+	
+	char** strArr1=cosmic_calloc((splitCount+2),sizeof(char*));
+	bool hasDupedDefinition=false;
+	char* dupedName=NULL;
+	for (int16_t i=0;strArr0[i]!=NULL;i++){
+		if (!areEnclosementsValidInString(strArr0[i])){
+			err_1111_("Type parsing failed due to something unusual with parentheses, brackets, or braces",startIndex,endIndex);
+		}
+		uint16_t errorValueForTypeNormalizer;
+		if ((strArr1[i]=checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(strArr0[i],&errorValueForTypeNormalizer,startIndex,endIndex))==NULL){
+			if (errorValueForTypeNormalizer==1){
+				err_1111_("Type keywords cannot be out of proper order",startIndex,endIndex);
+			} else if (errorValueForTypeNormalizer==2){
+				// this case is now impossible to reach
+				err_1111_("Types cannot contain the character `\'` or `\"`",startIndex,endIndex);
+			} else if (errorValueForTypeNormalizer==3){
+				err_1111_("Types cannot contain nested array brackets",startIndex,endIndex);
+			} else if (errorValueForTypeNormalizer==4){
+				err_1111_("Failed to find the type to qualify as either const or volatile",startIndex,endIndex);
+			} else {
+				assert(false);
+			}
+			exit(1);
+		}
+		assert(errorValueForTypeNormalizer==0);
+		assert(strArr1[i][0]!=0);
+		cosmic_free(strArr0[i]);
+		if (!areEnclosementsValidInString(strArr1[i])){
+			err_1111_("Type parsing failed due to something unusual with parentheses, brackets, or braces",startIndex,endIndex);
+		}
+		if (i==0){
+			const int32_t temporaryLenMinusOne=strlen(strArr1[0])-1;
+			hasDupedDefinition=(strArr1[0][temporaryLenMinusOne]=='}');
+			if (hasDupedDefinition){
+				int32_t indexOfDupedDefinitionNameStart;
+				int32_t indexOfDupedDefinitionNameEnd;
+				indexOfDupedDefinitionNameEnd=getIndexOfMatchingEnclosement(strArr1[0],temporaryLenMinusOne)-1;
+				indexOfDupedDefinitionNameStart=indexOfDupedDefinitionNameEnd;
+				assert(indexOfDupedDefinitionNameStart>0);
+				while (strArr1[0][--indexOfDupedDefinitionNameStart]!=' '){
+					assert(indexOfDupedDefinitionNameStart>0);
+				}
+				++indexOfDupedDefinitionNameStart;
+				dupedName=copyStringSegmentToHeap(strArr1[0],indexOfDupedDefinitionNameStart,indexOfDupedDefinitionNameEnd);
+			}
+		} else if (hasDupedDefinition){
+			const int32_t temporaryLenMinusOne=strlen(strArr1[i])-1;
+			if (strArr1[i][temporaryLenMinusOne]!='}'){
+				err_1111_("(Internal) failure to parse type (ID:6)",startIndex,endIndex);
+			}
+			int32_t indexOfDupedDefinitionNameStartTemp=getIndexOfMatchingEnclosement(strArr1[i],temporaryLenMinusOne)-1;
+			assert(indexOfDupedDefinitionNameStartTemp>0);
+			while (strArr1[i][--indexOfDupedDefinitionNameStartTemp]!=' '){
+				assert(indexOfDupedDefinitionNameStartTemp>0);
+			}
+			++indexOfDupedDefinitionNameStartTemp;
+			char* s0=copyStringSegmentToHeap(strArr1[i],0,indexOfDupedDefinitionNameStartTemp);
+			cosmic_free(strArr1[i]);
+			strArr1[i]=strMerge2(s0,dupedName);
+			cosmic_free(s0);
+		}
+	}
+	if (hasDupedDefinition){
+		cosmic_free(dupedName);
+	}
+	cosmic_free(strArr0);
+	return strArr1;
 }
-
-
-int main(){
-	temp("int i");
-	temp("int  (*i) (int k,long int)");
-	temp("void (*)()");
-	temp("long int (*compar)(const void *, const void*)");
-	temp("int (*i)[20]");
-	temp("int *i[20]");
-	temp("int *(i[20])");
-	temp("char *(*(**foo [][8])())[]");
-	temp("char (*var)[1]");
-	temp("void qsort(void *base, long nitems, long size, int (*compar)(const void *, const void*))");
-	temp("struct Me var");
-	temp("struct Me var[2]");
-	temp("struct ST{int i;} var");
-	temp("struct ST{int i;}");
-	temp("struct ST var");
-	temp("struct ST *var");
-	temp("struct ST *fun(struct STY, struct STY id)");
-	temp("struct ST fun(struct STY, struct STY id)");
-	temp("struct ST{int i1;} fun(struct {long i2;long int i4;}, struct STO{long long i3;} id)");
-	temp("enum {this,that} id");
-	temp("long int i");
-	temp("long long i");
-	temp("long long int i");
-	temp("short i");
-	temp("short int i");
-	temp("long double i");
-	temp("unsigned i");
-	temp("signed i");
-	temp("signed int i ");
-	temp("unsigned int i ");
-	temp("signed char i ");
-	temp("unsigned char i ");
-	temp("struct {long int component;}");
-	temp("union {long int component;}");
-	temp("struct {long int component;}");
-	temp("struct {long int component;}");
-	temp("struct {long int component;}");
-	temp("struct {long int component;}");
-	temp("struct {long int component;}");
-	temp("struct {long int component;}");
-	temp("struct {long int component;}");
-	temp("struct {long int component;}");
-	temp("struct {long int component;}");
-	temp("struct {long int component;}");
-	temp("struct {long int component;}");
-	temp("enum {component=13}");
-	temp("enum {c1=1,c2,c3=2,c4=5}");
-	temp("const int i");
-	temp("union ARGU{struct {char a_0;} R;struct {char a_0;char a_1;} RR; struct {char a_0;char a_2;} RRR;struct {char a_0;char a_1;} RB;struct {char a_0;unsigned int a_1;} RW;struct {char a_0;char a_1;unsigned long a_2;} RRD;struct {char a_0;char a_1;unsigned long a_2;} RRL;struct {char a_0;char a_1;unsigned long a_2;} RRW;struct {unsigned long a_0;} P;}");
-	temp("union ARGU{struct {char a_0;} R;}");
-	
-	printf("this should fail\n");
-	temp("char var*[1]");
-	
-	printf("this should fail\n");
-	temp("unsigned int long i");
-	
-	printf("The C standard says this should be valid, but it fails with this parser. It seems to be due to not having an identifer, so the starting place is off. However, I think this type is crazy, and I do not think I am going to work with it.");
-	temp("struct tag (*[5])(float)");
-	
-	printf("\nDONE\n");
-	return 0;
-}
-#endif
-
-
-
 
 

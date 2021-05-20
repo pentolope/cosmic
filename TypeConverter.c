@@ -211,7 +211,7 @@ const char* singleTypicalIntegralTypePromote(const char* typeString, bool* wasPr
 
 // expects all array brackets to match properly with no nesting
 // arrayNumberFromStart starts at 0
-char* insertSizeToEmptySizedArrayForTypeStringToNew(char* string, uint16_t arrayNumberFromStart, uint32_t sizeToInsert){
+char* insertSizeToEmptySizedArrayForTypeStringToNew(const char* string, uint16_t arrayNumberFromStart, uint32_t sizeToInsert){
 	char numberBuffer[14] = {0};
 	snprintf(numberBuffer,13,"%lu",(unsigned long)sizeToInsert);
 	uint8_t lengthOfNumber = strlen(numberBuffer);

@@ -81,10 +81,6 @@ void addFunctionParemetersAndInternalValuesToBlockFrame(char* typeStringOfFuncti
 	}
 	int32_t lengthOfInternalTypeString = strlen(internalTypeString);
 	int32_t indexOfOtherParenthese = getIndexOfMatchingEnclosement(internalTypeString,0);
-	if (indexOfOtherParenthese==-1){
-		printf("addFunctionParemetersAndInternalValuesToBlockFrame() got invalid type string\n");
-		exit(1);
-	}
 	bool isReturnValueNonVoid = !doStringsMatch(internalTypeString+(indexOfOtherParenthese+2),"void");
 	bool hasArguments = !specificStringEqualCheck(internalTypeString,0,indexOfOtherParenthese+1,"( )") && !specificStringEqualCheck(internalTypeString,0,indexOfOtherParenthese+1,"( void )");
 	if (hasArguments){
@@ -98,7 +94,6 @@ void addFunctionParemetersAndInternalValuesToBlockFrame(char* typeStringOfFuncti
 				isThisAnArgument = true;
 			} else if (c==')'){
 				i = getIndexOfMatchingEnclosement(internalTypeString,i);
-				// that should always succeed, it basically already succeeded above
 			}
 			if (isThisAnArgument){
 				for (int32_t j=0;j<lengthOfInternalTypeString;j++){

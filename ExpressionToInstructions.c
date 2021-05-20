@@ -2534,7 +2534,7 @@ void expressionToAssemblyWithInitializer(
 	if (!doesThisTypeStringHaveAnIdentifierAtBeginning(typeString)){
 		err_1111_("An identifier is required for initialization",startIndexForDeclaration,endIndexForDeclaration);
 	}
-	char* typeStringNI = applyToTypeStringRemoveIdentifierToNew(typeString); // what about potentially having multiple identifiers?
+	char* typeStringNI = applyToTypeStringRemoveIdentifierToNew(typeString);
 	char* identifier = applyToTypeStringGetIdentifierToNew(typeString);
 	cosmic_free(typeString);
 	InstructionBuffer ibTemp;
