@@ -76,10 +76,13 @@ struct MachineState* machineState;
 struct MachineState* initialMachineState;
 
 void performTraceback(uint64_t);
+void printProfileResults();
+
 
 noreturn void bye(void){
 	printf("\nTotal instructions executed:%llu\n",(unsigned long long)instructionExecutionCount);
-	
+	printProfileResults();
+	fflush(stdout);
 	// these were allocated using normal calloc, not cosmic_calloc
 	free(globalSDL_Information.pixelState);
 	free(machineState);
@@ -89,6 +92,7 @@ noreturn void bye(void){
 		if (globalSDL_Information.hasPixelBeenWritten){
 			if (globalSDL_Information.event.type != SDL_QUIT){
 				printf("Waiting for SDL_QUIT event...\n");
+				fflush(stdout);
 				do {
 					Sleep(15);
 					SDL_PollEvent(&globalSDL_Information.event);
@@ -100,6 +104,7 @@ noreturn void bye(void){
 		SDL_Quit();
 	}
 	printf("Exiting...\n");
+	fflush(stdout);
 	exit(0);
 }
 
@@ -153,6 +158,7 @@ void stateDump(){
 	}
 	printf("}\n");
 	resetColor();
+	fflush(stdout);
 }
 
 
@@ -231,13 +237,13 @@ void triggerFileLoad(){
 	char* fileMode=stringBuilderToString(&fileAccessInfo.mode);
 	stringBuilderClear(&fileAccessInfo.name);
 	stringBuilderClear(&fileAccessInfo.mode);
-	printf("\nfopen(\"%s\",\"%s\")->",filePath,fileMode);
+	//printf("\nfopen(\"%s\",\"%s\")->",filePath,fileMode);
 	FILE* inputFile = fopen(filePath,fileMode);
 	if (inputFile==NULL){
-		printf("NULL\n");
+		//printf("NULL\n");
 		return;
 	}
-	printf("VALID\n");
+	//printf("VALID\n");
 	if ((fileAccessInfo.isRead=!doStringsMatch(fileMode,"wb"))){
 		fpos_t startingPositionOfFile;
 		fgetpos(inputFile,&startingPositionOfFile);
@@ -273,7 +279,7 @@ void triggerFileClose(){
 	fileAccessInfo.outFile=NULL;
 	fileAccessInfo.contents=NULL;
 	fileAccessInfo.length=0;
-	printf("\nfclose()\n");
+	//printf("\nfclose()\n");
 }
 
 
@@ -501,10 +507,180 @@ uint16_t pop(){
 	return r;
 }
 
+uint16_t countdownToFlush;
+char printf_buffer[120000];
+uint16_t stackLengths[256]={[0]=6};
+const char* stackNames[2048]={[0]="main"};
+uint32_t stackAddresses[2048];
+int32_t stackLabelIndexes[2048]={[0]=-1};
+uint16_t stackPosition=1;
+uint16_t stackPrintLimit=40;
 
+uint32_t numberOfLabels;
+uint64_t* labelExecutionCountSkipped;
+uint64_t* labelExecutionCountTopSkipped;
+uint64_t totalExecutionCountSkipped;
+uint32_t* labelNumbers;
+uint32_t* labelAddresses;
+char** labelNames;
+
+
+uint32_t getLabelIndex(uint32_t labelToSearch){
+	for (uint32_t i=0;i<numberOfLabels;i++){
+		if (labelNumbers[i]==labelToSearch) return i;
+	}
+	printf("Unresolved Label %08X\n",labelToSearch);
+	bye();
+}
+
+uint32_t getLabelAddress(uint32_t labelToSearch){
+	return labelAddresses[getLabelIndex(labelToSearch)];
+}
+
+char* getFunctionNameForAddress(uint32_t address, int32_t* index){
+	for (uint32_t i=0;i<numberOfLabels;i++){
+		if (labelAddresses[i]==address){
+			*index=i;
+			return labelNames[i];
+		}
+	}
+	*index=-1;
+	return NULL;
+}
+
+void printProfileResults(){
+	if (totalExecutionCountSkipped!=0){
+		printf("\nProfile results:\n");
+		uint32_t functionCount=0;
+		for (uint32_t i=0;i<numberOfLabels;i++){
+			if (labelExecutionCountSkipped[i]!=0){
+				functionCount++;
+			}
+		}
+		uint32_t* arrangeIndexes=cosmic_calloc(functionCount*sizeof(uint32_t),1);
+		functionCount=0;
+		for (uint32_t i=0;i<numberOfLabels;i++){
+			if (labelExecutionCountSkipped[i]!=0){
+				arrangeIndexes[functionCount++]=i;
+			}
+		}
+		for (uint32_t i0=1;i0<functionCount;i0++){
+			uint32_t i1=i0-1;
+			uint32_t i2=i0;
+			uint32_t i1v=arrangeIndexes[i1];
+			uint32_t i2v=arrangeIndexes[i2];
+			while (labelExecutionCountSkipped[i1v]>labelExecutionCountSkipped[i2v]){
+				uint32_t t=arrangeIndexes[i2];
+				arrangeIndexes[i2]=arrangeIndexes[i1];
+				arrangeIndexes[i1]=t;
+				if (i1==0){
+					break;
+				} else {
+					i2v=arrangeIndexes[--i2];
+					i1v=arrangeIndexes[--i1];
+				}
+			}
+		}
+		for (uint32_t i=0;i<functionCount;i++){
+			uint32_t iv=arrangeIndexes[i];
+			double percent0=((double)labelExecutionCountSkipped[iv]/(double)totalExecutionCountSkipped)*100;
+			unsigned int wholePercent0=(unsigned int)percent0;
+			unsigned int decimalPercent0=(unsigned int)((percent0-wholePercent0)*1000);
+			double percent1=((double)labelExecutionCountTopSkipped[iv]/(double)totalExecutionCountSkipped)*100;
+			unsigned int wholePercent1=(unsigned int)percent1;
+			unsigned int decimalPercent1=(unsigned int)((percent1-wholePercent1)*1000);
+			char* name=labelNames[iv];
+			printf("%3u.%04u / %3u.%04u : ",wholePercent0,decimalPercent0,wholePercent1,decimalPercent1);
+			if (name==NULL){
+				printf("@ %08X\n",labelAddresses[iv]);
+			} else {
+				printf("%s()\n",name);
+			}
+		}
+		printf("\n");
+		cosmic_free(arrangeIndexes);
+		fflush(stdout);
+	} else {
+		printf("Profile results do not exist\n");
+	}
+}
+
+void handleFunctionStackPrint(uint32_t address, bool isCall){
+	if (!printEachInstruction){
+		if (isCall){
+			if (stackPosition>2000){
+				printf("Error: Too many call instructions for profiler\n");
+				bye();
+			}
+			int32_t index;
+			const char*const name=getFunctionNameForAddress(address,&index);
+			stackAddresses[stackPosition]=address;
+			stackNames[stackPosition]=name;
+			stackLabelIndexes[stackPosition]=index;
+			if (stackPosition>stackPrintLimit){
+				stackPosition++;
+				return;
+			}
+			printf("%5d:",stackPosition);
+			if (name==NULL){
+				printf("@ %08X\n",address);
+				stackLengths[stackPosition++]=16;
+			} else {
+				printf("%s()\n",name);
+				stackLengths[stackPosition++]=strlen(name)+8;
+			}
+			//fflush(stdout);
+		} else {
+			if (stackPosition<1){
+				printf("Error: Too many ret instructions\n");
+				bye();
+			}
+			if (stackPosition>stackPrintLimit+1){
+				stackPosition--;
+				return;
+			}
+			printf("%c%c%c%c",
+				 27,
+				'[',
+				'1',
+				'F');
+			const uint16_t l=stackLengths[--stackPosition];
+			for (uint16_t j=0;j<l;j++){
+				printf(" ");
+			}
+			printf("\r");
+			//fflush(stdout);
+		}
+	}
+}
+
+void profilerTick(){
+	totalExecutionCountSkipped+=1;
+	if (stackPosition>0 && stackLabelIndexes[stackPosition-1]!=-1){
+		labelExecutionCountTopSkipped[stackLabelIndexes[stackPosition-1]]+=1;
+	}
+	for (uint16_t i0=0;i0<stackPosition;i0++){
+		const int32_t index=stackLabelIndexes[i0];
+		if (index!=-1){
+			for (uint16_t i1=0;i1<i0;i1++){
+				if (index==stackLabelIndexes[i1]){
+					goto LoopEnd;
+				}
+			}
+			labelExecutionCountSkipped[index]+=1;
+		}
+		LoopEnd:;
+	}
+}
 
 void singleExecute(){
 	instructionExecutionCount++;
+	if (countdownToFlush==0){
+		fflush(stdout);
+		profilerTick();
+	}
+	countdownToFlush--;
+	countdownToFlush &= 0xFFF;
 	unsigned instr=readWord(machineState->pc);
 	uint8_t type=((instr&0xF000u)!=0xF000u)?((instr>>12)&0xFu):(((instr>>8)&0xFu)|0x10u);
 	uint8_t r0=(instr>>0)&0xFu;
@@ -608,6 +784,7 @@ void singleExecute(){
 		machineState->pc=(uint32_t)machineState->reg[r0]|((uint32_t)machineState->reg[r1]<<16);
 		machineState->ieCountAtSetReg[r0]=instructionExecutionCount;
 		machineState->ieCountAtSetPc=instructionExecutionCount;
+		handleFunctionStackPrint(machineState->pc,true);
 		break;
 		case 0x1B:
 		machineState->sp=machineState->reg[0];
@@ -621,6 +798,7 @@ void singleExecute(){
 		machineState->ieCountAtSetReg[0]=instructionExecutionCount;
 		machineState->ieCountAtSetPc=instructionExecutionCount;
 		machineState->ieCountAtSetSp=instructionExecutionCount;
+		handleFunctionStackPrint(machineState->pc,false);
 		break;
 		case 0x1C:machineState->reg[r0]=readByte(((uint32_t)machineState->reg[r1]<<16)|machineState->reg[13]);machineState->ieCountAtSetReg[r0]=instructionExecutionCount;break;
 		case 0x1D:writeByte(((uint32_t)machineState->reg[r1]<<16)|machineState->reg[13],machineState->reg[r0]&0x00FFu);break;
@@ -703,19 +881,6 @@ void performTraceback(uint64_t iicTarget){
 	tracebackLevel--;
 }
 
-uint32_t numberOfLabels;
-uint32_t* labelNumbers;
-uint32_t* labelAddresses;
-
-
-
-uint32_t getLabelAddress(uint32_t labelToSearch){
-	for (uint32_t i=0;i<numberOfLabels;i++){
-		if (labelNumbers[i]==labelToSearch) return labelAddresses[i];
-	}
-	printf("Unresolved Label %08X\n",labelToSearch);
-	bye();
-}
 
 uint16_t getIntrinsicID(enum InstructionTypeID id){
 	switch (id){
@@ -965,6 +1130,7 @@ int main(int argc, char** argv){
 	globalSDL_Information.pixelState=calloc((uint32_t)globalSDL_Information.windowSize.width*globalSDL_Information.windowSize.height,sizeof(uint8_t));
 	machineState=calloc(1,sizeof(struct MachineState));
 	initialMachineState=calloc(1,sizeof(struct MachineState));
+	assert(globalSDL_Information.pixelState!=NULL && machineState!=NULL && initialMachineState!=NULL);
 	machineState->pc=1LU<<16;
 	machineState->sp=0xFFFE;
 	printf("Loading Binary...\n");
@@ -981,16 +1147,7 @@ int main(int argc, char** argv){
 		printf("Could not find \'main\' in that binary.\n");
 		bye();
 	}
-	
-	for (uint32_t i=0;i<binContainer.len_symbols;i++){
-		if (binContainer.symbols[i].label==0){
-			printf("Object `%s` has NULL label\n",binContainer.symbols[i].name);
-			bye();
-		}
-		cosmic_free(binContainer.symbols[i].name);
-	}
-	cosmic_free(binContainer.symbols);
-	
+	setvbuf(stdout,printf_buffer,_IOFBF,120000);
 	InstructionBuffer allData;
 	initInstructionBuffer(&allData);
 	singleMergeIB(&allData,&binContainer.functions);
@@ -1036,6 +1193,9 @@ int main(int argc, char** argv){
 	numberOfLabels=labelCount;
 	labelNumbers=cosmic_malloc(numberOfLabels*sizeof(uint32_t));
 	labelAddresses=cosmic_malloc(numberOfLabels*sizeof(uint32_t));
+	labelNames=cosmic_calloc(numberOfLabels*sizeof(char*),1);
+	labelExecutionCountSkipped=cosmic_calloc(numberOfLabels*sizeof(uint64_t),1);
+	labelExecutionCountTopSkipped=cosmic_calloc(numberOfLabels*sizeof(uint64_t),1);
 	if (printEachInstruction){
 		addressToInstructionTranslationLen=allData.numberOfSlotsTaken;
 		addressToInstructionTranslation=cosmic_malloc(addressToInstructionTranslationLen*sizeof(struct AddressInstructionPair));
@@ -1066,12 +1226,28 @@ int main(int argc, char** argv){
 		} else if (IS.id==I_FCST){
 			labelNumbers[labelCount]=allData.buffer[i].arg.BWD.a_2;
 			labelAddresses[labelCount]=storageAddress;
+			for (uint32_t iTemp=0;iTemp<binContainer.len_symbols;iTemp++){
+				if (binContainer.symbols[iTemp].label==labelNumbers[labelCount]){
+					labelNames[labelCount]=copyStringToHeapString(binContainer.symbols[iTemp].name);
+					break;
+				}
+			}
 			//printf("%08X:%08X\n",labelNumbers[labelCount],labelAddresses[labelCount]);
 			labelCount++;
 		} else if (IS.id==I_FCEN){
 			endOfExecutable=storageAddress;
 		}
 	}
+	
+	for (uint32_t i=0;i<binContainer.len_symbols;i++){
+		if (binContainer.symbols[i].label==0){
+			printf("Object `%s` has NULL label\n",binContainer.symbols[i].name);
+			bye();
+		}
+		cosmic_free(binContainer.symbols[i].name);
+	}
+	cosmic_free(binContainer.symbols);
+	
 	uint32_t storageSize=storageAddress;
 	uint16_t func_stack_size;
 	uint8_t func_stack_initial;
@@ -1145,8 +1321,7 @@ int main(int argc, char** argv){
 	}
 	assert(temporaryStorageBufferWalk==(temporaryStorageBuffer+storageSize));
 	uint32_t mainAddress=getLabelAddress(mainLabelNumber);
-	cosmic_free(labelNumbers);
-	cosmic_free(labelAddresses);
+	stackLabelIndexes[0]=getLabelIndex(mainLabelNumber);
 	if (doFPGAbootGeneration){
 		FILE* fpga_boot_asm_file=NULL;
 		fpga_boot_asm_file=fopen("boot.asm","w");
@@ -1245,6 +1420,9 @@ int main(int argc, char** argv){
 		printf("Starting SDL...\n");
 		initializeSDL();
 		printf("Running...\n");
+		if (!printEachInstruction){
+			printf("Call Stack:\n|\n%5d:main()\n",0);
+		}
 		fullExecute();
 		
 		

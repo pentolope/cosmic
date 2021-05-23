@@ -481,7 +481,7 @@ void nullOutPreprocessTokensAtAndAboveIndex(int32_t indexToStartAt){
 void ensureLengthInPreprocessingTokens(int32_t i){
 	if (i>=preprocessTokens.allocationLength){
 		int32_t previousAllocationLength = preprocessTokens.allocationLength;
-		preprocessTokens.allocationLength=i+100;
+		preprocessTokens.allocationLength=(i<100)?1023:i*2;
 		preprocessTokens.preprocessTokens = cosmic_realloc(preprocessTokens.preprocessTokens,preprocessTokens.allocationLength*sizeof(PreprocessTokens));
 		nullOutPreprocessTokensAtAndAboveIndex(previousAllocationLength);
 	}
@@ -1290,10 +1290,10 @@ void printInformativeMessageAtSourceContainerIndex(bool isError,const char* mess
 	makeColor(COLOR_TO_TEXT,COLOR_CYAN);
 	printf("%s",arrowString1);
 	resetColor();
-	printf("\n  Original file name is: %s\n  Location in original file :%d:%d:\n  %s\n  ",
+	printf("\n  Original file name is: %s\n  Location in original file :%lu:%lu:\n  %s\n  ",
 		lineNumAndCharNum.fileName,
-		lineNumAndCharNum.lineNumInOriginal,
-		lineNumAndCharNum.charNumInLineInOriginal,
+		(unsigned long)lineNumAndCharNum.lineNumInOriginal,
+		(unsigned long)lineNumAndCharNum.charNumInLineInOriginal,
 		tempString2);
 	makeColor(COLOR_TO_TEXT,COLOR_CYAN);
 	printf("%s",arrowString2);

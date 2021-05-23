@@ -419,7 +419,7 @@ CALL - call to location at registers, r1 is upper word. (see CALL/RET_ descripti
 RET_ - return to calling function  (see CALL/RET_ description at bottom)
 STPA - transform stack offset into real address using [ %1 + ( Stack_Size - # ) -> r0 ]
 			this instruction, when combined with others, may often by optimized into STWN , STRN , STWV , STRV
-STPS - identical to STPA, however it is verified that ( ( Stack_Size - # ) <= 0x00FF ) is true, so the backend can use 1 less instruction (and ~2x less cycles)
+STPS - identical to STPA, however it is verified that ( ( Stack_Size - # ) <= 0x00FF ) is true, so the backend can use 1 less instruction
 
 STWN - write memory ( word access, non-volatile ) at [ ( %1 + ( 2 * $ ) ) , 0 ] with data in r0
 STRN - read  memory ( word access, non-volatile ) at [ ( %1 + ( 2 * $ ) ) , 0 ] into r0

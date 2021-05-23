@@ -25,7 +25,7 @@
 //#define FORCE_EXP_BUFFER_NULL
 
 
-#define ERR_MSG_LEN 18 // controls the length of error messages (60 is generally good)
+#define ERR_MSG_LEN 25 // controls the length of error messages (60 is generally good)
 
 
 //#define STATEMENT_DEBUG
@@ -464,14 +464,14 @@ bool isSegmentOfStringTypeLike(const char*const string, const int32_t startIndex
 	switch (endIndex-startIndex){
 		case 8:
 		p = string+startIndex;
-		buf[0]=*(p++);
-		buf[1]=*(p++);
-		buf[2]=*(p++);
-		buf[3]=*(p++);
-		buf[4]=*(p++);
-		buf[5]=*(p++);
-		buf[6]=*(p++);
-		buf[7]=*(p++);
+		buf[0]=*(p+0);
+		buf[1]=*(p+1);
+		buf[2]=*(p+2);
+		buf[3]=*(p+3);
+		buf[4]=*(p+4);
+		buf[5]=*(p+5);
+		buf[6]=*(p+6);
+		buf[7]=*(p+7);
 		if (
 		(buf[0]=='u' & buf[1]=='n' & buf[2]=='s' & buf[3]=='i' & buf[4]=='g' & buf[5]=='n' & buf[6]=='e' & buf[7]=='d') | //unsigned
 		(buf[0]=='v' & buf[1]=='o' & buf[2]=='l' & buf[3]=='a' & buf[4]=='t' & buf[5]=='i' & buf[6]=='l' & buf[7]=='e') | //volatile
@@ -482,12 +482,12 @@ bool isSegmentOfStringTypeLike(const char*const string, const int32_t startIndex
 		break;
 		case 6:
 		p = string+startIndex;
-		buf[0]=*(p++);
-		buf[1]=*(p++);
-		buf[2]=*(p++);
-		buf[3]=*(p++);
-		buf[4]=*(p++);
-		buf[5]=*(p++);
+		buf[0]=*(p+0);
+		buf[1]=*(p+1);
+		buf[2]=*(p+2);
+		buf[3]=*(p+3);
+		buf[4]=*(p+4);
+		buf[5]=*(p+5);
 		if (
 		(buf[0]=='s' & buf[1]=='i' & buf[2]=='g' & buf[3]=='n' & buf[4]=='e' & buf[5]=='d') | //signed
 		(buf[0]=='s' & buf[1]=='t' & buf[2]=='r' & buf[3]=='u' & buf[4]=='c' & buf[5]=='t') | //struct
@@ -501,11 +501,11 @@ bool isSegmentOfStringTypeLike(const char*const string, const int32_t startIndex
 		break;
 		case 5:
 		p = string+startIndex;
-		buf[0]=*(p++);
-		buf[1]=*(p++);
-		buf[2]=*(p++);
-		buf[3]=*(p++);
-		buf[4]=*(p++);
+		buf[0]=*(p+0);
+		buf[1]=*(p+1);
+		buf[2]=*(p+2);
+		buf[3]=*(p+3);
+		buf[4]=*(p+4);
 		if (
 		(buf[0]=='s' & buf[1]=='h' & buf[2]=='o' & buf[3]=='r' & buf[4]=='t') | // short
 		(buf[0]=='_' & buf[1]=='B' & buf[2]=='o' & buf[3]=='o' & buf[4]=='l') | //_Bool
@@ -518,10 +518,10 @@ bool isSegmentOfStringTypeLike(const char*const string, const int32_t startIndex
 		break;
 		case 4:
 		p = string+startIndex;
-		buf[0]=*(p++);
-		buf[1]=*(p++);
-		buf[2]=*(p++);
-		buf[3]=*(p++);
+		buf[0]=*(p+0);
+		buf[1]=*(p+1);
+		buf[2]=*(p+2);
+		buf[3]=*(p+3);
 		if (
 		(buf[0]=='l' & buf[1]=='o' & buf[2]=='n' & buf[3]=='g') | //long
 		(buf[0]=='c' & buf[1]=='h' & buf[2]=='a' & buf[3]=='r') | //char

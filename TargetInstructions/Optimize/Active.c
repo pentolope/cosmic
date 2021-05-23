@@ -1908,6 +1908,7 @@ bool attemptStackMemoryAccessReduction(InstructionBuffer* ib){
 				i1=i0;
 				bool isRegMethodValid=true;
 				bool isStackMethodValid=true;
+				bool isWriteRemovalValid=true;
 				while (i1--!=0){
 					fillInstructionInformation(&II_1,ib,i1);
 					if (II_1.isMemoryAccess){
@@ -1915,7 +1916,7 @@ bool attemptStackMemoryAccessReduction(InstructionBuffer* ib){
 							if (!sdfma_1.isDiscrete) trueOffset_1=(unsigned)stackSize-(unsigned)sdfma_1.offset*2U;
 							else trueOffset_1=sdfma_1.offset;
 							trueOffset_1=stackSize-trueOffset_1;
-							//printf("%04X,%04X,(----)[%04X,%04X]\n",i1,i0,trueOffset_0,trueOffset_1);
+							//printf("%04X,%04X,(----)[%04X,%04X]\n",i1,i0,trueOffset_1,trueOffset_0);
 							bool isBaseEqual=((unsigned)trueOffset_0&0xFFFEu)==((unsigned)trueOffset_1&0xFFFEu);
 							bool isExactEqual=trueOffset_0==trueOffset_1;
 							if (isExactEqual | isBaseEqual){
@@ -1954,6 +1955,10 @@ switch (state){
 // !sdfma_0.isRead & !sdfma_1.isRead
 	case 0x01:
 	//printf("%04X,%04X,(0x01)\n",i1,i0);
+	if (!isWriteRemovalValid){
+		//printf("blocked\n");
+		//printInstructionBufferWithMessageAndNumber(ib,"Blocked",i1);
+		break;}
 	//printInstructionBufferWithMessageAndNumber(ib,"Before:",0);
 	ib->buffer[i1].id=I_NOP_;
 	//printInstructionBufferWithMessageAndNumber(ib,"After:",0);
@@ -1963,6 +1968,10 @@ sanityCheck(ib);
 	break;
 	case 0x02:
 	//printf("%04X,%04X,(0x02)\n",i1,i0);
+	if (!isWriteRemovalValid){
+		//printf("blocked\n");
+		//printInstructionBufferWithMessageAndNumber(ib,"Blocked",i1);
+		break;}
 	//printInstructionBufferWithMessageAndNumber(ib,":",i1);
 	if (sdfma_1.isDiscrete){
 		assert(II_1.id==I_MWWN);
@@ -2069,6 +2078,10 @@ sanityCheck(ib);
 // !sdfma_0.isRead & !sdfma_1.isRead
 	case 0x10:
 	//printf("%04X,%04X,(0x10)\n",i1,i0);
+	if (!isWriteRemovalValid){
+		//printf("blocked\n");
+		//printInstructionBufferWithMessageAndNumber(ib,"Blocked",i1);
+		break;}
 	//printInstructionBufferWithMessageAndNumber(ib,"Before:",0);
 	ib->buffer[i1].id=I_NOP_;
 	//printInstructionBufferWithMessageAndNumber(ib,"After:",0);
@@ -2078,6 +2091,10 @@ sanityCheck(ib);
 	break;
 	case 0x11:
 	//printf("%04X,%04X,(0x11)\n",i1,i0);
+	if (!isWriteRemovalValid){
+		//printf("blocked\n");
+		//printInstructionBufferWithMessageAndNumber(ib,"Blocked",i1);
+		break;}
 	//printInstructionBufferWithMessageAndNumber(ib,"Before:",0);
 	ib->buffer[i1].id=I_NOP_;
 	//printInstructionBufferWithMessageAndNumber(ib,"After:",0);
@@ -2087,6 +2104,10 @@ sanityCheck(ib);
 	break;
 	case 0x12:
 	//printf("%04X,%04X,(0x12)\n",i1,i0);
+	if (!isWriteRemovalValid){
+		//printf("blocked\n");
+		//printInstructionBufferWithMessageAndNumber(ib,"Blocked",i1);
+		break;}
 	//printInstructionBufferWithMessageAndNumber(ib,":",i1);
 	if (sdfma_1.isDiscrete){
 		assert(II_1.id==I_MWWN);
@@ -2097,8 +2118,12 @@ sanityCheck(ib);
 	}
 	break;
 	case 0x13:
-	didSucceedAtLeastOnce=true;
 	//printf("%04X,%04X,(0x13)\n",i1,i0);
+	if (!isWriteRemovalValid){
+		//printf("blocked\n");
+		//printInstructionBufferWithMessageAndNumber(ib,"Blocked",i1);
+		break;}
+	didSucceedAtLeastOnce=true;
 	//printInstructionBufferWithMessageAndNumber(ib,"Before:",0);
 	ib->buffer[i1].id=I_NOP_;
 	//printInstructionBufferWithMessageAndNumber(ib,"After:",0);
@@ -2303,9 +2328,15 @@ break;
 // (as well as there are cases where the current assumptions of the search are known to be invalid)
 							}
 						} else if (
-!sdfma_1.isRead & (!sdfma_1.isOnStackKnown | sdfma_1.isOnStack)){
-	//printInstructionBufferWithMessageAndNumber(ib,"This memory access DOES stop search",i1);
-	break; // then the location of a memory write couldn't be verified to not be on the stack, which must stop this search
+!sdfma_1.isOnStackKnown | sdfma_1.isOnStack){
+	if (sdfma_1.isRead){
+		//printf("blocker {%04X,%04X}\n",i1,i0);
+		//printInstructionBufferWithMessageAndNumber(ib,"This memory access PREVENTS write removal",i1);
+		isWriteRemovalValid=false;
+	} else {
+		//printInstructionBufferWithMessageAndNumber(ib,"This memory access DOES stop search",i1);
+		break; // then the location of a memory write either [it is unknown if it targets the stack area] or [could be verified to target the stack area], which must stop this search
+	}
 } else {
 	//printInstructionBufferWithMessageAndNumber(ib,"This memory access DOES NOT stop search",i1);
 }
@@ -2352,7 +2383,7 @@ sanityCheck(ib);
 
 
 bool attemptStackMemoryOpt(InstructionBuffer* ib){
-	bool didSucceedAtLeastOnce;
+	bool didSucceedAtLeastOnce=0;
 	didSucceedAtLeastOnce =attemptStackMemoryInstructionOpt(ib);
 	didSucceedAtLeastOnce|=attemptStackMemoryAccessReduction(ib);
 	return didSucceedAtLeastOnce;
