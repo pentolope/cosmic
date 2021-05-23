@@ -605,14 +605,12 @@ void addVariableToBlockFrame(
 		bool isRegister,
 		bool isStatic){
 
-	int32_t indexOfFirstSpace = getIndexOfFirstSpaceInString(typeString);
-	if (indexOfFirstSpace==-1){
-		printf("Internal error: Cannot add non-identifier to BlockFrameEntry.variableEntries\n");
-		exit(1);
-	}
-	if (typeString[1+indexOfFirstSpace]=='('){
-		printInformativeMessageAtSourceContainerIndex(true,"Function declaration is not allowed here",indexOfDeclaration,0);
-		exit(1);
+	{
+		const int32_t indexOfFirstSpace = getIndexOfFirstSpaceInString(typeString);
+		assert(indexOfFirstSpace!=-1);
+		if (typeString[1+indexOfFirstSpace]=='('){
+			err_1101_("Declaring a function inside a function is a bad idea. Cosmic does not allow it.",indexOfDeclaration);
+		}
 	}
 	assert(!(isRegister & isStatic));
 	{
@@ -628,12 +626,9 @@ void addVariableToBlockFrame(
 				isAcceptable=isr.reference.typeMemberReference.isGlobal || isr.reference.typeMemberReference.blockFrameEntryIndex!=blockFrameArray.numberOfValidSlots-1;
 			}
 			if (isAcceptable){
-printInformativeMessageAtSourceContainerIndex(false,
-	"Identical identifier was already declared in a previous scope.\n  The previous declaration will be overriden while this variable is in scope",indexOfDeclaration,0);
+				err_010_0("Identical identifier was already declared in a previous scope.\n  The previous declaration will be overriden while this variable is in scope",indexOfDeclaration);
 			} else {
-printInformativeMessageAtSourceContainerIndex(true,
-	"Identical identifier was already declared in the same scope",indexOfDeclaration,0);
-exit(1);
+				err_1101_("Identical identifier was already declared in the same scope",indexOfDeclaration);
 			}
 		}
 		// getting here means that the variable has no identifier collisions
@@ -653,8 +648,7 @@ exit(1);
 	blockFrameVariableEntryPtr->typeString = copyStringToHeapString(typeString);
 	
 	if (thisSizeof==0){
-		printf("sizeof failed while adding variable `%s` to block frame\n",typeString);
-		exit(1);
+		err_1101_("sizeof failed on this declaration",indexOfDeclaration);
 	}
 	thisSizeof += thisSizeof&1; // word align by adding padding if the size isn't word aligned
 	static uint32_t staticLinkbackID;
@@ -671,8 +665,7 @@ exit(1);
 		assert(ret==0); // addGlobalVariable is expected to not fail here
 	} else {
 		if ((((uint32_t)blockFrameEntryPtr->addedStackValue)+((uint32_t)thisSizeof))>64000){
-			printf("size of that type is too large for the stack\n");
-			exit(1);
+			err_1101_("This variable is too large to be placed on the stack",indexOfDeclaration);
 		}
 		blockFrameEntryPtr->addedStackValue += (uint16_t)thisSizeof;
 		blockFrameVariableEntryPtr->offsetInThisBlockFrame = blockFrameEntryPtr->addedStackValue;
