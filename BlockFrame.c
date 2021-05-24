@@ -1043,17 +1043,16 @@ char* breakDownTypeAndAdd(const char* typeString, bool addToGlobal){
 	return finalString;
 }
 
-char* fullTypeParseAndAdd(int32_t startIndex,int32_t endIndex,bool addToGlobal){
+char** fullTypeParseAndAdd(int32_t startIndex,int32_t endIndex,bool addToGlobal){
 	char** typeStrings = convertType(startIndex,endIndex);
-	char* typeStringLast = NULL;
-	for (int16_t i=0;typeStrings[i]!=NULL;i++){
-		cosmic_free(typeStringLast); // it's fine if typeStringLast is NULL
-		typeStringLast = breakDownTypeAndAdd(typeStrings[i],addToGlobal);
+	char* typeStringTemp;
+	for (uint16_t i=0;typeStrings[i]!=NULL;i++){
+		typeStringTemp = breakDownTypeAndAdd(typeStrings[i],addToGlobal);
 		cosmic_free(typeStrings[i]);
+		typeStrings[i]=typeStringTemp;
 	}
-	assert(typeStringLast!=NULL);
-	cosmic_free(typeStrings);
-	return typeStringLast;
+	assert(typeStrings[0]!=NULL);
+	return typeStrings;
 }
 
 void ensureNoNewDefinitions(const char* typeString,int32_t startIndex,int32_t endIndex){
@@ -1064,18 +1063,34 @@ void ensureNoNewDefinitions(const char* typeString,int32_t startIndex,int32_t en
 	}
 }
 
+// fullTypeParseAvoidAdd() is used for type casts and thus will only give a single type string with no identifier
 char* fullTypeParseAvoidAdd(int32_t startIndex,int32_t endIndex){
 	char** typeStrings = convertType(startIndex,endIndex);
-	char* typeStringLast = NULL;
-	for (int16_t i=0;typeStrings[i]!=NULL;i++){
-		cosmic_free(typeStringLast); // it's fine if typeStringLast is NULL
-		ensureNoNewDefinitions(typeStrings[i],startIndex,endIndex);
+	char* typeStringTemp0=NULL;
+	char* typeStringTemp1;
+	uint16_t typeStringIndex;
+	uint16_t typeStringIndexLast=0;
+	for (typeStringIndex=0;typeStrings[typeStringIndex]!=NULL;typeStringIndex++){
+		typeStringIndexLast=typeStringIndex;
+		typeStringTemp1=typeStrings[typeStringIndex];
+		ensureNoNewDefinitions(typeStringTemp1,startIndex,endIndex);
 		bool didAllocateAnotherString;
-		typeStringLast = resolveTypdefsInTypeString(typeStrings[i],&didAllocateAnotherString);
-		if (didAllocateAnotherString) cosmic_free(typeStrings[i]);
-		ensureNoNewDefinitions(typeStringLast,startIndex,endIndex);
+		typeStringTemp0 = resolveTypdefsInTypeString(typeStringTemp1,&didAllocateAnotherString);
+		if (didAllocateAnotherString) cosmic_free(typeStringTemp1);
+		ensureNoNewDefinitions(typeStringTemp0,startIndex,endIndex);
+		typeStrings[typeStringIndex]=typeStringTemp0;
 	}
-	assert(typeStringLast!=NULL);
+	for (typeStringIndex=0;typeStrings[typeStringIndex]!=NULL;typeStringIndex++){
+		if (typeStringIndex!=typeStringIndexLast){
+			cosmic_free(typeStrings[typeStringIndex]);
+		}
+	}
 	cosmic_free(typeStrings);
-	return typeStringLast;
+	assert(typeStringTemp0!=NULL);
+	if (doesThisTypeStringHaveAnIdentifierAtBeginning(typeStringTemp0)){
+		typeStringTemp1=applyToTypeStringRemoveIdentifierToNew(typeStringTemp0);
+		cosmic_free(typeStringTemp0);
+		typeStringTemp0=typeStringTemp1;
+	}
+	return typeStringTemp0;
 }

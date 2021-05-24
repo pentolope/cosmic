@@ -295,13 +295,18 @@ int32_t functionStatementsWalk(
 						expressionToAssemblyWithInitializer(&instructionBufferLocalTemp_0,indexOfStartOfInitializer,indexOfEndOfInitializer,walkingIndex,indexOfEndOfDeclaration,usedRegister,usedStatic);
 						walkingIndex=indexOfEndOfInitializer;
 					} else {
-						char* typeString = fullTypeParseAndAdd(walkingIndex,indexOfEndOfDeclaration,false);
-						if (doesThisTypeStringHaveAnIdentifierAtBeginning(typeString)){
-							addVariableToBlockFrame(typeString,walkingIndex,usedRegister,usedStatic);
-							if (usedStatic) addBlankStaticVariable(typeString);
+						char* typeString;
+						char** typeStrings = fullTypeParseAndAdd(walkingIndex,indexOfEndOfDeclaration,false);
+						for (uint16_t typeStringIndex=0;typeStrings[typeStringIndex]!=NULL;typeStringIndex++){
+							typeString=typeStrings[typeStringIndex];
+							if (doesThisTypeStringHaveAnIdentifierAtBeginning(typeString)){
+								addVariableToBlockFrame(typeString,walkingIndex,usedRegister,usedStatic);
+								if (usedStatic) addBlankStaticVariable(typeString);
+							}
+							cosmic_free(typeString);
 						}
-						cosmic_free(typeString);
 						walkingIndex=indexOfEndOfDeclaration;
+						cosmic_free(typeStrings);
 					}
 				} else {
 					// then assume the first statement is an expression
@@ -591,14 +596,18 @@ while (true){
 			
 			int32_t startIndexForDeclaration = walkingIndex+8;
 			int32_t endIndexForDeclaration = findEndIndexForConvertType(startIndexForDeclaration);
+			walkingIndex=endIndexForDeclaration;
 			if (sourceContainer.string[endIndexForDeclaration]!=';'){
 				err_1101_("expected \';\' after typedef entry",endIndexForDeclaration);
 			}
-			char* typeString = fullTypeParseAndAdd(startIndexForDeclaration,endIndexForDeclaration,false);
-			addTypedefEntryToBlockFrame(addTypedefEntry(typeString,startIndexForDeclaration));
-			cosmic_free(typeString);
-			walkingIndex=endIndexForDeclaration;
-			
+			char* typeString;
+			char** typeStrings = fullTypeParseAndAdd(startIndexForDeclaration,endIndexForDeclaration,false);
+			for (uint16_t typeStringIndex=0;typeStrings[typeStringIndex]!=NULL;typeStringIndex++){
+				typeString=typeStrings[typeStringIndex];
+				addTypedefEntryToBlockFrame(addTypedefEntry(typeString,startIndexForDeclaration));
+				cosmic_free(typeString);
+			}
+			cosmic_free(typeStrings);
 		} else if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"goto")){
 			
 			int32_t labelStart=emptyIndexAdvance(endOfToken);
@@ -641,13 +650,18 @@ while (true){
 					expressionToAssemblyWithInitializer(parentInstructionBufferToInsertTo,indexOfStartOfInitializer,indexOfEndOfInitializer,walkingIndex,indexOfEndOfDeclaration,usedRegister,usedStatic);
 					walkingIndex=indexOfEndOfInitializer;
 				} else {
-					char* typeString = fullTypeParseAndAdd(walkingIndex,indexOfEndOfDeclaration,false);
-					if (doesThisTypeStringHaveAnIdentifierAtBeginning(typeString)){
-						addVariableToBlockFrame(typeString,walkingIndex,usedRegister,usedStatic);
-						if (usedStatic) addBlankStaticVariable(typeString);
+					char* typeString;
+					char** typeStrings = fullTypeParseAndAdd(walkingIndex,indexOfEndOfDeclaration,false);
+					for (uint16_t typeStringIndex=0;typeStrings[typeStringIndex]!=NULL;typeStringIndex++){
+						typeString=typeStrings[typeStringIndex];
+						if (doesThisTypeStringHaveAnIdentifierAtBeginning(typeString)){
+							addVariableToBlockFrame(typeString,walkingIndex,usedRegister,usedStatic);
+							if (usedStatic) addBlankStaticVariable(typeString);
+						}
+						cosmic_free(typeString);
 					}
-					cosmic_free(typeString);
 					walkingIndex=indexOfEndOfDeclaration;
+					cosmic_free(typeStrings);
 				}
 			} else {
 				// then assume it is an expression
@@ -696,11 +710,15 @@ void fileScopeStatementsWalk(){
 			// then this is a typedef entry
 			int32_t startIndexForDeclaration = walkingIndex+8;
 			int32_t endIndexForDeclaration = findEndIndexForConvertType(startIndexForDeclaration);
-			char* typeString = fullTypeParseAndAdd(startIndexForDeclaration,endIndexForDeclaration,true);
-			addTypedefEntry(typeString,startIndexForDeclaration);
-			cosmic_free(typeString);
 			walkingIndex=1+endIndexForDeclaration;
-			
+			char* typeString;
+			char** typeStrings = fullTypeParseAndAdd(startIndexForDeclaration,endIndexForDeclaration,true);
+			for (uint16_t typeStringIndex=0;typeStrings[typeStringIndex]!=NULL;typeStringIndex++){
+				typeString=typeStrings[typeStringIndex];
+				addTypedefEntry(typeString,startIndexForDeclaration);
+				cosmic_free(typeString);
+			}
+			cosmic_free(typeStrings);
 		} else if (isSegmentOfStringTypeLike(sourceContainer.string,walkingIndex,endOfToken)){
 			// then it is some sort of declaration
 			if (specificStringEqualCheck(sourceContainer.string,walkingIndex,endOfToken,"auto")){
@@ -746,85 +764,97 @@ void fileScopeStatementsWalk(){
 				hasInline=inlineCount!=0;
 			}
 			int32_t endIndexForDeclaration = findEndIndexForConvertType(startIndexForDeclaration);
-			char* typeString = fullTypeParseAndAdd(startIndexForDeclaration,endIndexForDeclaration,true);
 			int32_t gotoFailIndex=startIndexForDeclaration;
 			walkingIndex=1+endIndexForDeclaration;
-			if (doesThisTypeStringHaveAnIdentifierAtBeginning(typeString)){
-				int32_t indexOfFirstSpace = getIndexOfFirstSpaceInString(typeString);
-				if (typeString[indexOfFirstSpace+1]=='('){
-					// then this is a function declaration or definition
-					bool isDefinitionBeingGiven;
-					if (sourceContainer.string[endIndexForDeclaration]=='{'){
-						isDefinitionBeingGiven=true;
-					} else if (sourceContainer.string[endIndexForDeclaration]==';'){
-						isDefinitionBeingGiven=false;
-					} else {
-						printf("Internal Error: It seems that a function was being declared at file scope, but something went wrong when trying to figure out if it was being defined\n");
-						exit(1);
-					}
-					applyToTypeStringArrayDecayToSelf(typeString);
-					uint8_t retValForAddingFunction = addGlobalFunction(typeString,gotoFailIndex,isDefinitionBeingGiven,hasStatic,hasExtern,hasInline);
-					if (retValForAddingFunction!=0){
-						if (retValForAddingFunction==1){
-							err_1101_("function declaration has type conflicts with previous declaration",gotoFailIndex);
-						} else if (retValForAddingFunction==2){
-							err_1101_("function was already defined",gotoFailIndex);
-						} else if (retValForAddingFunction==3){
-							err_1101_("that identifier is already used for a global variable, it cannot be used for a function",gotoFailIndex);
-						} else if (retValForAddingFunction==4){
-							err_1101_("function definitions must have identifiers for all parameters",gotoFailIndex);
-						} else if (retValForAddingFunction==4){
-							err_1101_("functions declared 'extern' cannot be given a definition",gotoFailIndex);
+			char* typeString;
+			char** typeStrings = fullTypeParseAndAdd(startIndexForDeclaration,endIndexForDeclaration,true);
+			uint16_t typeStringIndexLast=0;
+			uint16_t typeStringIndex;
+			for (typeStringIndex=0;typeStrings[typeStringIndex]!=NULL;typeStringIndex++){
+				typeStringIndexLast=typeStringIndex;
+			}
+			for (typeStringIndex=0;typeStrings[typeStringIndex]!=NULL;typeStringIndex++){
+				typeString=typeStrings[typeStringIndex];
+				if (doesThisTypeStringHaveAnIdentifierAtBeginning(typeString)){
+					int32_t indexOfFirstSpace = getIndexOfFirstSpaceInString(typeString);
+					if (typeString[indexOfFirstSpace+1]=='('){
+						// then this is a function declaration or definition
+						if (typeStringIndex!=0 | typeStringIndex!=typeStringIndexLast){
+							err_1101_("functions cannot have multiple identifiers like that",gotoFailIndex); // is this even possible?
 						}
-						assert(false);
-					}
-					if (isDefinitionBeingGiven){
-						InstructionBuffer instructionBufferForFunction;
-						InstructionSingle instructionSingle;
-						struct IdentifierSearchResult identifierSearchResult;
-						searchForIdentifier(&identifierSearchResult,typeString,true,false,false,false,true);
-						assert(identifierSearchResult.didExist);
-						assert(blockFrameArray.numberOfValidSlots==0);
-						addBlockFrame();
-						initInstructionBuffer(&instructionBufferForFunction);
-						instructionSingle.id = I_FCST;
-						instructionSingle.arg.BWD.a_0=0;
-						instructionSingle.arg.BWD.a_1=0;
-						instructionSingle.arg.BWD.a_2 = blockFrameArray.globalBlockFrame.globalFunctionEntries[identifierSearchResult.reference.functionReference.functionEntryIndex].labelID;
-						addInstruction(&instructionBufferForFunction,instructionSingle);
-						instructionSingle.id = I_ALOC;
-						addInstruction(&instructionBufferForFunction,instructionSingle);
-						
-						addFunctionParemetersAndInternalValuesToBlockFrame(typeString);
-						//printf("Starting Function Statement Walk\n");
-						
-						int32_t tempIndex = getIndexOfNthSpace(typeString,0);
-						char* returnTypeString = (getIndexOfMatchingEnclosement(typeString,tempIndex+1)+2)+typeString;
-						walkingIndex = functionStatementsWalk(
-							returnTypeString,
-							endIndexForDeclaration,
-							&instructionBufferForFunction,
-							0,0,0,true
-							);
-						
-						//printf("Finished Function Walk\n");
-						removeBlockFrame();
-						assert(blockFrameArray.numberOfValidSlots==0);
-						instructionSingle.id = I_RET_; // ensure implicit return exists at the end
-						addInstruction(&instructionBufferForFunction,instructionSingle);
-						instructionSingle.id = I_FCEN;
-						addInstruction(&instructionBufferForFunction,instructionSingle);
-						
-						assert(instructionBufferForFunction.buffer[0].id==I_FCST);
-						instructionBufferForFunction.buffer[0].arg.BWD.a_0=blockFrameArray.initialStackSize;
-						instructionBufferForFunction.buffer[0].arg.BWD.a_1=blockFrameArray.maxStackSize;
-						
-						resolveGoto(gotoFailIndex);
-						
+						bool isDefinitionBeingGiven;
+						if (sourceContainer.string[endIndexForDeclaration]=='{'){
+							isDefinitionBeingGiven=true;
+						} else if (sourceContainer.string[endIndexForDeclaration]==';'){
+							isDefinitionBeingGiven=false;
+						} else {
+							printf("Internal Error: It seems that a function was being declared at file scope, but something went wrong when trying to figure out if it was being defined\n");
+							exit(1);
+						}
+						applyToTypeStringArrayDecayToSelf(typeString);
+						uint8_t retValForAddingFunction = addGlobalFunction(typeString,gotoFailIndex,isDefinitionBeingGiven,hasStatic,hasExtern,hasInline);
+						if (retValForAddingFunction!=0){
+							if (retValForAddingFunction==1){
+								err_1101_("function declaration has type conflicts with previous declaration",gotoFailIndex);
+							} else if (retValForAddingFunction==2){
+								err_1101_("function was already defined",gotoFailIndex);
+							} else if (retValForAddingFunction==3){
+								err_1101_("that identifier is already used for a global variable, it cannot be used for a function",gotoFailIndex);
+							} else if (retValForAddingFunction==4){
+								err_1101_("function definitions must have identifiers for all parameters",gotoFailIndex);
+							} else if (retValForAddingFunction==4){
+								err_1101_("functions declared 'extern' cannot be given a definition",gotoFailIndex);
+							}
+							assert(false);
+						}
+						if (isDefinitionBeingGiven){
+							InstructionBuffer instructionBufferForFunction;
+							InstructionSingle instructionSingle;
+							struct IdentifierSearchResult identifierSearchResult;
+							searchForIdentifier(&identifierSearchResult,typeString,true,false,false,false,true);
+							assert(identifierSearchResult.didExist);
+							assert(blockFrameArray.numberOfValidSlots==0);
+							addBlockFrame();
+							initInstructionBuffer(&instructionBufferForFunction);
+							instructionSingle.id = I_FCST;
+							instructionSingle.arg.BWD.a_0=0;
+							instructionSingle.arg.BWD.a_1=0;
+							instructionSingle.arg.BWD.a_2 = blockFrameArray.globalBlockFrame.globalFunctionEntries[identifierSearchResult.reference.functionReference.functionEntryIndex].labelID;
+							addInstruction(&instructionBufferForFunction,instructionSingle);
+							instructionSingle.id = I_ALOC;
+							addInstruction(&instructionBufferForFunction,instructionSingle);
+							
+							addFunctionParemetersAndInternalValuesToBlockFrame(typeString);
+							//printf("Starting Function Statement Walk\n");
+							
+							int32_t tempIndex = getIndexOfNthSpace(typeString,0);
+							char* returnTypeString = (getIndexOfMatchingEnclosement(typeString,tempIndex+1)+2)+typeString;
+							walkingIndex = functionStatementsWalk(
+								returnTypeString,
+								endIndexForDeclaration,
+								&instructionBufferForFunction,
+								0,0,0,true
+								);
+							walkingIndex++;
+							
+							//printf("Finished Function Walk\n");
+							removeBlockFrame();
+							assert(blockFrameArray.numberOfValidSlots==0);
+							instructionSingle.id = I_RET_; // ensure implicit return exists at the end
+							addInstruction(&instructionBufferForFunction,instructionSingle);
+							instructionSingle.id = I_FCEN;
+							addInstruction(&instructionBufferForFunction,instructionSingle);
+							
+							assert(instructionBufferForFunction.buffer[0].id==I_FCST);
+							instructionBufferForFunction.buffer[0].arg.BWD.a_0=blockFrameArray.initialStackSize;
+							instructionBufferForFunction.buffer[0].arg.BWD.a_1=blockFrameArray.maxStackSize;
+							
+							resolveGoto(gotoFailIndex);
+							
 #ifdef OPT_DEBUG_GENERAL_ACTIVE
 printf("%s\n",typeString);
 #endif
-						runOptimizerOnFunctionPriorToGlobalIntegration(&instructionBufferForFunction);
+							runOptimizerOnFunctionPriorToGlobalIntegration(&instructionBufferForFunction);
 #ifdef OPT_DEBUG_GENERAL_ACTIVE
 printf("-----\n\n");
 #endif
@@ -832,61 +862,61 @@ printf("-----\n\n");
 printInstructionBufferWithMessageAndNumber(&instructionBufferForFunction,typeString,instructionBufferForFunction.numberOfSlotsTaken);
 #endif
 
-						addEntryToInstructionBuffersOfFunctions(&instructionBufferForFunction);
-						
-						walkingIndex++;
-					}
-				} else {
-					// then this isn't a function declaration, so it must be a variable declaration
-					if (hasInline){
-						err_1101_("Global variables cannot use inline keyword",gotoFailIndex);
-					}
-					bool isInitializationBeingGiven;
-					if (sourceContainer.string[endIndexForDeclaration]=='='){
-						isInitializationBeingGiven = true;
-					} else if (sourceContainer.string[endIndexForDeclaration]==';'){
-						isInitializationBeingGiven = false;
+							addEntryToInstructionBuffersOfFunctions(&instructionBufferForFunction);
+						}
 					} else {
-						err_1101_("It seems that a variable was being declared at file scope,\n  but something went wrong when trying to figure out if it had an initalizer",gotoFailIndex);
-					}
-					int32_t indexOfSemicolon = endIndexForDeclaration;
-					uint32_t labelID=++globalLabelID;
-					if (isInitializationBeingGiven){
-						indexOfSemicolon = findIndexOfTypicalStatementEnd(endIndexForDeclaration);
-						walkingIndex = indexOfSemicolon+1;
-						int32_t startOfInitializer = endIndexForDeclaration+1;
-						char c = sourceContainer.string[startOfInitializer];
-						while (c==' ' | c=='\n'){
-							c = sourceContainer.string[++startOfInitializer];
+						// then this isn't a function declaration, so it must be a variable declaration
+						if (hasInline){
+							err_1101_("Global variables cannot use inline keyword",gotoFailIndex);
 						}
-						char* typeStringNI = applyToTypeStringRemoveIdentifierToNew(typeString);
-						char* typeStringIdentifier = applyToTypeStringGetIdentifierToNew(typeString);
-						cosmic_free(typeString);
-						int32_t initRoot = initializerMapRoot(startOfInitializer,indexOfSemicolon);
-						if (!initializerImplementRoot(&global_static_data,initRoot,labelID,&typeStringNI,true)){
-							assert(false);
+						bool isInitializationBeingGiven;
+						if (sourceContainer.string[endIndexForDeclaration]=='='){
+							isInitializationBeingGiven = true;
+						} else if (sourceContainer.string[endIndexForDeclaration]==';'){
+							isInitializationBeingGiven = false;
+						} else {
+							err_1101_("It seems that a variable was being declared at file scope,\n  but something went wrong when trying to figure out if it had an initalizer",gotoFailIndex);
 						}
-						typeString=strMerge3(typeStringIdentifier," ",typeStringNI);
-						cosmic_free(typeStringIdentifier);
-						cosmic_free(typeStringNI);
+						int32_t indexOfSemicolon = endIndexForDeclaration;
+						uint32_t labelID=++globalLabelID;
+						if (isInitializationBeingGiven & typeStringIndex==typeStringIndexLast){
+							indexOfSemicolon = findIndexOfTypicalStatementEnd(endIndexForDeclaration);
+							walkingIndex = indexOfSemicolon+1;
+							int32_t startOfInitializer = endIndexForDeclaration+1;
+							char c = sourceContainer.string[startOfInitializer];
+							while (c==' ' | c=='\n'){
+								c = sourceContainer.string[++startOfInitializer];
+							}
+							char* typeStringNI = applyToTypeStringRemoveIdentifierToNew(typeString);
+							char* typeStringIdentifier = applyToTypeStringGetIdentifierToNew(typeString);
+							cosmic_free(typeString);
+							int32_t initRoot = initializerMapRoot(startOfInitializer,indexOfSemicolon);
+							if (!initializerImplementRoot(&global_static_data,initRoot,labelID,&typeStringNI,true)){
+								assert(false);
+							}
+							typeString=strMerge3(typeStringIdentifier," ",typeStringNI);
+							cosmic_free(typeStringIdentifier);
+							cosmic_free(typeStringNI);
+						}
+						switch (addGlobalVariable(typeString,0,labelID,gotoFailIndex,hasStatic,hasExtern,isInitializationBeingGiven)){
+							case 1:err_1101_("identifier collision at file scope for variable, a variable was already declared with the same identifier",gotoFailIndex);
+							case 2:err_1101_("identifier collision at file scope for variable, a function was already declared with the same identifier",gotoFailIndex);
+							case 3:err_1101_("sizeof failed while adding variable at file scope",gotoFailIndex);
+							default:assert(false);
+							case 0:;
+						}
+						if (!isInitializationBeingGiven | typeStringIndex!=typeStringIndexLast){
+							addBlankStaticVariable(typeString);
+						}
 					}
-					switch (addGlobalVariable(typeString,0,labelID,gotoFailIndex,hasStatic,hasExtern,isInitializationBeingGiven)){
-						case 1:err_1101_("identifier collision at file scope for variable, a variable was already declared with the same identifier",gotoFailIndex);
-						case 2:err_1101_("identifier collision at file scope for variable, a function was already declared with the same identifier",gotoFailIndex);
-						case 3:err_1101_("sizeof failed while adding variable at file scope",gotoFailIndex);
-						default:assert(false);
-						case 0:;
-					}
-					if (!isInitializationBeingGiven){
-						addBlankStaticVariable(typeString);
-					}
+				} else if (sourceContainer.string[endIndexForDeclaration]=='='){
+					err_1111_("An identifier is required for initialization",startIndexForDeclaration,endIndexForDeclaration);
+				} else if (sourceContainer.string[endIndexForDeclaration]!=';'){
+					err_1111_("It seems that a type declaration occured at file scope,\n  but something went wrong when trying to figure out if it had an initalizer",startIndexForDeclaration,endIndexForDeclaration);
 				}
-			} else if (sourceContainer.string[endIndexForDeclaration]=='='){
-				err_1111_("An identifier is required for initialization",startIndexForDeclaration,endIndexForDeclaration);
-			} else if (sourceContainer.string[endIndexForDeclaration]!=';'){
-				err_1111_("It seems that a type declaration occured at file scope,\n  but something went wrong when trying to figure out if it had an initalizer",startIndexForDeclaration,endIndexForDeclaration);
+				cosmic_free(typeString);
 			}
-			cosmic_free(typeString);
+			cosmic_free(typeStrings);
 		} else {
 			// technically, it is possible for an initalizer without a declaration to occur. We should add a check for something like a global variable being the first token
 			err_1111_("Unknown starting token at file scope",walkingIndex,endOfToken);

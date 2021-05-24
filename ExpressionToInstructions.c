@@ -2512,6 +2512,8 @@ void expressionToAssemblyWithReturn(
 	cosmic_free(assignment->post.typeString);
 }
 
+void addBlankStaticVariable(const char* typeString);
+
 #include "InitializerMapping.c"
 
 
@@ -2530,38 +2532,57 @@ void expressionToAssemblyWithInitializer(
 		exit(1);
 	}
 	int32_t initializerRoot=initializerMapRoot(startIndexForInitializer,endIndexForInitializer);
-	char* typeString = fullTypeParseAndAdd(startIndexForDeclaration,endIndexForDeclaration,false);
-	if (!doesThisTypeStringHaveAnIdentifierAtBeginning(typeString)){
-		err_1111_("An identifier is required for initialization",startIndexForDeclaration,endIndexForDeclaration);
+	char* typeString;
+	char** typeStrings = fullTypeParseAndAdd(startIndexForDeclaration,endIndexForDeclaration,false);
+	uint16_t typeStringIndexLast=0;
+	uint16_t typeStringIndex;
+	for (typeStringIndex=0;typeStrings[typeStringIndex]!=NULL;typeStringIndex++){
+		typeStringIndexLast=typeStringIndex;
 	}
-	char* typeStringNI = applyToTypeStringRemoveIdentifierToNew(typeString);
-	char* identifier = applyToTypeStringGetIdentifierToNew(typeString);
-	cosmic_free(typeString);
-	InstructionBuffer ibTemp;
-	initInstructionBuffer(&ibTemp);
-	// the label of 0 is used as a temporary value, if it is static it will be renamed
-	bool gotStatic=initializerImplementRoot(&ibTemp,initializerRoot,0,&typeStringNI,usedStatic);
-	assert(usedStatic==gotStatic);
-	typeString=strMerge3(identifier," ",typeStringNI);
-	addVariableToBlockFrame(typeString,startIndexForDeclaration,usedRegister,usedStatic);
-	struct IdentifierSearchResult isr;
-	searchForIdentifier(&isr,identifier,false,true,true,false,false);
-	assert(isr.didExist);
-	if (gotStatic){
-		struct GlobalVariableEntry* globalVariableEntry=
-			blockFrameArray.globalBlockFrame.globalVariableEntries+
-			isr.reference.variableReference.variableEntryIndex;
-		doLabelRename(&ibTemp,0,globalVariableEntry->labelID);
-		singleMergeIB(&global_static_data,&ibTemp);
-	} else {
-		uint16_t revOffset = getReversedOffsetForLocalVariable(&isr.reference.variableReference);
-		convertSTPI_STPA(&ibTemp,revOffset);
-		singleMergeIB(ib_to,&ibTemp);
+	for (typeStringIndex=0;typeStrings[typeStringIndex]!=NULL;typeStringIndex++){
+		typeString=typeStrings[typeStringIndex];
+		if (!doesThisTypeStringHaveAnIdentifierAtBeginning(typeString)){
+			err_1111_("An identifier is required for initialization",startIndexForDeclaration,endIndexForDeclaration);
+		}
+		char* identifier = applyToTypeStringGetIdentifierToNew(typeString);
+		if (typeStringIndex==typeStringIndexLast){
+			char* typeStringNI = applyToTypeStringRemoveIdentifierToNew(typeString);
+			cosmic_free(typeString);
+			InstructionBuffer ibTemp;
+			initInstructionBuffer(&ibTemp);
+			// the label of 0 is used as a temporary value, if it is static it will be renamed
+			bool gotStatic=initializerImplementRoot(&ibTemp,initializerRoot,0,&typeStringNI,usedStatic);
+			assert(usedStatic==gotStatic);
+			typeString=strMerge3(identifier," ",typeStringNI); // typeString must be reconstructed because typeStringNI may have changed
+			addVariableToBlockFrame(typeString,startIndexForDeclaration,usedRegister,usedStatic);
+			struct IdentifierSearchResult isr;
+			searchForIdentifier(&isr,identifier,false,true,true,false,false);
+			assert(isr.didExist);
+			if (gotStatic){
+				struct GlobalVariableEntry* globalVariableEntry=
+					blockFrameArray.globalBlockFrame.globalVariableEntries+
+					isr.reference.variableReference.variableEntryIndex;
+				doLabelRename(&ibTemp,0,globalVariableEntry->labelID);
+				singleMergeIB(&global_static_data,&ibTemp);
+			} else {
+				uint16_t revOffset = getReversedOffsetForLocalVariable(&isr.reference.variableReference);
+				convertSTPI_STPA(&ibTemp,revOffset);
+				singleMergeIB(ib_to,&ibTemp);
+			}
+			destroyInstructionBuffer(&ibTemp);
+			cosmic_free(typeStringNI);
+		} else {
+			addVariableToBlockFrame(typeString,startIndexForDeclaration,usedRegister,usedStatic);
+			if (usedStatic){
+				addBlankStaticVariable(typeString);
+				err_011_1(strMerge3("The variable `",identifier,"` is not effected by that initializer"),startIndexForDeclaration,endIndexForDeclaration);
+			} else {
+				err_011_1(strMerge4("The variable `",identifier,"` is not effected by that initializer",", so it remains uninitialized"),startIndexForDeclaration,endIndexForDeclaration);
+			}
+		}
+		cosmic_free(identifier);
+		cosmic_free(typeString);
 	}
-	destroyInstructionBuffer(&ibTemp);
-	cosmic_free(typeStringNI);
-	cosmic_free(identifier);
-	cosmic_free(typeString);
 }
 
 
