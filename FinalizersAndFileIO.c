@@ -551,9 +551,9 @@ void stringBuilderClear(struct StringBuilder* stringBuilderIn){
 struct BinContainer loadFileContentsAsBinContainer(const char* filePath){
 	binaryFileLoadState.binaryFile=fopen(filePath,"rb");
 	if (binaryFileLoadState.binaryFile==NULL){
-		err_10_1_(strMerge3("Error: Could not load file \"",filePath,"\""));
+		err_10_1_(strMerge3("Could not load file \"",filePath,"\""));
 	}
-	binaryFileLoadState.corruptionErrorMessage=strMerge3("Error: Input file \"",filePath,"\" is corrupted");
+	binaryFileLoadState.corruptionErrorMessage=strMerge3("Input file \"",filePath,"\" is corrupted");
 	struct BinContainer binContainerOut;
 	{
 		struct StringBuilder* stringBuilder=stringBuilderCreate();

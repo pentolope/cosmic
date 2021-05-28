@@ -22,7 +22,7 @@ int32_t nextUnshieldedEndForFunctionTypeString(char* typeString, int32_t i){
 		if (c==',' | c==')'){
 			return i;
 		} else if (c=='('){
-			i=nextUnshieldedEndForFunctionTypeString(typeString,i);
+			i=getIndexOfMatchingEnclosement(typeString,i);
 		}
 	}
 	printf("Internal Error: function type string corrupted\n");
@@ -35,7 +35,6 @@ void analyseFunctionTypeString(
 		const char* typeString,
 		bool removeSingularVoidArgument){
 	
-	functionTypeAnalysis->usesVaArgs=false;
 	char* typeStringInternal;
 	if (doesThisTypeStringHaveAnIdentifierAtBeginning(typeString)){
 		typeStringInternal = applyToTypeStringRemoveIdentifierToNew(typeString);
@@ -55,7 +54,8 @@ void analyseFunctionTypeString(
 		for (uint16_t i=0;i<functionTypeAnalysis->numberOfParameters;i++){
 			uint32_t endIndex = nextUnshieldedEndForFunctionTypeString(typeStringInternal,walkingIndex);
 			char* s = copyStringSegmentToHeap(typeStringInternal,walkingIndex+1,endIndex);
-			if (s[strlen(s)-1]==' ') s[strlen(s)-1]=26;
+			uint32_t l=strlen(s);
+			if (s[l-1]==' ') s[l-1]=26;
 			if (s[0]==' ') s[0]=26;
 			copyDownForInPlaceEdit(s);
 			applyToTypeStringArrayDecayToSelf(s);
@@ -74,9 +74,7 @@ void analyseFunctionTypeString(
 	}
 	functionTypeAnalysis->returnType = copyStringToHeapString(typeStringInternal+(parenEnd+2));
 	cosmic_free(typeStringInternal);
-	if (functionTypeAnalysis->numberOfParameters!=0 && doStringsMatch(functionTypeAnalysis->params[functionTypeAnalysis->numberOfParameters-1].noIdentifierTypeString,"...")){
-		functionTypeAnalysis->usesVaArgs=true;
-	}
+	functionTypeAnalysis->usesVaArgs = functionTypeAnalysis->numberOfParameters!=0 && doStringsMatch(functionTypeAnalysis->params[functionTypeAnalysis->numberOfParameters-1].noIdentifierTypeString,"...");
 	if ((removeSingularVoidArgument & functionTypeAnalysis->numberOfParameters==1) &&
 		doStringsMatch(functionTypeAnalysis->params[0].noIdentifierTypeString,"void")){
 		

@@ -1036,9 +1036,10 @@ void genSinglePreWalkData(int16_t nodeIndex){
 	} else if (!(oID>=59 & oID<=62)){
 		etn->pre.hasLeftNode = true;
 		etn->pre.hasRightNode = true;
-		etn->pre.leftNode = etn->indexOfComponent1;
-		etn->pre.rightNode = etn->indexOfComponent2;
-		if (oID==66){
+		if (oID!=66){
+			etn->pre.leftNode = etn->indexOfComponent1;
+			etn->pre.rightNode = etn->indexOfComponent2;
+		} else {
 			// if it is a complex function call, then switch the component names to reflect which side it is on
 			etn->pre.leftNode = etn->indexOfComponent2;
 			etn->pre.rightNode = etn->indexOfComponent1;
