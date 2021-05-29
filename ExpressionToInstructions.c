@@ -2306,7 +2306,8 @@ void expressionToAssembly(
 		expressionToAssembly(thisNode->pre.leftNode,NULL,0);
 	}
 	bool isFunctionCall = oID==65 | oID==66;
-	uint32_t functionEntryLabelID; // only used when oID==65
+	bool isFunctionCallComplex = oID==66;
+	uint32_t functionEntryLabelID; // only used when isFunctionCallComplex==false
 	struct FunctionTypeAnalysis* functionTypeAnalysisChild; // only used when isFunctionCall
 	if (isFunctionCall){
 		if (oID==65){
@@ -2332,9 +2333,38 @@ void expressionToAssembly(
 		} else {
 			// complex function call (no identifier detected)
 			assert(thisNode->pre.hasLeftNode);
-			printf("\nCOMPLEX:`%s`\n",leftNode->post.typeString);
+			char* typeStringTemp=leftNode->post.typeStringNQ;
+			if (typeStringTemp[0]!='('){
+				if (typeStringTemp[0]=='*'){
+					typeStringTemp=stripQualifiers(typeStringTemp+2,NULL,NULL);
+					if (typeStringTemp[0]!='('){
+						goto ComplexFunctionTypeError;
+					}
+					if (leftNode->post.isLValue){
+						leftNode->post.isLValue=false;
+						singleMergeIB(&leftNode->ib,leftNode->post.isLValueVolatile?&ib_mem_dword_read_v:&ib_mem_dword_read_n);
+					}
+					applyRvaluePointerToLvalueTransform(leftNode);
+				} else {
+					ComplexFunctionTypeError:;
+					printInformativeMessageForExpression(true,"called object\'s type is not a function or function pointer",leftNode);
+					exit(1);
+				}
+			}
+			typeStringTemp=copyStringToHeapString(leftNode->post.typeStringNQ);
+			cosmic_free(leftNode->post.typeString);
+			leftNode->post.typeString=typeStringTemp;
+			genTypeStringNQ(leftNode);
+			if (!leftNode->post.isLValue){
+				// I don't know it this is possible. If it is possible, I don't know if the address was calculated correctly. It may have been dereferenced one too many times already.
+				printInformativeMessageForExpression(false,"(internal) this function may not have had the address computed correctly",leftNode);
+			}
+			printf("\nCOMPLEX:`%s`(%d)\n",leftNode->post.typeString,leftNode->post.isLValue);
+			printInstructionBufferWithMessageAndNumber(&leftNode->ib,"",0);
 			exit(1);
 		}
+		
+		
 		const uint16_t numberOfParameters=getNumberOfParametersOnFunctionCall(thisNode);
 		if (functionTypeAnalysisChild->numberOfParameters!=numberOfParameters){
 			uint8_t errorID=0;
