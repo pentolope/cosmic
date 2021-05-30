@@ -2277,8 +2277,117 @@ void applyOperator(ExpressionTreeNode* thisNode){
 }
 
 
+struct FunctionCallInformation{
+	bool isFunctionCall;
+	bool isFunctionCallComplex;
+	uint32_t functionEntryLabelID; // only used when isFunctionCallComplex==false
+	struct FunctionTypeAnalysis* functionTypeAnalysisChild; // only used when isFunctionCall
+};
 
+void functionToAssemblyPart1(struct FunctionCallInformation* functionCallInformation,ExpressionTreeNode* thisNode,ExpressionTreeNode* leftNode){
+	assert(functionCallInformation->isFunctionCall);
+	if (functionCallInformation->isFunctionCallComplex){
+		// complex function call (no identifier detected)
+		assert(thisNode->pre.hasLeftNode);
+		char* typeStringTemp=leftNode->post.typeStringNQ;
+		if (typeStringTemp[0]!='('){
+			if (typeStringTemp[0]=='*'){
+				typeStringTemp=stripQualifiers(typeStringTemp+2,NULL,NULL);
+				if (typeStringTemp[0]!='('){
+					goto ComplexFunctionTypeError;
+				}
+				if (leftNode->post.isLValue){
+					leftNode->post.isLValue=false;
+					singleMergeIB(&leftNode->ib,leftNode->post.isLValueVolatile?&ib_mem_dword_read_v:&ib_mem_dword_read_n);
+				}
+				applyRvaluePointerToLvalueTransform(leftNode);
+			} else {
+				ComplexFunctionTypeError:;
+				printInformativeMessageForExpression(true,"called object\'s type is not a function or function pointer",leftNode);
+				exit(1);
+			}
+		}
+		typeStringTemp=copyStringToHeapString(leftNode->post.typeStringNQ);
+		cosmic_free(leftNode->post.typeString);
+		leftNode->post.typeString=typeStringTemp;
+		genTypeStringNQ(leftNode);
+		if (!leftNode->post.isLValue){
+			// I don't know it this is possible. If it is possible, I don't know if the address was calculated correctly. It may have been dereferenced one too many times already.
+			printInformativeMessageForExpression(false,"(internal) this function may not have had the address computed correctly",leftNode);
+		}
+		printf("\nCOMPLEX:`%s`(%d)\n",leftNode->post.typeString,leftNode->post.isLValue);
+		printInstructionBufferWithMessageAndNumber(&leftNode->ib,"",0);
+		exit(1);
+	} else {
+		// non-complex function call (had identifier detected)
+		struct IdentifierSearchResult identifierSearchResult;
+		{
+			char* functionIdentifier = copyStringSegmentToHeap(sourceContainer.string,thisNode->startIndexInString,thisNode->endIndexInString);
+			searchForIdentifier(&identifierSearchResult,functionIdentifier,true,true,true,true,true);
+			if (identifierSearchResult.didExist){
+				if (identifierSearchResult.typeOfResult!=IdentifierSearchResultIsFunction){
+					err_1111_("This identifier is not a function, but is expected to be",thisNode->startIndexInString,thisNode->endIndexInString);
+				}
+			} else {
+				err_1111_("This identifier does not exist",thisNode->startIndexInString,thisNode->endIndexInString);
+			}
+			cosmic_free(functionIdentifier);
+		}
+		{
+			struct GlobalFunctionEntry* functionEntryPtr=blockFrameArray.globalBlockFrame.globalFunctionEntries+identifierSearchResult.reference.functionReference.functionEntryIndex;
+			functionCallInformation->functionTypeAnalysisChild=&(functionEntryPtr->functionTypeAnalysis);
+			functionCallInformation->functionEntryLabelID=functionEntryPtr->labelID;
+		}
+	}
+	{
+		const uint16_t numberOfParameters=getNumberOfParametersOnFunctionCall(thisNode);
+		if (functionCallInformation->functionTypeAnalysisChild->numberOfParameters!=numberOfParameters){
+			uint8_t errorID=0;
+			if (functionCallInformation->functionTypeAnalysisChild->usesVaArgs){
+				if (numberOfParameters<(functionCallInformation->functionTypeAnalysisChild->numberOfParameters-1U)) errorID=2;
+			} else errorID=1;
+			if (errorID!=0){
+				char* stringForError = cosmic_calloc(100,1);
+				snprintf(stringForError,99,
+					"This function takes at least %u arguments, not %u",
+					(unsigned int)(functionCallInformation->functionTypeAnalysisChild->numberOfParameters-(errorID!=1)),
+					(unsigned int)numberOfParameters);
+				err_1101_(stringForError,thisNode->startIndexInString);
+			}
+		}
+	}
+}
 
+void functionToAssemblyPart2(struct FunctionCallInformation* functionCallInformation,ExpressionTreeNode* thisNode,ExpressionTreeNode* rightNode){
+	assert(functionCallInformation->isFunctionCall);
+	if (functionCallInformation->isFunctionCallComplex){
+		printf("Unimplemented Error: complex function calls are not ready yet\n");
+		exit(1);
+	} else {
+		bool isVoidReturn=doStringsMatch("void",stripQualifiersC(functionCallInformation->functionTypeAnalysisChild->returnType,NULL,NULL));
+		if (!isVoidReturn){
+			uint32_t returnSize=getSizeofForTypeString(functionCallInformation->functionTypeAnalysisChild->returnType,true);
+			assert(returnSize!=0);
+			if (returnSize>64000){
+				printf("Return size of function is too large (this should have been caught elsewhere)\n");
+				exit(1);
+			}
+			returnSize+=returnSize&1;
+			add_ALCR(&thisNode->ib,returnSize);
+		}
+		uint16_t stackSize=0;
+		if (thisNode->pre.hasRightNode){
+			stackSize=rightNode->post.sizeOnStack;
+			singleMergeIB(&thisNode->ib,&rightNode->ib);
+		}
+		insert_IB_call_nonComplex_function(
+			&thisNode->ib,functionCallInformation->functionEntryLabelID,stackSize,
+			!isVoidReturn);
+		thisNode->post.typeString=copyStringToHeapString(
+			singleTypicalIntegralTypePromote(functionCallInformation->functionTypeAnalysisChild->returnType,NULL)); // this does trim off the qualifiers on the base of the type. is that desired?
+		genTypeStringNQ(thisNode);
+	}
+}
 
 void expressionToAssembly(
 		int16_t nodeIndex,
@@ -2296,6 +2405,7 @@ void expressionToAssembly(
 	ExpressionTreeNode* rightNode;
 	ExpressionTreeNode* leftNode;
 	const uint8_t oID = thisNode->operatorID;
+	struct FunctionCallInformation functionCallInformation;
 	#ifdef EXP_TO_ASSEMBLY_DEBUG
 	printf("+%d\n",oID);
 	#endif
@@ -2305,90 +2415,12 @@ void expressionToAssembly(
 		leftNode=expressionTreeGlobalBuffer.expressionTreeNodes+thisNode->pre.leftNode;
 		expressionToAssembly(thisNode->pre.leftNode,NULL,0);
 	}
-	bool isFunctionCall = oID==65 | oID==66;
-	bool isFunctionCallComplex = oID==66;
-	uint32_t functionEntryLabelID; // only used when isFunctionCallComplex==false
-	struct FunctionTypeAnalysis* functionTypeAnalysisChild; // only used when isFunctionCall
-	if (isFunctionCall){
-		if (oID==65){
-			// nonComplex function call (has identifier)
-			struct IdentifierSearchResult identifierSearchResult;
-			{
-				char* functionIdentifier = copyStringSegmentToHeap(sourceContainer.string,thisNode->startIndexInString,thisNode->endIndexInString);
-				searchForIdentifier(&identifierSearchResult,functionIdentifier,true,true,true,true,true);
-				if (identifierSearchResult.didExist){
-					if (identifierSearchResult.typeOfResult!=IdentifierSearchResultIsFunction){
-						err_1111_("This identifier is not a function, but is expected to be",thisNode->startIndexInString,thisNode->endIndexInString);
-					}
-				} else {
-					err_1111_("This identifier does not exist",thisNode->startIndexInString,thisNode->endIndexInString);
-				}
-				cosmic_free(functionIdentifier);
-			}
-			{
-				struct GlobalFunctionEntry* functionEntryPtr=blockFrameArray.globalBlockFrame.globalFunctionEntries+identifierSearchResult.reference.functionReference.functionEntryIndex;
-				functionTypeAnalysisChild=&(functionEntryPtr->functionTypeAnalysis);
-				functionEntryLabelID=functionEntryPtr->labelID;
-			}
-		} else {
-			// complex function call (no identifier detected)
-			assert(thisNode->pre.hasLeftNode);
-			char* typeStringTemp=leftNode->post.typeStringNQ;
-			if (typeStringTemp[0]!='('){
-				if (typeStringTemp[0]=='*'){
-					typeStringTemp=stripQualifiers(typeStringTemp+2,NULL,NULL);
-					if (typeStringTemp[0]!='('){
-						goto ComplexFunctionTypeError;
-					}
-					if (leftNode->post.isLValue){
-						leftNode->post.isLValue=false;
-						singleMergeIB(&leftNode->ib,leftNode->post.isLValueVolatile?&ib_mem_dword_read_v:&ib_mem_dword_read_n);
-					}
-					applyRvaluePointerToLvalueTransform(leftNode);
-				} else {
-					ComplexFunctionTypeError:;
-					printInformativeMessageForExpression(true,"called object\'s type is not a function or function pointer",leftNode);
-					exit(1);
-				}
-			}
-			typeStringTemp=copyStringToHeapString(leftNode->post.typeStringNQ);
-			cosmic_free(leftNode->post.typeString);
-			leftNode->post.typeString=typeStringTemp;
-			genTypeStringNQ(leftNode);
-			if (!leftNode->post.isLValue){
-				// I don't know it this is possible. If it is possible, I don't know if the address was calculated correctly. It may have been dereferenced one too many times already.
-				printInformativeMessageForExpression(false,"(internal) this function may not have had the address computed correctly",leftNode);
-			}
-			printf("\nCOMPLEX:`%s`(%d)\n",leftNode->post.typeString,leftNode->post.isLValue);
-			printInstructionBufferWithMessageAndNumber(&leftNode->ib,"",0);
-			exit(1);
-		}
-		
-		
-		const uint16_t numberOfParameters=getNumberOfParametersOnFunctionCall(thisNode);
-		if (functionTypeAnalysisChild->numberOfParameters!=numberOfParameters){
-			uint8_t errorID=0;
-			if (functionTypeAnalysisChild->usesVaArgs){
-				if (numberOfParameters<(functionTypeAnalysisChild->numberOfParameters-1U)) errorID=2;
-			} else errorID=1;
-			if (errorID!=0){
-				char* stringForError = cosmic_calloc(100,1);
-				if (errorID==1)
-					snprintf(stringForError,99,
-					"This function takes %u arguments, not %u",
-					(unsigned int)(functionTypeAnalysisChild->numberOfParameters),
-					(unsigned int)numberOfParameters);
-				else
-					snprintf(stringForError,99,
-					"This function takes at least %u arguments, not %u",
-					(unsigned int)(functionTypeAnalysisChild->numberOfParameters-1U),
-					(unsigned int)numberOfParameters);
-				err_1101_(stringForError,thisNode->startIndexInString);
-			}
-		}
-	}
-	if (isFunctionCall){
-		if (thisNode->pre.hasRightNode) expressionToAssembly(thisNode->pre.rightNode,functionTypeAnalysisChild,0);
+	
+	functionCallInformation.isFunctionCallComplex = oID==66; // may become true if it was false due to complex function calls being possible even if the parser detected it to be a non-complex function call
+	functionCallInformation.isFunctionCall = oID==65 | oID==66;
+	if (functionCallInformation.isFunctionCall){
+		functionToAssemblyPart1(&functionCallInformation,thisNode,leftNode);
+		if (thisNode->pre.hasRightNode) expressionToAssembly(thisNode->pre.rightNode,functionCallInformation.functionTypeAnalysisChild,0);
 	} else if (thisNode->pre.hasRightNode&!(oID==5 | oID==6 | oID==17)) expressionToAssembly(thisNode->pre.rightNode,NULL,0);
 	
 	if (thisNode->pre.hasChainNode){
@@ -2404,35 +2436,8 @@ void expressionToAssembly(
 		// right part of ternary does not get an instruction buffer
 		initInstructionBuffer(&thisNode->ib);
 	}
-	if (isFunctionCall){
-		if (oID==65){
-			bool isVoidReturn=doStringsMatch("void",
-					stripQualifiersC(functionTypeAnalysisChild->returnType,NULL,NULL));
-			if (!isVoidReturn){
-				uint32_t returnSize=getSizeofForTypeString(functionTypeAnalysisChild->returnType,true);
-				assert(returnSize!=0);
-				if (returnSize>64000){
-					printf("Return size of function is too large (this should have been caught elsewhere)\n");
-					exit(1);
-				}
-				returnSize+=returnSize&1;
-				add_ALCR(&thisNode->ib,returnSize);
-			}
-			uint16_t stackSize=0;
-			if (thisNode->pre.hasRightNode){
-				stackSize=rightNode->post.sizeOnStack;
-				singleMergeIB(&thisNode->ib,&rightNode->ib);
-			}
-			insert_IB_call_nonComplex_function(
-				&thisNode->ib,functionEntryLabelID,stackSize,
-				!isVoidReturn);
-			thisNode->post.typeString=copyStringToHeapString(
-				singleTypicalIntegralTypePromote(functionTypeAnalysisChild->returnType,NULL)); // this does trim off the qualifiers on the base of the type. is that desired?
-			genTypeStringNQ(thisNode);
-		} else {
-			printf("Unimplemented Error: complex function calls are not ready yet\n");
-			exit(1);
-		}
+	if (functionCallInformation.isFunctionCall){
+		functionToAssemblyPart2(&functionCallInformation,thisNode,rightNode);
 	} else {
 		applyAutoTypeConversion(thisNode);
 		if (oID==37) return; // right part of ternary needs to return now
