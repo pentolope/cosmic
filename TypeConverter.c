@@ -108,15 +108,18 @@ void applyToTypeStringArrayDecayToSelf(char* string){
 // only decays array at start of typeString
 // returns true if it decayed, false otherwise
 bool applyToTypeStringBaseArrayDecayToSelf(char* string){
-	int32_t start=0;
-	if (isSectionOfStringEquivalent(string,start,"const ")){
-		start+=6;
-	} else if (isSectionOfStringEquivalent(string,start,"volatile ")){
-		start+=9;
+	int32_t startIndex=0;
+	Start:;
+	if (isSectionOfStringEquivalent(string,startIndex,"const ")){
+		startIndex+=6;
+		goto Start;
+	} else if (isSectionOfStringEquivalent(string,startIndex,"volatile ")){
+		startIndex+=9;
+		goto Start;
 	}
-	if (string[start]=='['){
-		int32_t indexOfOtherBracket = getIndexOfMatchingEnclosement(string,start);
-		for (int32_t i=start;i<indexOfOtherBracket;i++){
+	if (string[startIndex]=='['){
+		int32_t indexOfOtherBracket = getIndexOfMatchingEnclosement(string,startIndex);
+		for (int32_t i=startIndex;i<indexOfOtherBracket;i++){
 			string[i]=26;
 		}
 		string[indexOfOtherBracket]='*';

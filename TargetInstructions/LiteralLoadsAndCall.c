@@ -68,3 +68,33 @@ void insert_IB_call_nonComplex_function(InstructionBuffer *ib_ToAppendTo,uint32_
 	iS.arg.B2.a_1 = 11;
 	addInstruction(ib_ToAppendTo,iS);
 }
+
+// insert_IB_call_complex_function should be called after arguments are pushed, then address was pushed
+void insert_IB_call_complex_function(InstructionBuffer *ib_ToAppendTo,uint16_t stackSize,bool returnsNonVoid){
+	InstructionSingle iS;
+	iS.id = I_POP2;
+	iS.arg.B2.a_0 = 10;
+	iS.arg.B2.a_1 = 11;
+	addInstruction(ib_ToAppendTo,iS);
+	if (returnsNonVoid){
+		iS.id = I_STOF;
+		iS.arg.BW.a_0 = 2;
+		iS.arg.BW.a_1 = stackSize;
+		addInstruction(ib_ToAppendTo,iS);
+		iS.id = I_PUA1;
+		iS.arg.B1.a_0 = 2;
+		addInstruction(ib_ToAppendTo,iS);
+		stackSize+=2;
+	}
+	iS.id = I_RL1_;
+	iS.arg.BW.a_0 = 2;
+	iS.arg.BW.a_1 = stackSize;
+	addInstruction(ib_ToAppendTo,iS);
+	iS.id = I_PUA1;
+	iS.arg.B1.a_0 = 2;
+	addInstruction(ib_ToAppendTo,iS);
+	iS.id = I_CALL;
+	iS.arg.B2.a_0 = 10;
+	iS.arg.B2.a_1 = 11;
+	addInstruction(ib_ToAppendTo,iS);
+}

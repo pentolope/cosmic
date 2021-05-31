@@ -138,7 +138,7 @@ void applyConvertToRvalue(ExpressionTreeNode* thisNode){
 			const InstructionBuffer* ibMem;
 			bool applySignedCharConvert=false;
 			if (size==1){
-				applySignedCharConvert = (bool)doStringsMatch(thisNode->post.typeStringNQ,"signed char");
+				applySignedCharConvert = doStringsMatch(thisNode->post.typeStringNQ,"signed char");
 				ibMem=thisNode->post.isLValueVolatile?&ib_mem_byte_read_v:&ib_mem_byte_read_n;
 			} else if (size==2){
 				ibMem=thisNode->post.isLValueVolatile?&ib_mem_word_read_v:&ib_mem_word_read_n;
@@ -190,7 +190,7 @@ probably not perfect, this is used for warning messages (mainly for auto type ca
  typeString2 is to
  hasHadPointer should generally be false when being called outside this function
 */
-void warnForTypeCastChangeQualifiersOrTypeStructure(
+bool warnForTypeCastChangeQualifiersOrTypeStructure(
 		ExpressionTreeNode* thisNode,
 		const char* typeString1,
 		const char* typeString2,
@@ -198,55 +198,114 @@ void warnForTypeCastChangeQualifiersOrTypeStructure(
 		bool isForTypeCast,
 		bool warnForQualifiers){
 
-	bool c1;
-	bool v1;
-	bool c2;
-	bool v2;
-	//printf("w:%d|`%s`|`%s`\n",hasHadPointer,typeString1,typeString2);
+	bool c1,v1,c2,v2;
+	bool gaveWarn=false;
 	const char* typeString1NQ=stripQualifiersC(typeString1,&v1,&c1);
 	const char* typeString2NQ=stripQualifiersC(typeString2,&v2,&c2);
 	if (isForTypeCast&warnForQualifiers){
-		if ( v1&!v2&hasHadPointer) printInformativeMessageForExpression(false,"A volatile qualifier is being removed in this type",thisNode);
-		if (!v1& v2&hasHadPointer) printInformativeMessageForExpression(false,"A volatile qualifier is being added in this type",thisNode);
+		if ( v1&!v2&hasHadPointer){
+			gaveWarn=true;
+			printInformativeMessageForExpression(false,"A volatile qualifier is being removed in this type",thisNode);
+		}
+		if (!v1& v2&hasHadPointer){
+			gaveWarn=true;
+			printInformativeMessageForExpression(false,"A volatile qualifier is being added in this type",thisNode);
+		}
 		
 		//this check below may cause some annoying warnings, but I think it's actually a good warning to give
-		if ( c1&!c2&hasHadPointer) printInformativeMessageForExpression(false,"A const qualifier is being removed in this type",thisNode);
+		if ( c1&!c2&hasHadPointer){
+			gaveWarn=true;
+			printInformativeMessageForExpression(false,"A const qualifier is being removed in this type",thisNode);
+		}
 	}
-	if (doStringsMatch(typeString1NQ,typeString2NQ)) return;
-	if (doStringsMatch(typeString1NQ,"void")) return;
-	if (doStringsMatch(typeString2NQ,"void")) return;
+	if (doStringsMatch(typeString1NQ,typeString2NQ)) return gaveWarn;
+	if (doStringsMatch(typeString1NQ,"void")) return gaveWarn;
+	if (doStringsMatch(typeString2NQ,"void")) return gaveWarn;
 	const bool isSU1=isTypeStringOfStructOrUnion(typeString1NQ);
 	const bool isSU2=isTypeStringOfStructOrUnion(typeString2NQ);
 	if (hasHadPointer){
 		if (isSU1 & isSU2){
+			gaveWarn=true;
 			if (isForTypeCast) printInformativeMessageForExpression(false,"Pointers to differing structs or unions are being type casted here",thisNode);
 			else printInformativeMessageForExpression(false,"Pointers to differing structs or unions are being compared here",thisNode);
 		} else if (isSU1 | isSU2){
+			gaveWarn=true;
 			if (isForTypeCast) printInformativeMessageForExpression(false,"Pointers to a struct or union and a non struct or union are being type casted here",thisNode);
 			else printInformativeMessageForExpression(false,"Pointers to a struct or union and a non struct or union are being compared here",thisNode);
 		}
 	}
-	if (isSU1 | isSU2) return;
-	const char* extraDecayedString1=NULL;
-	const char* extraDecayedString2=NULL;
-	const uint16_t tID1=(typeString1NQ[0]=='[')?getTypeIdForCast(extraDecayedString1=applyToTypeStringBaseArrayDecayToNew(typeString1NQ)):getTypeIdForCast(typeString1NQ);
-	const uint16_t tID2=(typeString2NQ[0]=='[')?getTypeIdForCast(extraDecayedString2=applyToTypeStringBaseArrayDecayToNew(typeString2NQ)):getTypeIdForCast(typeString2NQ);
-	//printf("w:%d:%d;\n",tID1,tID2);
-	if ((tID1==9 | tID1==8) & (tID2==9 | tID2==8)){
-		//printf("w->\n");
-		warnForTypeCastChangeQualifiersOrTypeStructure(
-			thisNode,
-			((extraDecayedString1==NULL)?typeString1NQ:extraDecayedString1)+2,
-			((extraDecayedString2==NULL)?typeString2NQ:extraDecayedString2)+2,
-			true,
-			isForTypeCast,
-			warnForQualifiers);
-	} else if (hasHadPointer){
-		if (isForTypeCast) printInformativeMessageForExpression(false,"Pointers to differing types are being type casted here",thisNode);
-		else printInformativeMessageForExpression(false,"Pointers to differing types are being compared here",thisNode);
+	if (isSU1 | isSU2) return gaveWarn;
+	if (typeString1NQ[0]=='(' | typeString2NQ[0]=='('){
+		if (hasHadPointer){
+			bool giveWarnForFunction=false;
+			if (typeString1NQ[0]=='(' & typeString2NQ[0]=='('){
+				struct FunctionTypeAnalysis functionTypeAnalysis1;
+				struct FunctionTypeAnalysis functionTypeAnalysis2;
+				analyseFunctionTypeString(&functionTypeAnalysis1,typeString1NQ,false);
+				analyseFunctionTypeString(&functionTypeAnalysis2,typeString2NQ,false);
+				if (functionTypeAnalysis1.usesVaArgs!=functionTypeAnalysis2.usesVaArgs | functionTypeAnalysis1.numberOfParameters!=functionTypeAnalysis2.numberOfParameters){
+					giveWarnForFunction=true;
+				} else {
+					for (uint16_t i=0;i<functionTypeAnalysis1.numberOfParameters;i++){
+						if (
+							warnForTypeCastChangeQualifiersOrTypeStructure(
+								thisNode,
+								functionTypeAnalysis1.params[i].noIdentifierTypeString,
+								functionTypeAnalysis2.params[i].noIdentifierTypeString,
+								false,
+								isForTypeCast,
+								warnForQualifiers)
+						){
+							gaveWarn = true;
+							giveWarnForFunction = true;
+							err_00__0("The type warning above is a parameter of a function");
+						}
+					}
+				}
+				if (
+					warnForTypeCastChangeQualifiersOrTypeStructure(
+						thisNode,
+						functionTypeAnalysis1.returnType,
+						functionTypeAnalysis2.returnType,
+						false,
+						isForTypeCast,
+						warnForQualifiers)
+				){
+					gaveWarn = true;
+					giveWarnForFunction = true;
+					err_00__0("The type warning above is the return value of a function");
+				}
+				destroyFunctionTypeAnalysis(&functionTypeAnalysis1);
+				destroyFunctionTypeAnalysis(&functionTypeAnalysis2);
+			} else {
+				giveWarnForFunction = true;
+			}
+			if (giveWarnForFunction){
+				if (isForTypeCast) printInformativeMessageForExpression(false,"Pointers to differing function types are being type casted here",thisNode);
+				else printInformativeMessageForExpression(false,"Pointers to differing function types are being compared here",thisNode);
+			}
+		}
+	} else {
+		const char* extraDecayedString1=NULL;
+		const char* extraDecayedString2=NULL;
+		const uint16_t tID1=(typeString1NQ[0]=='[')?getTypeIdForCast(extraDecayedString1=applyToTypeStringBaseArrayDecayToNew(typeString1NQ)):getTypeIdForCast(typeString1NQ);
+		const uint16_t tID2=(typeString2NQ[0]=='[')?getTypeIdForCast(extraDecayedString2=applyToTypeStringBaseArrayDecayToNew(typeString2NQ)):getTypeIdForCast(typeString2NQ);
+		if ((tID1==9 | tID1==8) & (tID2==9 | tID2==8)){
+			gaveWarn |= warnForTypeCastChangeQualifiersOrTypeStructure(
+				thisNode,
+				((extraDecayedString1==NULL)?typeString1NQ:extraDecayedString1)+2,
+				((extraDecayedString2==NULL)?typeString2NQ:extraDecayedString2)+2,
+				true,
+				isForTypeCast,
+				warnForQualifiers);
+		} else if (hasHadPointer){
+			if (isForTypeCast) printInformativeMessageForExpression(false,"Pointers to differing types are being type casted here",thisNode);
+			else printInformativeMessageForExpression(false,"Pointers to differing types are being compared here",thisNode);
+		}
+		if (extraDecayedString1!=NULL) cosmic_free((char*)extraDecayedString1);
+		if (extraDecayedString2!=NULL) cosmic_free((char*)extraDecayedString2);
 	}
-	if (extraDecayedString1!=NULL) cosmic_free((char*)extraDecayedString1);
-	if (extraDecayedString2!=NULL) cosmic_free((char*)extraDecayedString2);
+	return gaveWarn;
 }
 
 /*
@@ -261,10 +320,23 @@ there are 3 configuable types of warnings this can produce. Each bit in warnStat
 
 if a pointer to non-pointer cast is performed and the non-pointer type cannot hold the entire value of a pointer, then a warning is always given
 if either type is a struct or union that will cause an error message (unless either type is void)
-if typeStringTo is "void", then it is guaranteed to succeed and no warnings will be given.
+if typeStringTo is "void", then it is guaranteed to succeed and no warnings will be given unless the cast is from an rvalue function type, which is invalid. (the exception does not apply to pointers to functions)
 */
-// todo: check if this will properly handle function type casts
 void applyTypeCast(ExpressionTreeNode* thisNode,const char* typeStringTo_input, uint16_t warnState){
+	if (typeStringTo_input[0]=='('){
+		printInformativeMessageForExpression(true,"casting to a function type is not allowed, use a pointer to function instead",thisNode);
+		exit(1);
+	}
+	if (thisNode->post.typeStringNQ[0]=='('){
+		if (thisNode->post.isLValue){
+			thisNode->post.isLValue=false;
+			applyPrependWithInputReplace("const * ",&thisNode->post.typeString);
+			genTypeStringNQ(thisNode);
+		} else {
+			printInformativeMessageForExpression(true,"casting from a function type is not allowed, use a pointer to function instead",thisNode);
+			exit(1);
+		}
+	}
 	char* typeStringTo=applyToTypeStringBaseArrayDecayToNew(typeStringTo_input);
 	if (applyToTypeStringBaseArrayDecayToSelf(thisNode->post.typeString)){
 		assert(thisNode->post.isLValue); // how would an rvalue array exist at this stage?
@@ -892,8 +964,6 @@ void applyAutoTypeConversion_Identifier(ExpressionTreeNode* thisNode){
 		thisNode->post.extraPtr = gfep;
 		thisNode->post.extraVal = gfep->labelID;
 		thisNode->post.typeString = applyToTypeStringRemoveIdentifierToNew(gfep->typeString);
-		
-		applyPrependWithInputReplace("const ",&thisNode->post.typeString);
 	} else {
 		assert(false);
 		exit(1);
@@ -1427,16 +1497,14 @@ void applyAutoTypeConversion(ExpressionTreeNode* thisNode){
 		cosmic_free(expressionTreeGlobalBuffer.expressionTreeNodes[thisNode->pre.leftNode].post.typeString);
 	if (thisNode->pre.hasRightNode&!(oID==5 | oID==6 | oID==17))
 		cosmic_free(expressionTreeGlobalBuffer.expressionTreeNodes[thisNode->pre.rightNode].post.typeString);
-	if (thisNode->isRoot){
-		if (thisNode->post.typeStringNQ[0]=='('){
-			// qualifiers are effectively overridden because these are functions auto-transforming to pointers and I'm overriding the qualifiers because I know what a function pointer should be
-			thisNode->post.isLValue=false;
-			applyPrependWithInputReplace("const * ",&thisNode->post.typeString);
-			genTypeStringNQ(thisNode);
-			#ifdef EXP_TO_ASSEMBLY_DEBUG
-			printf("~~~>%s<%d,%d,%d,%d\n",thisNode->post.typeString,thisNode->operatorID,thisNode->post.isLValue,thisNode->post.isLValueVolatile,thisNode->post.isLValueConst);
-			#endif
-		}
+	if (thisNode->isRoot & thisNode->post.typeStringNQ[0]=='(' & thisNode->post.isLValue){
+		// qualifiers are effectively overridden because these are functions auto-transforming to pointers and I'm overriding the qualifiers because I know what a function pointer should be
+		thisNode->post.isLValue=false;
+		applyPrependWithInputReplace("const * ",&thisNode->post.typeString);
+		genTypeStringNQ(thisNode);
+		#ifdef EXP_TO_ASSEMBLY_DEBUG
+		printf("~~~>%s<%d,%d,%d,%d\n",thisNode->post.typeString,thisNode->operatorID,thisNode->post.isLValue,thisNode->post.isLValueVolatile,thisNode->post.isLValueConst);
+		#endif
 	}
 }
 
@@ -2276,12 +2344,25 @@ void applyOperator(ExpressionTreeNode* thisNode){
 	exit(1);
 }
 
+struct FunctionCallInformationAdditional{
+	bool isFromGlobalIdentifier;
+	bool hasVolatile;
+	bool hasConst;
+	char* rawTypeString;
+	char* modifiedTypeString;
+	uint32_t labelID;
+	uint16_t reversedStackOffset;
+};
 
 struct FunctionCallInformation{
 	bool isFunctionCall;
 	bool isFunctionCallComplex;
-	uint32_t functionEntryLabelID; // only used when isFunctionCallComplex==false
-	struct FunctionTypeAnalysis* functionTypeAnalysisChild; // only used when isFunctionCall
+	bool hasAdditionalInformation;
+	union {
+		uint32_t functionEntryLabelID; // only used when `isFunctionCallComplex==false`
+		struct FunctionCallInformationAdditional* additionalInformation;  // only used when `hasAdditionalInformation==true`
+	} location;
+	struct FunctionTypeAnalysis* functionTypeAnalysisChild;
 };
 
 void functionToAssemblyPart1(struct FunctionCallInformation* functionCallInformation,ExpressionTreeNode* thisNode,ExpressionTreeNode* leftNode){
@@ -2294,7 +2375,7 @@ void functionToAssemblyPart1(struct FunctionCallInformation* functionCallInforma
 			if (typeStringTemp[0]=='*'){
 				typeStringTemp=stripQualifiers(typeStringTemp+2,NULL,NULL);
 				if (typeStringTemp[0]!='('){
-					goto ComplexFunctionTypeError;
+					goto ComplexFunctionTypeError1;
 				}
 				if (leftNode->post.isLValue){
 					leftNode->post.isLValue=false;
@@ -2302,8 +2383,8 @@ void functionToAssemblyPart1(struct FunctionCallInformation* functionCallInforma
 				}
 				applyRvaluePointerToLvalueTransform(leftNode);
 			} else {
-				ComplexFunctionTypeError:;
-				printInformativeMessageForExpression(true,"called object\'s type is not a function or function pointer",leftNode);
+				ComplexFunctionTypeError1:;
+				printInformativeMessageForExpression(true,"Called object\'s type is not a function or function pointer",leftNode);
 				exit(1);
 			}
 		}
@@ -2313,79 +2394,130 @@ void functionToAssemblyPart1(struct FunctionCallInformation* functionCallInforma
 		genTypeStringNQ(leftNode);
 		if (!leftNode->post.isLValue){
 			// I don't know it this is possible. If it is possible, I don't know if the address was calculated correctly. It may have been dereferenced one too many times already.
-			printInformativeMessageForExpression(false,"(internal) this function may not have had the address computed correctly",leftNode);
+			printInformativeMessageForExpression(false,"(internal) This function\'s address may not have been computed correctly",leftNode);
 		}
-		printf("\nCOMPLEX:`%s`(%d)\n",leftNode->post.typeString,leftNode->post.isLValue);
-		printInstructionBufferWithMessageAndNumber(&leftNode->ib,"",0);
-		exit(1);
+		analyseFunctionTypeString(
+			(functionCallInformation->functionTypeAnalysisChild = cosmic_calloc(1,sizeof(struct FunctionTypeAnalysis))),
+			typeStringTemp,
+			true
+		);
 	} else {
 		// non-complex function call (had identifier detected)
-		struct IdentifierSearchResult identifierSearchResult;
+		struct IdentifierSearchResult isr;
 		{
 			char* functionIdentifier = copyStringSegmentToHeap(sourceContainer.string,thisNode->startIndexInString,thisNode->endIndexInString);
-			searchForIdentifier(&identifierSearchResult,functionIdentifier,true,true,true,true,true);
-			if (identifierSearchResult.didExist){
-				if (identifierSearchResult.typeOfResult!=IdentifierSearchResultIsFunction){
-					err_1111_("This identifier is not a function, but is expected to be",thisNode->startIndexInString,thisNode->endIndexInString);
-				}
-			} else {
-				err_1111_("This identifier does not exist",thisNode->startIndexInString,thisNode->endIndexInString);
-			}
+			searchForIdentifier(&isr,functionIdentifier,true,true,true,true,true);
 			cosmic_free(functionIdentifier);
 		}
-		{
-			struct GlobalFunctionEntry* functionEntryPtr=blockFrameArray.globalBlockFrame.globalFunctionEntries+identifierSearchResult.reference.functionReference.functionEntryIndex;
-			functionCallInformation->functionTypeAnalysisChild=&(functionEntryPtr->functionTypeAnalysis);
-			functionCallInformation->functionEntryLabelID=functionEntryPtr->labelID;
+		if (isr.didExist){
+			if (isr.typeOfResult!=IdentifierSearchResultIsFunction){
+				if (isr.typeOfResult!=IdentifierSearchResultIsVariable){
+					ComplexFunctionTypeError3:;
+					err_1111_("This identifier's type is not a function or function pointer",thisNode->startIndexInString,thisNode->endIndexInString);
+				} else {
+					struct FunctionCallInformationAdditional additionalInformation={.isFromGlobalIdentifier=isr.reference.variableReference.isGlobal};
+					additionalInformation.rawTypeString=applyToTypeStringRemoveIdentifierToNew(
+						isr.reference.variableReference.isGlobal ?
+							blockFrameArray.globalBlockFrame.globalVariableEntries[isr.reference.variableReference.variableEntryIndex].typeString :
+							blockFrameArray.entries[isr.reference.variableReference.blockFrameEntryIndex].variableEntries[isr.reference.variableReference.variableEntryIndex].typeString
+						);
+					additionalInformation.modifiedTypeString=stripQualifiers(additionalInformation.rawTypeString,&additionalInformation.hasVolatile,&additionalInformation.hasConst);
+					if (additionalInformation.modifiedTypeString[0]!='*') goto ComplexFunctionTypeError3;
+					additionalInformation.modifiedTypeString=stripQualifiers(additionalInformation.modifiedTypeString+2,NULL,NULL);
+					if (additionalInformation.modifiedTypeString[0]!='(') goto ComplexFunctionTypeError3;
+					
+					functionCallInformation->isFunctionCallComplex = true;
+					functionCallInformation->hasAdditionalInformation = true;
+					
+					analyseFunctionTypeString(
+						(functionCallInformation->functionTypeAnalysisChild = cosmic_calloc(1,sizeof(struct FunctionTypeAnalysis))),
+						additionalInformation.modifiedTypeString,
+						true
+					);
+					
+					if (additionalInformation.isFromGlobalIdentifier){
+						additionalInformation.labelID=blockFrameArray.globalBlockFrame.globalVariableEntries[isr.reference.variableReference.variableEntryIndex].labelID;
+					} else {
+						additionalInformation.reversedStackOffset=getReversedOffsetForLocalVariable(&isr.reference.variableReference);
+					}
+					functionCallInformation->location.additionalInformation = cosmic_calloc(1,sizeof(struct FunctionCallInformationAdditional));
+					*(functionCallInformation->location.additionalInformation)=additionalInformation;
+				}
+			} else {
+				struct GlobalFunctionEntry* functionEntryPtr=blockFrameArray.globalBlockFrame.globalFunctionEntries+isr.reference.functionReference.functionEntryIndex;
+				functionCallInformation->functionTypeAnalysisChild=&(functionEntryPtr->functionTypeAnalysis);
+				functionCallInformation->location.functionEntryLabelID=functionEntryPtr->labelID;
+			}
+		} else {
+			err_1111_("This identifier does not exist",thisNode->startIndexInString,thisNode->endIndexInString);
 		}
 	}
 	{
 		const uint16_t numberOfParameters=getNumberOfParametersOnFunctionCall(thisNode);
 		if (functionCallInformation->functionTypeAnalysisChild->numberOfParameters!=numberOfParameters){
 			uint8_t errorID=0;
-			if (functionCallInformation->functionTypeAnalysisChild->usesVaArgs){
+			const bool usesVaArgs=functionCallInformation->functionTypeAnalysisChild->usesVaArgs;
+			if (usesVaArgs){
 				if (numberOfParameters<(functionCallInformation->functionTypeAnalysisChild->numberOfParameters-1U)) errorID=2;
 			} else errorID=1;
 			if (errorID!=0){
 				char* stringForError = cosmic_calloc(100,1);
 				snprintf(stringForError,99,
-					"This function takes at least %u arguments, not %u",
+					usesVaArgs?"This function takes at least %u arguments, not %u":"This function takes %u arguments, not %u",
 					(unsigned int)(functionCallInformation->functionTypeAnalysisChild->numberOfParameters-(errorID!=1)),
-					(unsigned int)numberOfParameters);
+					(unsigned int)numberOfParameters
+				);
 				err_1101_(stringForError,thisNode->startIndexInString);
 			}
 		}
 	}
 }
 
-void functionToAssemblyPart2(struct FunctionCallInformation* functionCallInformation,ExpressionTreeNode* thisNode,ExpressionTreeNode* rightNode){
+void functionToAssemblyPart2(struct FunctionCallInformation* functionCallInformation,ExpressionTreeNode* thisNode,ExpressionTreeNode* leftNode,ExpressionTreeNode* rightNode){
 	assert(functionCallInformation->isFunctionCall);
+	const bool isVoidReturn=doStringsMatch("void",stripQualifiersC(functionCallInformation->functionTypeAnalysisChild->returnType,NULL,NULL));
+	if (!isVoidReturn){
+		uint32_t returnSize=getSizeofForTypeString(functionCallInformation->functionTypeAnalysisChild->returnType,true);
+		// todo: bad returnSize might be possible to reach now
+		assert(returnSize!=0);
+		if (returnSize>64000){
+			printf("Return size of function is too large (this should have been caught elsewhere)\n");
+			exit(1);
+		}
+		returnSize+=returnSize&1;
+		add_ALCR(&thisNode->ib,returnSize);
+	}
+	uint16_t stackSize=0;
+	if (thisNode->pre.hasRightNode){
+		stackSize=rightNode->post.sizeOnStack;
+		singleMergeIB(&thisNode->ib,&rightNode->ib);
+	}
 	if (functionCallInformation->isFunctionCallComplex){
-		printf("Unimplemented Error: complex function calls are not ready yet\n");
-		exit(1);
-	} else {
-		bool isVoidReturn=doStringsMatch("void",stripQualifiersC(functionCallInformation->functionTypeAnalysisChild->returnType,NULL,NULL));
-		if (!isVoidReturn){
-			uint32_t returnSize=getSizeofForTypeString(functionCallInformation->functionTypeAnalysisChild->returnType,true);
-			assert(returnSize!=0);
-			if (returnSize>64000){
-				printf("Return size of function is too large (this should have been caught elsewhere)\n");
-				exit(1);
+		assert(thisNode->pre.hasLeftNode!=functionCallInformation->hasAdditionalInformation);
+		if (functionCallInformation->hasAdditionalInformation){
+			if (functionCallInformation->location.additionalInformation->isFromGlobalIdentifier){
+				insert_IB_address_label(&thisNode->ib,functionCallInformation->location.additionalInformation->labelID);
+			} else {
+				insert_IB_STPA(&thisNode->ib,functionCallInformation->location.additionalInformation->reversedStackOffset);
 			}
-			returnSize+=returnSize&1;
-			add_ALCR(&thisNode->ib,returnSize);
+			singleMergeIB(&thisNode->ib,functionCallInformation->location.additionalInformation->hasVolatile?&ib_mem_dword_read_v:&ib_mem_dword_read_n);
+		} else {
+			singleMergeIB(&thisNode->ib,&leftNode->ib);
 		}
-		uint16_t stackSize=0;
-		if (thisNode->pre.hasRightNode){
-			stackSize=rightNode->post.sizeOnStack;
-			singleMergeIB(&thisNode->ib,&rightNode->ib);
+		insert_IB_call_complex_function(&thisNode->ib,stackSize,!isVoidReturn);
+	} else {
+		insert_IB_call_nonComplex_function(&thisNode->ib,functionCallInformation->location.functionEntryLabelID,stackSize,!isVoidReturn);
+	}
+	thisNode->post.typeString=copyStringToHeapString(
+		singleTypicalIntegralTypePromote(functionCallInformation->functionTypeAnalysisChild->returnType,NULL)); // this does trim off the qualifiers on the base of the type. is that desired?
+	genTypeStringNQ(thisNode);
+	if (functionCallInformation->isFunctionCallComplex){
+		destroyFunctionTypeAnalysis(functionCallInformation->functionTypeAnalysisChild);
+		cosmic_free(functionCallInformation->functionTypeAnalysisChild);
+		if (functionCallInformation->hasAdditionalInformation){
+			cosmic_free(functionCallInformation->location.additionalInformation->rawTypeString);
+			cosmic_free(functionCallInformation->location.additionalInformation);
 		}
-		insert_IB_call_nonComplex_function(
-			&thisNode->ib,functionCallInformation->functionEntryLabelID,stackSize,
-			!isVoidReturn);
-		thisNode->post.typeString=copyStringToHeapString(
-			singleTypicalIntegralTypePromote(functionCallInformation->functionTypeAnalysisChild->returnType,NULL)); // this does trim off the qualifiers on the base of the type. is that desired?
-		genTypeStringNQ(thisNode);
 	}
 }
 
@@ -2405,7 +2537,8 @@ void expressionToAssembly(
 	ExpressionTreeNode* rightNode;
 	ExpressionTreeNode* leftNode;
 	const uint8_t oID = thisNode->operatorID;
-	struct FunctionCallInformation functionCallInformation;
+	struct FunctionCallInformation functionCallInformation={.isFunctionCall=(oID==65 | oID==66), .isFunctionCallComplex=(oID==66)};
+	// `functionCallInformation.isFunctionCallComplex` may become true if it is false due to complex function calls being possible even if the parser detected it to be a non-complex function call
 	#ifdef EXP_TO_ASSEMBLY_DEBUG
 	printf("+%d\n",oID);
 	#endif
@@ -2415,9 +2548,6 @@ void expressionToAssembly(
 		leftNode=expressionTreeGlobalBuffer.expressionTreeNodes+thisNode->pre.leftNode;
 		expressionToAssembly(thisNode->pre.leftNode,NULL,0);
 	}
-	
-	functionCallInformation.isFunctionCallComplex = oID==66; // may become true if it was false due to complex function calls being possible even if the parser detected it to be a non-complex function call
-	functionCallInformation.isFunctionCall = oID==65 | oID==66;
 	if (functionCallInformation.isFunctionCall){
 		functionToAssemblyPart1(&functionCallInformation,thisNode,leftNode);
 		if (thisNode->pre.hasRightNode) expressionToAssembly(thisNode->pre.rightNode,functionCallInformation.functionTypeAnalysisChild,0);
@@ -2426,18 +2556,18 @@ void expressionToAssembly(
 	if (thisNode->pre.hasChainNode){
 		expressionToAssembly(thisNode->pre.chainNode,functionTypeAnalysis,paramIndex+1);
 		ExpressionTreeNode* chainNode = expressionTreeGlobalBuffer.expressionTreeNodes+thisNode->pre.chainNode;
-		// we now take the InstructionBuffer that the chain node allocated and claim it as our own
+		// we now take the InstructionBuffer that the chain node allocated and claim it as thisNodes's InstructionBuffer
 		thisNode->ib=chainNode->ib;
-		thisNode->post.sizeOnStack=chainNode->post.sizeOnStack;
 		chainNode->ib.numberOfSlotsAllocated=0;
-		// now, treat the ib on the chainNode as destroyed, because it is now this node's ib
+		// now, treat the InstructionBuffer on the chainNode as destroyed, because it is now thisNode's InstructionBuffer
+		thisNode->post.sizeOnStack=chainNode->post.sizeOnStack;
 	} else if (oID!=37){
 		// then there is no node chain to allocate our node for us, so this node allocates one for itself.
 		// right part of ternary does not get an instruction buffer
 		initInstructionBuffer(&thisNode->ib);
 	}
 	if (functionCallInformation.isFunctionCall){
-		functionToAssemblyPart2(&functionCallInformation,thisNode,rightNode);
+		functionToAssemblyPart2(&functionCallInformation,thisNode,leftNode,rightNode);
 	} else {
 		applyAutoTypeConversion(thisNode);
 		if (oID==37) return; // right part of ternary needs to return now

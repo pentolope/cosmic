@@ -971,15 +971,42 @@ int16_t findStartForTypeTokens(int16_t boundStart, int16_t boundEnd){
 	}
 	/*
 	then this does not start on a container (struct, enum, union)
-	therefore, search for identifier or colon
+	therefore, search for identifier, colon, or function pointer start point
 	*/
-	for (int16_t i=boundStart+doStartSkip*2;i<boundEnd;i++){
-		struct TypeToken* thisTypeTokenPtr = typeTokenArray.typeTokens+i;
+	for (int16_t i0=boundStart+doStartSkip*2;i0<boundEnd;i0++){
+		struct TypeToken* thisTypeTokenPtr = typeTokenArray.typeTokens+i0;
 		char firstCharacter=thisTypeTokenPtr->firstCharacter;
 		if (firstCharacter=='[' | firstCharacter=='{'){
-			i = thisTypeTokenPtr->enclosementMatch;
+			i0 = thisTypeTokenPtr->enclosementMatch;
 		} else if (firstCharacter==':' | (!thisTypeTokenPtr->isKeywordOrTypedefed & thisTypeTokenPtr->isNonSymbol)){
-			return i;
+			return i0; // identifier or colon found
+		} else if (firstCharacter=='('){
+			uint16_t stage=0;
+			int16_t i2=i0+1;
+			for (int16_t i1=i2;i1<boundEnd;i1++){
+				firstCharacter = typeTokenArray.typeTokens[i1].firstCharacter;
+				switch (stage){
+					case 0:
+					stage=4-(firstCharacter=='*')*3;
+					i2=i1;
+					break;
+					case 1:
+					if (firstCharacter=='*'){
+						i2=i1;
+					} else if (firstCharacter=='['){
+						i2=i1;
+						i1=typeTokenArray.typeTokens[i1].enclosementMatch;
+					} else {
+						stage=4-(firstCharacter==')')*2;
+					}
+					break;
+					case 2:
+					stage=4-(firstCharacter=='(')*1;
+					if (stage==3) return i2; // function pointer start point found
+					break;
+				}
+				if (stage==4) break;
+			}
 		}
 	}
 	/*
