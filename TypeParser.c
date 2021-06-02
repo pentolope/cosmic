@@ -733,9 +733,8 @@ char* checkAndApplyTypeReorderAndNormalizationAnalysisToTypeStringToNew(char* st
 				specificStringEqualCheck(stringInternal,segments[i-1].startInString,segments[i-1].endInString,"short") ||
 				specificStringEqualCheck(stringInternal,segments[i-1].startInString,segments[i-1].endInString,"long"))
 				){
-				
 				// this does copy the null terminator because of stringI<=length
-				for (int32_t stringI=segments[i].endInString+1;stringI<=length;stringI++){
+				for (int32_t stringI=segments[i].endInString;stringI<=length;stringI++){
 					stringInternal[stringI-4] = stringInternal[stringI];
 				}
 				length=length-4;

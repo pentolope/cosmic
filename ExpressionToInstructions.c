@@ -1158,7 +1158,6 @@ void applyAutoTypeConversion_Typical(ExpressionTreeNode* tn){
 		break;
 		case 12:{
 			etc_07(&r);
-			etc_05(&r);
 			applyTypeCast(rn,"_Bool",15);
 			*thisTSP=copyStringToHeapString("_Bool");
 		}
