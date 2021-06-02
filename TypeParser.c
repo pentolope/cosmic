@@ -94,25 +94,25 @@ bool doesThisTypeStringHaveAnIdentifierAtBeginning(const char* string){
 		return false;
 	} else {
 		return !(
-			isSectionOfStringEquivalent(string,0,"char ") ||
-			isSectionOfStringEquivalent(string,0,"short ") ||
-			isSectionOfStringEquivalent(string,0,"int ") ||
-			isSectionOfStringEquivalent(string,0,"long ") ||
-			isSectionOfStringEquivalent(string,0,"float ") ||
-			isSectionOfStringEquivalent(string,0,"double ") ||
-			isSectionOfStringEquivalent(string,0,"void ") ||
-			isSectionOfStringEquivalent(string,0,"signed ") ||
-			isSectionOfStringEquivalent(string,0,"unsigned ") ||
-			isSectionOfStringEquivalent(string,0,"_Bool ") ||
-			isSectionOfStringEquivalent(string,0,"struct ") ||
-			isSectionOfStringEquivalent(string,0,"union ") ||
-			isSectionOfStringEquivalent(string,0,"enum ") ||
-			isSectionOfStringEquivalent(string,0,"const ") ||
-			isSectionOfStringEquivalent(string,0,"volatile ") ||
-			isSectionOfStringEquivalent(string,0,"* ") ||
-			isSectionOfStringEquivalent(string,0,"[ ") ||
-			isSectionOfStringEquivalent(string,0,"( ") ||
-			isSectionOfStringEquivalent(string,0,": ")
+			isPrefixOfStringEquivalent(string,"char ") ||
+			isPrefixOfStringEquivalent(string,"short ") ||
+			isPrefixOfStringEquivalent(string,"int ") ||
+			isPrefixOfStringEquivalent(string,"long ") ||
+			isPrefixOfStringEquivalent(string,"float ") ||
+			isPrefixOfStringEquivalent(string,"double ") ||
+			isPrefixOfStringEquivalent(string,"void ") ||
+			isPrefixOfStringEquivalent(string,"signed ") ||
+			isPrefixOfStringEquivalent(string,"unsigned ") ||
+			isPrefixOfStringEquivalent(string,"_Bool ") ||
+			isPrefixOfStringEquivalent(string,"struct ") ||
+			isPrefixOfStringEquivalent(string,"union ") ||
+			isPrefixOfStringEquivalent(string,"enum ") ||
+			isPrefixOfStringEquivalent(string,"const ") ||
+			isPrefixOfStringEquivalent(string,"volatile ") ||
+			isPrefixOfStringEquivalent(string,"* ") ||
+			isPrefixOfStringEquivalent(string,"[ ") ||
+			isPrefixOfStringEquivalent(string,"( ") ||
+			isPrefixOfStringEquivalent(string,": ")
 			);
 	}
 }
@@ -317,20 +317,20 @@ char* giveNameToSingleAnonymous(char* string, int32_t startIndexAtBracket, uint8
 
 // the input string is potentially destroyed, and an output string is given (effectively, cosmic_realloc() may be used on the input string)
 char* giveNamesToAllAnonymous(char* string){
-	if (isSectionOfStringEquivalent(string,0,"struct { ")){
+	if (isPrefixOfStringEquivalent(string,"struct { ")){
 		string=giveNameToSingleAnonymous(string,7,0);
 	}
-	if (isSectionOfStringEquivalent(string,0,"union { ")){
+	if (isPrefixOfStringEquivalent(string,"union { ")){
 		string=giveNameToSingleAnonymous(string,6,1);
 	}
-	if (isSectionOfStringEquivalent(string,0,"enum { ")){
+	if (isPrefixOfStringEquivalent(string,"enum { ")){
 		string=giveNameToSingleAnonymous(string,5,2);
 	}
 	// the above checks are for if the struct,union,enum part is at the very beginning, because those wouldn't be detected by the one below due to the space at the beginning
 	int32_t length = strlen(string);
 	for (int32_t i=10;i<length;i++){
 		// the first term in the if expression is there to speed it up
-		if (string[i-2]=='{' && isSectionOfStringEquivalent(string,i-10," struct { ")){
+		if (string[i-2]=='{' && isPrefixOfStringEquivalent(string+(i-10)," struct { ")){
 			string = giveNameToSingleAnonymous(string,i-2,0);
 			length = strlen(string);
 			i=9;
@@ -338,7 +338,7 @@ char* giveNamesToAllAnonymous(char* string){
 	}
 	for (int32_t i=9;i<length;i++){
 		// the first term in the if expression is there to speed it up
-		if (string[i-2]=='{' && isSectionOfStringEquivalent(string,i-9," union { ")){
+		if (string[i-2]=='{' && isPrefixOfStringEquivalent(string+(i-9)," union { ")){
 			string = giveNameToSingleAnonymous(string,i-2,1);
 			length = strlen(string);
 			i=8;
@@ -346,7 +346,7 @@ char* giveNamesToAllAnonymous(char* string){
 	}
 	for (int32_t i=8;i<length;i++){
 		// the first term in the if expression is there to speed it up
-		if (string[i-2]=='{' && isSectionOfStringEquivalent(string,i-8," enum { ")){
+		if (string[i-2]=='{' && isPrefixOfStringEquivalent(string+(i-8)," enum { ")){
 			string = giveNameToSingleAnonymous(string,i-2,2);
 			length = strlen(string);
 			i=7;
@@ -899,31 +899,37 @@ int16_t findStartForTypeTokens(int16_t boundStart, int16_t boundEnd){
 	bool doContainerStart = false;
 	bool doStartSkip = false;
 	if (typeTokenArray.typeTokens[boundStart].isKeywordOrTypedefed){
-		int32_t startIndexOfStartBound = typeTokenArray.typeTokens[boundStart].stringIndexStart;
-		int16_t lengthOfBoundStartToken = typeTokenArray.typeTokens[boundStart].stringIndexEnd-startIndexOfStartBound;
-		if (lengthOfBoundStartToken==4){
-			if (isSectionOfStringEquivalent(sourceContainer.string,startIndexOfStartBound,"enum")){
+		const int32_t startIndexOfStartBound = typeTokenArray.typeTokens[boundStart].stringIndexStart;
+		const char*const startInContainerString=sourceContainer.string+startIndexOfStartBound;
+		switch (typeTokenArray.typeTokens[boundStart].stringIndexEnd-startIndexOfStartBound){
+			case 4:
+			if (isPrefixOfStringEquivalent(startInContainerString,"enum")){
 				doContainerStart = true;
 				doStartSkip = true;
 			}
-		} else if (lengthOfBoundStartToken==5){
-			if (isSectionOfStringEquivalent(sourceContainer.string,startIndexOfStartBound,"union")){
+			break;
+			case 5:
+			if (isPrefixOfStringEquivalent(startInContainerString,"union")){
 				doContainerStart = true;
 				doStartSkip = true;
-			} else if (isSectionOfStringEquivalent(sourceContainer.string,startIndexOfStartBound,"const")){
+			} else if (isPrefixOfStringEquivalent(startInContainerString,"const")){
 				boundStart++;
 				goto Start;
 			}
-		} else if (lengthOfBoundStartToken==6){
-			if (isSectionOfStringEquivalent(sourceContainer.string,startIndexOfStartBound,"struct")){
+			break;
+			case 6:
+			if (isPrefixOfStringEquivalent(startInContainerString,"struct")){
 				doContainerStart = true;
 				doStartSkip = true;
 			}
-		} else if (lengthOfBoundStartToken==8){
-			if (isSectionOfStringEquivalent(sourceContainer.string,startIndexOfStartBound,"volatile")){
+			break;
+			case 8:
+			if (isPrefixOfStringEquivalent(startInContainerString,"volatile")){
 				boundStart++;
 				goto Start;
 			}
+			break;
+			default:break;
 		}
 	}
 	// doContainerStart is used to more easily parse containers (struct, enum, union)
@@ -1094,15 +1100,15 @@ void bracketHandlerForMainWalkForTypeTokens(int16_t boundStart, int16_t bracketI
 	int32_t startIndexInString = typeTokenArray.typeTokens[descriptorIndex].stringIndexStart;
 	int16_t lengthInString = typeTokenArray.typeTokens[descriptorIndex].stringIndexEnd-startIndexInString;
 	if (lengthInString==4){
-		if (isSectionOfStringEquivalent(sourceContainer.string,startIndexInString,"enum")){
+		if (isPrefixOfStringEquivalent(sourceContainer.string+startIndexInString,"enum")){
 			outID = 1;
 		}
 	} else if (lengthInString==5){
-		if (isSectionOfStringEquivalent(sourceContainer.string,startIndexInString,"union")){
+		if (isPrefixOfStringEquivalent(sourceContainer.string+startIndexInString,"union")){
 			outID = 2;
 		}
 	} else if (lengthInString==6){
-		if (isSectionOfStringEquivalent(sourceContainer.string,startIndexInString,"struct")){
+		if (isPrefixOfStringEquivalent(sourceContainer.string+startIndexInString,"struct")){
 			outID = 3;
 		}
 	}

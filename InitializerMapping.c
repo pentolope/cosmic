@@ -1204,7 +1204,7 @@ char* getTypeStringOfFirstNonStructUnionMember(const char* typeString){
 	struct TypeSearchResult tsr;
 	typeString=stripQualifiersC(typeString,NULL,NULL);
 	assert(isTypeStringOfStructOrUnion(typeString));
-	bool isUnion=isSectionOfStringEquivalent(typeString,0,"union");
+	bool isUnion=isPrefixOfStringEquivalent(typeString,"union");
 	searchForType(&tsr,typeString+(7-isUnion),isUnion);
 	assert(tsr.didExist);
 	char* firstMemberTypeString;

@@ -66,9 +66,9 @@ bool checkTypeStringForConstMembers(const char* typeString,ExpressionTreeNode* t
 	struct TypeSearchResult tsr;
 	const char* name;
 	uint8_t t;
-	if (isSectionOfStringEquivalent(typeStringNQ,0,"struct ")){
+	if (isPrefixOfStringEquivalent(typeStringNQ,"struct ")){
 		t=0;  name=typeStringNQ+7;
-	} else if (isSectionOfStringEquivalent(typeStringNQ,0,"union ")){
+	} else if (isPrefixOfStringEquivalent(typeStringNQ,"union ")){
 		t=1;  name=typeStringNQ+6;
 	} else {
 		return false;
@@ -166,7 +166,7 @@ uint16_t getTypeIdForCast(const char* ts){
 		return 3;
 	else if (doStringsMatch(ts,"int") || 
 			doStringsMatch(ts,"short") || 
-			isSectionOfStringEquivalent(ts,0,"enum "))
+			isPrefixOfStringEquivalent(ts,"enum "))
 		return 4;
 	else if (doStringsMatch(ts,"unsigned int") || 
 			doStringsMatch(ts,"unsigned short"))
@@ -177,7 +177,7 @@ uint16_t getTypeIdForCast(const char* ts){
 		return 7;
 	else if (doStringsMatch(ts,"* void"))
 		return 8;
-	else if (isSectionOfStringEquivalent(ts,0,"* "))
+	else if (isPrefixOfStringEquivalent(ts,"* "))
 		return 9;
 	printf("Internal Error: type cast could not recognize type `%s`\n",ts);
 	exit(1);
@@ -674,7 +674,7 @@ struct IntegralTypePromoteResult getRankOfPromotedTypeString(const char* typeStr
 		(itpr.isSignedChar=doStringsMatch(typeStringNQ,"signed char")) ||
 		doStringsMatch(typeStringNQ,"short") ||
 		(itpr.isUnsignedChar|=doStringsMatch(typeStringNQ,"_Bool")) ||
-		isSectionOfStringEquivalent(typeStringNQ,0,"enum ")
+		isPrefixOfStringEquivalent(typeStringNQ,"enum ")
 		){
 		itpr.rankValue=0;
 		itpr.typeString="int";

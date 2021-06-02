@@ -58,10 +58,10 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 			goto End; // void gives the error value of 0
 		}
 	} else {
-		if (isSectionOfStringEquivalent(stringInternal,0,"* ")){
+		if (isPrefixOfStringEquivalent(stringInternal,"* ")){
 			ret=4;goto End; // pointers are always 4
 		}
-		if (isSectionOfStringEquivalent(stringInternal,0,"[ ")){
+		if (isPrefixOfStringEquivalent(stringInternal,"[ ")){
 			int32_t indexOfOtherBrace = getIndexOfMatchingEnclosement(stringInternal,0);
 			if (indexOfOtherBrace==2 | (indexOfOtherBrace+2)>=strlen(stringInternal)){
 				// indexOfOtherBrace==2 is if there is nothing inside the brackets
@@ -91,12 +91,12 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 			ret = getSizeofForTypeString(stringInternal+(indexOfOtherBrace+2),true) * numberParseResult.valueUnion.value;
 			goto End;
 		}
-		if (isSectionOfStringEquivalent(stringInternal,0,"enum ")){
+		if (isPrefixOfStringEquivalent(stringInternal,"enum ")){
 			ret=2;goto End; // enums are of same size as int
 		}
 		{
-			bool isUnion = isSectionOfStringEquivalent(stringInternal,0,"union ");
-			bool isStruct = isSectionOfStringEquivalent(stringInternal,0,"struct ");
+			bool isUnion = isPrefixOfStringEquivalent(stringInternal,"union ");
+			bool isStruct = isPrefixOfStringEquivalent(stringInternal,"struct ");
 			if (isUnion | isStruct){
 				uint8_t typeOfThis=isUnion;
 				const char* stringInternalSkipStart=stringInternal+(6+(1-typeOfThis));
@@ -140,7 +140,7 @@ uint32_t getSizeofForTypeString(const char* typeStringIn, bool failIfHasIdentifi
 		if (doStringsMatch(stringInternal,"long double")){
 			ret=8;goto End;
 		}
-		if (isSectionOfStringEquivalent(stringInternal,0,"( ")){
+		if (isPrefixOfStringEquivalent(stringInternal,"( ")){
 			err_10_00("sizeof failed because getting the size of a function is not allowed (use a pointer to a function instead)");
 			goto End;
 		}

@@ -243,13 +243,11 @@ char* copyStringSegmentToHeap(const char*const string,const int32_t start,const 
 #define isDigit(c) (c>47 & c<58)
 
 
-bool isSectionOfStringEquivalent(const char*const string1,const int32_t startIndexForString1,const char*const string2){
-	const char*const string3=string1+startIndexForString1;
+bool isPrefixOfStringEquivalent(const char*const string1,const char*const string2){
 	int32_t i=0;
-	char c1;
-	char c2;
+	char c1,c2;
 	do {
-		c1=string3[i];
+		c1=string1[i];
 		c2=string2[i];
 		++i;
 	} while (!(c2==0 | c1==0 | c1!=c2));
@@ -264,7 +262,7 @@ bool isSegmentAnywhereInString(const char*const stringSearchIn,const char*const 
 	}
 	int32_t lengthToSearchTo = lengthIn-lengthFor;
 	for (int32_t i=0;i<lengthToSearchTo;i++){
-		if (isSectionOfStringEquivalent(stringSearchIn,i,stringSearchFor)){
+		if (isPrefixOfStringEquivalent(stringSearchIn+i,stringSearchFor)){
 			return true;
 		}
 	}
@@ -276,7 +274,7 @@ bool specificStringEqualCheck(const char*const stringLarge,const int32_t startIn
 	if (strlen(subStringToCheck)!=endInStringLarge-startInStringLarge){
 		return false;
 	}
-	return isSectionOfStringEquivalent(stringLarge,startInStringLarge,subStringToCheck);
+	return isPrefixOfStringEquivalent(stringLarge+startInStringLarge,subStringToCheck);
 }
 
 // returns -1 if that space number doesn't exist

@@ -738,9 +738,9 @@ struct TypeMemberEntry* getOffsetAndTypeStringOfMemberInType(const char* typeStr
 	assert(getIndexOfNthSpace(typeString,1)==-1);
 	int32_t indexOfFirstSpaceInTypeString = getIndexOfNthSpace(typeString,0);
 	uint8_t typeNumber;
-	if (isSectionOfStringEquivalent(typeString,0,"struct ")){
+	if (isPrefixOfStringEquivalent(typeString,"struct ")){
 		typeNumber = 0;
-	} else if (isSectionOfStringEquivalent(typeString,0,"union ")){
+	} else if (isPrefixOfStringEquivalent(typeString,"union ")){
 		typeNumber = 1;
 	} else {
 		assert(false);

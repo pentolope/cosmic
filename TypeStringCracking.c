@@ -55,7 +55,7 @@ void crackArraysAndEnum(char* string){
 	int32_t i0;
 	int32_t i1;
 	for (i0=0;string[i0];i0++){
-		if (isSectionOfStringEquivalent(string,i0,"[ ]")){
+		if (isPrefixOfStringEquivalent(string+i0,"[ ]")){
 			string[i0  ]='?';
 			string[i0+1]=26;
 			string[i0+2]=26;
@@ -73,7 +73,7 @@ void crackArraysAndEnum(char* string){
 	}
 	copyDownForInPlaceEdit(string);
 	for (i0=0;string[i0];i0++){
-		if (isSectionOfStringEquivalent(string,i0,"enum ")){
+		if (isPrefixOfStringEquivalent(string+i0,"enum ")){
 			int32_t end=getIndexOfNthSpace(string+i0,1);
 			end+=i0;
 			string[i0  ]='i';
@@ -90,7 +90,7 @@ void strInPlaceReplaceForTypeCrack(char* string,const char* from,const char to){
 	char cFrom=from[0];
 	for (int32_t i0=0;string[i0];i0++){
 		if (string[i0]==cFrom){ // this check reduces amount of function call overhead
-			if (isSectionOfStringEquivalent(string,i0,from)){
+			if (isPrefixOfStringEquivalent(string+i0,from)){
 				string[i0  ]=' ';
 				string[i0+1]=to;
 				string[i0+2]=' ';
@@ -272,8 +272,8 @@ int32_t findUncrackedStructOrUnion(char* string){
 		if (c=='('){
 			i=getIndexOfMatchingEnclosement(string,i);
 		} else if ((
-			c=='s' && isSectionOfStringEquivalent(string,i,"struct ")) || (
-			c=='u' && isSectionOfStringEquivalent(string,i,"union "))){
+			c=='s' && isPrefixOfStringEquivalent(string+i,"struct ")) || (
+			c=='u' && isPrefixOfStringEquivalent(string+i,"union "))){
 			
 			if (i==0 || string[i-1]==' '){
 				if (p<0 || (string[p]!='<' & string[p]!='*')){
@@ -292,8 +292,8 @@ void splitUncrackedStructUnion(char** stringPtr){
 		int32_t p=i-2;
 		char c=string[i];
 		if ((
-			c=='s' && isSectionOfStringEquivalent(string,i,"struct ")) || (
-			c=='u' && isSectionOfStringEquivalent(string,i,"union "))){
+			c=='s' && isPrefixOfStringEquivalent(string+i,"struct ")) || (
+			c=='u' && isPrefixOfStringEquivalent(string+i,"union "))){
 			
 			if (i==0 || string[i-1]==' '){
 				if (p>=0 && string[p]!='<'){

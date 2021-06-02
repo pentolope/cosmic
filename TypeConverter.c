@@ -16,12 +16,12 @@ const char* stripQualifiersC(const char* typeString,bool* hadVolatile,bool* hadC
 	if (hadVolatile!=NULL) *hadVolatile=false;
 	if (hadConst!=NULL) *hadConst=false;
 	Repeat:;
-	if (isSectionOfStringEquivalent(typeString,0,"volatile ")){
+	if (isPrefixOfStringEquivalent(typeString,"volatile ")){
 		typeString+=9;
 		if (hadVolatile!=NULL) *hadVolatile=true;
 		goto Repeat;
 	}
-	if (isSectionOfStringEquivalent(typeString,0,"const ")){
+	if (isPrefixOfStringEquivalent(typeString,"const ")){
 		typeString+=6;
 		if (hadConst!=NULL) *hadConst=true;
 		goto Repeat;
@@ -110,10 +110,10 @@ void applyToTypeStringArrayDecayToSelf(char* string){
 bool applyToTypeStringBaseArrayDecayToSelf(char* string){
 	int32_t startIndex=0;
 	Start:;
-	if (isSectionOfStringEquivalent(string,startIndex,"const ")){
+	if (isPrefixOfStringEquivalent(string+startIndex,"const ")){
 		startIndex+=6;
 		goto Start;
-	} else if (isSectionOfStringEquivalent(string,startIndex,"volatile ")){
+	} else if (isPrefixOfStringEquivalent(string+startIndex,"volatile ")){
 		startIndex+=9;
 		goto Start;
 	}
@@ -172,7 +172,7 @@ char* applyToTypeStringGetIdentifierToNew(const char* string){
 
 // returns if the start of a type string is a struct or union. should not have an identifier or qualifiers.
 bool isTypeStringOfStructOrUnion(const char* typeString){
-	return isSectionOfStringEquivalent(typeString,0,"struct ") || isSectionOfStringEquivalent(typeString,0,"union ");
+	return isPrefixOfStringEquivalent(typeString,"struct ") || isPrefixOfStringEquivalent(typeString,"union ");
 }
 
 
@@ -186,7 +186,7 @@ const char* singleTypicalIntegralTypePromote(const char* typeString, bool* wasPr
 		doStringsMatch(typeStringNQ,"unsigned char") ||
 		doStringsMatch(typeStringNQ,"short") ||
 		doStringsMatch(typeStringNQ,"_Bool") ||
-		isSectionOfStringEquivalent(typeStringNQ,0,"enum ")
+		isPrefixOfStringEquivalent(typeStringNQ,"enum ")
 		){
 		new="int";
 	} else if (

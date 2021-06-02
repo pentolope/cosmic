@@ -436,13 +436,13 @@ void generatePrecedenceTotal(){
 		
 		uint8_t n_oID = 0;
 		if (lengthOfStringInCurrentToken==6){
-			if (isSectionOfStringEquivalent(sourceContainer.string,ifcct,"sizeof"))   n_oID = 17;
+			if (isPrefixOfStringEquivalent(sourceContainer.string+ifcct,"sizeof"))   n_oID = 17;
 		} else if (lengthOfStringInCurrentToken==3){
 			if (fcct=='<' | fcct=='>'){
-				if (isSectionOfStringEquivalent(sourceContainer.string,ifcct,"<<="))      n_oID = 44;
-				else if (isSectionOfStringEquivalent(sourceContainer.string,ifcct,">>=")) n_oID = 45;
+				if (isPrefixOfStringEquivalent(sourceContainer.string+ifcct,"<<="))      n_oID = 44;
+				else if (isPrefixOfStringEquivalent(sourceContainer.string+ifcct,">>=")) n_oID = 45;
 			} else if (fcct=='.'){
-				if (isSectionOfStringEquivalent(sourceContainer.string,ifcct,"...")) err_1101_("va_arg token is not allowed in expressions",ifcct);
+				if (isPrefixOfStringEquivalent(sourceContainer.string+ifcct,"...")) err_1101_("va_arg token is not allowed in expressions",ifcct);
 			}
 		} else if (lengthOfStringInCurrentToken==2){
 			switch ((fcct<<8)|sourceContainer.string[ifcct+1]){
