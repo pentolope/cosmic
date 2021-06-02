@@ -195,7 +195,7 @@ int main(int argc, char** argv){
 	}
 	
 	if (mainArg.expectOutNext) err_10_1_("Command argument: Expected output file path after \'-o\'");
-	if (mainArg.doTypicalCompile & mainArg.in2Path!=NULL) err_10_1_("Command argument: Maxiumum of one input files may be specified for compile task");
+	if (mainArg.doTypicalCompile & mainArg.in2Path!=NULL) err_10_1_("Command argument: Maxiumum of one input file may be specified for compile task");
 	if (mainArg.doLink & mainArg.in2Path==NULL) err_10_1_("Command argument: Two input files required for link task");
 	if (mainArg.in1Path==NULL) err_10_1_("Command argument: No input files specified");
 	if (mainArg.optz) compileSettings.optLevel=0;
