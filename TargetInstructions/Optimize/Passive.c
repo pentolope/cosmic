@@ -995,7 +995,6 @@ for AJMP and CJMP . returns true if it could trace to a labelNumber
 labelNumber and labelLoadLocation may be NULL
 */
 bool traceJumpLabel(const InstructionBuffer* ib,const uint32_t locationOfJump, uint32_t* labelNumber, uint32_t* labelLoadLocation){
-	InstructionInformation II;
 	struct RegOriginInfo regOriginInfo0;
 	struct RegOriginInfo regOriginInfo1;
 	InstructionSingle IS_jmp = ib->buffer[locationOfJump];

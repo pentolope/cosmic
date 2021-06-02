@@ -1282,7 +1282,6 @@ void applySTPAtoSTPSopt(InstructionBuffer* ib){
 	const uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
 	InstructionSingle* IS_ptr0=ib->buffer;
 	InstructionSingle* IS_ptr1;
-	InstructionSingle IS;
 	bool isStackSizeKnown=false;
 	uint16_t stackSize=0;
 	for (uint32_t i=0;i<numberOfSlotsTaken;i++){
@@ -1354,9 +1353,6 @@ sanityCheck(ib);
 		}
 	}
 	InstructionInformation II_0;
-	InstructionSingle* IS_ptr0;
-	InstructionSingle* IS_ptr1;
-	InstructionSingle IS;
 	struct {
 		uint16_t constValue;
 		uint8_t movCount;
@@ -1451,8 +1447,6 @@ sanityCheck(ib);
 
 bool attemptRepeatedConstantOpt(InstructionBuffer* ib){
 	bool didSucceedAtLeastOnce=false;
-	InstructionInformation II_0;
-	InstructionInformation II_1;
 	InstructionSingle* buffer=ib->buffer;
 	struct RepeatedConstInfo repeatedConstInfo;
 	repeatedConstInfo.ib=ib;
@@ -1639,7 +1633,7 @@ sanityCheck(ib);
 		if (!II.isSymbolicInternal & II.id!=I_SYRB & II.id!=I_SYRW & II.id!=I_SYRD & II.id!=I_SYRQ){
 			upperReorderBoundry=findUpperReorderBoundry(ib,i);
 			for (uint32_t i2=i+1;i2<upperReorderBoundry;i2++){
-				enum InstructionTypeID id=ib->buffer[i2].id;
+				enum InstructionTypeID id=buffer[i2].id;
 				if (id==I_SYRB | id==I_SYRW | id==I_SYRD | id==I_SYRQ){
 					// SYRB,SYRW,SYRD,I_SYRQ have priority, so nothing should pass them here. It makes their pass harder
 					upperReorderBoundry=i2-1;
@@ -1660,7 +1654,7 @@ sanityCheck(ib);
 	// SYRB,SYRW,SYRD,I_SYRQ have priority, so they get a second pass after the first reorder pass
 	i=ib->numberOfSlotsTaken;
 	while (i--!=0){
-		enum InstructionTypeID id=ib->buffer[i].id;
+		enum InstructionTypeID id=buffer[i].id;
 		if (id==I_SYRB | id==I_SYRW | id==I_SYRD | id==I_SYRQ){
 			upperReorderBoundry=findUpperReorderBoundry(ib,i);
 			if (upperReorderBoundry!=i) applyReorder(ib,i,upperReorderBoundry);
@@ -2414,7 +2408,6 @@ sanityCheck(vtearp->ib);
 	vtearp->walkSource=0;vtearp->walkTemplate=0;vtearp->pushPopWalk=0;
 	applyInitialPeepHoleTransform(vtearp,0,0);
 	//printInstructionBufferWithMessageAndNumber(vtearp->ib,"Peephole (2/4)",vtearp->startIndex);
-	uint8_t sourceLength=vtearp->walkSource;
 	vtearp->walkSource=0;vtearp->walkTemplate=0;
 	dbph=getDualBoundPeephole(vtearp);
 	vtearp->walkSource=0;vtearp->walkTemplate=0;

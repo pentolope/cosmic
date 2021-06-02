@@ -22,7 +22,6 @@ int32_t findIndexOfTypicalStatementEnd(int32_t indexToStartAt){
 			}
 			enclosementLevel--;
 		} else if (c=='\'' | c=='\"'){
-			int32_t backup=i;
 			i = getEndOfToken(i);
 			i--;
 		}
@@ -175,7 +174,6 @@ int32_t functionStatementsWalk(
 	InstructionBuffer instructionBufferLocalTemp_1;
 	InstructionBuffer instructionBufferLocalTemp_2;
 	InstructionBuffer instructionBufferLocalTemp_3;
-	InstructionSingle instructionSingleTemp;
 	addBlockFrame();
 	
 	
@@ -625,7 +623,7 @@ while (true){
 			int32_t labelStart=walkingIndex;
 			int32_t labelEnd=endOfToken;
 			int32_t colon=emptyIndexAdvance(endOfToken);
-			walkingIndex=labelEnd;
+			walkingIndex=colon;
 			insert_IB_raw_label(parentInstructionBufferToInsertTo,addGotoOrLabel(copyStringSegmentToHeap(sourceContainer.string,labelStart,labelEnd),false));
 			
 		} else {

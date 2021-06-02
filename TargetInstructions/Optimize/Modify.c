@@ -402,7 +402,6 @@ void expandPushPop(InstructionBuffer* ib){
 	{
 		uint32_t countOfExpansion=0;
 		uint32_t numberOfSlotsTaken=ib->numberOfSlotsTaken;
-		uint32_t nextSlotsTaken;
 		for (i=0;i<numberOfSlotsTaken;i++){
 			consolePrintBufferPoint(ib,i,-1,0,"Counting Push/Pop for Expansion");
 			id = buffer[i].id;

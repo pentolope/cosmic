@@ -155,8 +155,7 @@ void* cosmic_malloc(size_t size){
 	}
 	finish:
 	localCurrent->isNotTaken[i]^=v;
-	void* ret=(void*)((uint8_t*)&localCurrent->entries+sizeof(uint8_t[ALT_ALLOC_BLK_SIZE])*(uint32_t)((7-e)+i*8));
-	return ret;
+	return (void*)((uint8_t*)&localCurrent->entries+sizeof(uint8_t[ALT_ALLOC_BLK_SIZE])*(uint32_t)((7-e)+i*8));
 }
 
 void* cosmic_calloc(size_t nmemb,size_t size){

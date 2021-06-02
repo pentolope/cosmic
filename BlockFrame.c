@@ -3,8 +3,6 @@
 #include "Common.c"
 #include "FunctionParamHelper.c"
 
-//void debugPrintOfBlockFrameArray();
-
 struct TypeMemberEntry{
 	const char* typeString; // must have identifier
 	// however, when this is a part of an enum entry, the string above is not a type string.

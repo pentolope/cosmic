@@ -169,33 +169,33 @@ void pullDownSourceChar(SourceChar*const sourceChar){
 }
 
 // given index of `'` or `"` it will give the index of the ending `'` or `"` respectively
-int32_t literalSkipSourceChar(SourceChar*const sourceChar, int32_t start){
-	if (sourceChar[start].c=='\''){
-		start++;
-		while (sourceChar[start].c!='\''){
-			if (sourceChar[start].c==0){
+int32_t literalSkipSourceChar(const SourceChar*const sourceChar, int32_t index){
+	if (sourceChar[index].c=='\''){
+		index++;
+		while (sourceChar[index].c!='\''){
+			if (sourceChar[index].c==0){
 				printf("literalSkip() detected unbounded character literal\n");
 				exit(1);
 			}
-			if (sourceChar[start].c=='\\'){
-				start++;
+			if (sourceChar[index].c=='\\'){
+				index++;
 			}
-			start++;
+			index++;
 		}
-		return start; // this parameter has been modified
-	} else if (sourceChar[start].c=='\"'){
-		start++;
-		while (sourceChar[start].c!='\"'){
-			if (sourceChar[start].c==0){
+		return index;
+	} else if (sourceChar[index].c=='\"'){
+		index++;
+		while (sourceChar[index].c!='\"'){
+			if (sourceChar[index].c==0){
 				printf("literalSkip() detected unbounded string literal\n");
 				exit(1);
 			}
-			if (sourceChar[start].c=='\\'){
-				start++;
+			if (sourceChar[index].c=='\\'){
+				index++;
 			}
-			start++;
+			index++;
 		}
-		return start; // this parameter has been modified
+		return index;
 	} else {
 		printf("literalSkip() got invalid character for beginning\n");
 		exit(1);
@@ -383,14 +383,12 @@ void adjacentStringConcatInSourceChar(SourceChar*const sourceChar){
 			int32_t beginning=i;
 			i = literalSkipSourceChar(sourceChar,i);
 			if (sourceChar[i+2].c=='\"' & sourceChar[i+1].c==' ' & !isThisWideLiteral){
-				int32_t endOfNextStringLiteral = literalSkipSourceChar(sourceChar,i+2);
 				sourceChar[i+2].c = 26;
 				sourceChar[i+1].c = 26;
 				sourceChar[i ].c = 26;
 				i=beginning;
 				continue;
 			} else if (sourceChar[i+3].c=='\"' & sourceChar[i+2].c=='L' & sourceChar[i+1].c==' ' & isThisWideLiteral){
-				int32_t endOfNextStringLiteral = literalSkipSourceChar(sourceChar,i+3);
 				sourceChar[i+3].c = 26;
 				sourceChar[i+2].c = 26;
 				sourceChar[i+1].c = 26;
@@ -824,8 +822,6 @@ PreprocessTokenWithContents* replaceTokenWithTokensForPreprocessTokenWithContent
 PreprocessTokenWithContents* convertStringToHeapPreprocessTokenWithContents(char* string){
 	int32_t length = strlen(string);
 	PreprocessTokenWithContents* tokens = cosmic_calloc(length+1,sizeof(PreprocessTokenWithContents));// likely oversized, but it will always work
-	uint8_t currentCatagory;
-	int32_t indexInTokens = 0;
 	uint8_t *catagoryAtIndex = cosmic_calloc(length,1);
 	uint8_t *lengthAtIndex = cosmic_calloc(length,1);
 	uint8_t temp;

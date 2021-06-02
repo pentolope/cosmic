@@ -413,7 +413,6 @@ void generatePrecedenceTotal(){
 	ExpressionToken* currentTokenPtr;
 	char fcct; // first character of current token
 	uint8_t operatorIDofCurrentToken;
-	bool doPairing = false;
 	/* 
 	This will be looping a lot so those variable declarations up there can just go there for common names between loops.
 	sometimes the variable is set for a loop, sometimes it is not. check the beginning of the loop to see which ones are set for that loop

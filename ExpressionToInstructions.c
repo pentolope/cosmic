@@ -801,8 +801,6 @@ void applyAutoTypeConversion_Ternary(ExpressionTreeNode* thisNode){
 	ExpressionTreeNode* ln=expressionTreeGlobalBuffer.expressionTreeNodes+thisNode->pre.leftNode;
 	ExpressionTreeNode* rn=expressionTreeGlobalBuffer.expressionTreeNodes+thisNode->pre.rightNode;
 	if (thisNode->operatorID==36){
-		ExpressionTreeNode* rrn=expressionTreeGlobalBuffer.expressionTreeNodes+rn->pre.rightNode;
-		ExpressionTreeNode* rln=expressionTreeGlobalBuffer.expressionTreeNodes+rn->pre.leftNode;
 		thisNode->post.typeString=copyStringToHeapString(rn->post.typeString);
 		applyTypeCast(ln,"_Bool",15);
 	} else {

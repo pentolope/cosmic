@@ -945,7 +945,6 @@ DualBoundPeephole getDualBoundPeephole(ValueTraceEntriesApplicableRepeatedParams
 	DualBoundPeephole dbph_temp;
 	dbph.lowerBoundForUnusedOut=thisSource->instr;
 	dbph.upperBoundForUnusedOut=dbph.lowerBoundForUnusedOut+1;
-	uint32_t lowerBound=thisSource->instr;
 	while (vte->id==I_PEPH){
 		vte=vtearp->template->vte+ ++vtearp->walkTemplate;
 	}
@@ -1351,10 +1350,7 @@ uint16_t applyPostPeepHole_1(ValueTraceEntriesApplicableRepeatedParams* vtearp, 
 
 
 uint16_t applyPostPeepHole_3(ValueTraceEntriesApplicableRepeatedParams* vtearp, uint8_t* unusedRegs){
-	uint8_t perm=peepholeSortTriple(vtearp);
-	uint32_t insertionIndex=vtearp->source[0].instr;
-	InstructionBuffer* ib=vtearp->ib;
-	switch (perm){
+	switch (peepholeSortTriple(vtearp)){
 		case 1:// todo: these cases should be re-checked at some point
 		case 6:
 		vtearp->template->iip=IIP_arr_09_1;
@@ -1372,26 +1368,14 @@ uint16_t applyPostPeepHole_3(ValueTraceEntriesApplicableRepeatedParams* vtearp, 
 }
 
 uint16_t applyPostPeepHole_4(ValueTraceEntriesApplicableRepeatedParams* vtearp, uint8_t* unusedRegs){
-	uint32_t insertionIndex=vtearp->source[0].instr;
-	InstructionBuffer* ib=vtearp->ib;
 	assert(vtearp->pushPopWalk==2);
-	if (vtearp->pushPopRecord[0]>vtearp->pushPopRecord[1]){
-		vtearp->template->iip=IIP_arr_10_1;
-	} else {
-		vtearp->template->iip=IIP_arr_10_0;
-	}
+	vtearp->template->iip=(vtearp->pushPopRecord[0]>vtearp->pushPopRecord[1])?IIP_arr_10_1:IIP_arr_10_0;
 	return applyPostPeepHole_2(vtearp,unusedRegs);
 }
 
 uint16_t applyPostPeepHole_5(ValueTraceEntriesApplicableRepeatedParams* vtearp, uint8_t* unusedRegs){
-	uint32_t insertionIndex=vtearp->source[0].instr;
-	InstructionBuffer* ib=vtearp->ib;
 	assert(vtearp->pushPopWalk==2);
-	if (vtearp->pushPopRecord[0]>vtearp->pushPopRecord[1]){
-		vtearp->template->iip=IIP_arr_11_1;
-	} else {
-		vtearp->template->iip=IIP_arr_11_0;
-	}
+	vtearp->template->iip=(vtearp->pushPopRecord[0]>vtearp->pushPopRecord[1])?IIP_arr_11_1:IIP_arr_11_0;
 	return applyPostPeepHole_2(vtearp,unusedRegs);
 }
 
