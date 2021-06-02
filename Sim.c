@@ -1,11 +1,22 @@
 
+#ifdef _WIN32
+#define _CRT_SECURE_NO_DEPRECATE
+#endif
+
 #include <stddef.h>
 #include <time.h>
-#include <stdnoreturn.h>
+#include <assert.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <windows.h>
+
+#include <stdnoreturn.h>
 
 #define INCLUDE_BACKEND
 #include "StatementWalk.c"
@@ -1612,11 +1623,11 @@ int main(int argc, char** argv){
 					fprintf(fastSimFile,"tp0=ms.reg[%u] / ms.reg[%u];ms.reg[%u]=ms.reg[%u] %s ms.reg[%u];ms.reg[%u]=tp0;tp0=0;\n",(unsigned)r0,(unsigned)r1,(unsigned)r1,(unsigned)r0,"%",(unsigned)r1,(unsigned)r0);
 					break;
 					case 0x1A:
-					fprintf(fastSimFile,"ms.sp-=2;ms.mem[(ms.sp+0)&0xFFFF]=(unsigned)ms.reg[0]>>0;ms.mem[(ms.sp+1)&0xFFFF]=(unsigned)ms.reg[0]>>8;",(unsigned)r0,(unsigned)r0);
-					fprintf(fastSimFile,"ms.sp-=2;ms.mem[(ms.sp+0)&0xFFFF]=(unsigned)ms.reg[1]>>0;ms.mem[(ms.sp+1)&0xFFFF]=(unsigned)ms.reg[1]>>8;",(unsigned)r0,(unsigned)r0);
-					fprintf(fastSimFile,"ms.sp-=2;ms.mem[(ms.sp+0)&0xFFFF]=ms.pc>>16;ms.mem[(ms.sp+1)&0xFFFF]=ms.pc>>24;",(unsigned)r0,(unsigned)r0);
-					fprintf(fastSimFile,"ms.sp-=2;ms.mem[(ms.sp+0)&0xFFFF]=ms.pc>> 0;ms.mem[(ms.sp+1)&0xFFFF]=ms.pc>> 8;",(unsigned)r0,(unsigned)r0);
-					fprintf(fastSimFile,"ms.reg[0]=ms.sp;\n",(unsigned)r0,(unsigned)r1);
+					fprintf(fastSimFile,"ms.sp-=2;ms.mem[(ms.sp+0)&0xFFFF]=(unsigned)ms.reg[0]>>0;ms.mem[(ms.sp+1)&0xFFFF]=(unsigned)ms.reg[0]>>8;");
+					fprintf(fastSimFile,"ms.sp-=2;ms.mem[(ms.sp+0)&0xFFFF]=(unsigned)ms.reg[1]>>0;ms.mem[(ms.sp+1)&0xFFFF]=(unsigned)ms.reg[1]>>8;");
+					fprintf(fastSimFile,"ms.sp-=2;ms.mem[(ms.sp+0)&0xFFFF]=ms.pc>>16;ms.mem[(ms.sp+1)&0xFFFF]=ms.pc>>24;");
+					fprintf(fastSimFile,"ms.sp-=2;ms.mem[(ms.sp+0)&0xFFFF]=ms.pc>> 0;ms.mem[(ms.sp+1)&0xFFFF]=ms.pc>> 8;");
+					fprintf(fastSimFile,"ms.reg[0]=ms.sp;\n");
 					fprintf(fastSimFile,"ms.pc=((uint32_t)ms.reg[%u]<<16)|((uint32_t)ms.reg[%u]<<0);goto LJUMP;",(unsigned)r1,(unsigned)r0);
 					fprintf(fastSimFile,"AR%08X:;\n",(unsigned)(i0+2u));
 					break;
