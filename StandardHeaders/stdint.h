@@ -11,7 +11,10 @@ typedef signed long int32_t;
 
 typedef unsigned long size_t;
 typedef signed long ptrdiff_t;
-
+typedef signed long intptr_t;
+typedef unsigned long uintptr_t;
+typedef signed long intmax_t;
+typedef unsigned long uintmax_t;
 
 // todo: macros for things like MAX_INT
 
