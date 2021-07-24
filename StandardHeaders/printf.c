@@ -22,99 +22,66 @@ static void _print_target_char(struct _print_target* print_target,char c){
 
 
 static struct {
-	uint8_t font[665];
 	uint8_t ansiBuffer[8];
 	bool isAnsiEscapeOccuring;
 	uint8_t current_foreground;
 	uint8_t current_background;
 	uint16_t cursor;
-	struct _CharacterState{
-		uint8_t character;
-		uint8_t foreground;
-		uint8_t background;
-	} state[880];
 } _terminalCharacterState={
 	.current_foreground=224,
-	.current_background=0,
-	.font={0,0,0,0,0,0,0,0,0,0,250,0,0,0,0,0,192,0,192,0,0,0,40,254,40,254,40,0,0,100,146,254,146,76,0,66,164,72,16,36,74,132,108,146,146,170,68,10,0,0,0,0,192,0,0,0,0,0,56,68,130,0,0,0,0,130,68,56,0,0,0,0,80,32,80,0,0,0,0,8,28,8,0,0,0,0,0,1,2,0,0,0,0,8,8,8,0,0,0,0,0,2,0,0,0,2,4,8,16,32,64,128,0,124,138,146,162,124,0,0,34,66,254,2,2,0,0,66,134,138,146,98,0,0,68,146,146,146,108,0,0,24,40,72,254,8,0,0,242,146,146,146,140,0,0,124,146,146,146,12,0,0,128,128,134,152,224,0,0,108,146,146,146,108,0,0,96,146,146,146,108,0,0,0,0,36,0,0,0,0,0,2,36,0,0,0,0,16,40,68,130,0,0,0,40,40,40,40,40,0,0,0,130,68,40,16,0,0,0,128,138,144,96,0,124,130,154,186,138,122,0,0,126,144,144,144,126,0,0,254,146,146,146,108,0,0,124,130,130,130,130,0,0,254,130,130,68,56,0,0,254,146,146,130,130,0,0,254,144,144,128,128,0,0,124,130,138,138,12,0,0,254,16,16,16,254,0,0,130,130,254,130,130,0,4,130,130,130,252,128,0,0,254,16,40,68,130,0,0,254,2,2,2,2,0,254,64,32,16,32,64,254,254,64,32,16,8,4,254,0,124,130,130,130,124,0,0,254,144,144,144,96,0,0,124,130,138,132,122,0,0,254,144,152,148,98,0,0,100,146,146,146,76,0,0,128,128,254,128,128,0,0,252,2,2,2,252,0,0,248,4,2,4,248,0,252,2,2,12,2,2,252,130,68,40,16,40,68,130,0,224,16,14,16,224,0,0,134,138,146,162,194,0,0,0,254,130,0,0,0,128,64,32,16,8,4,2,0,0,0,130,254,0,0,0,16,32,64,32,16,0,1,1,1,1,1,1,1,0,0,128,128,64,0,0,0,6,42,42,42,28,2,0,254,18,18,18,12,0,0,28,34,34,34,34,0,0,12,18,18,18,254,0,0,28,42,42,42,26,0,0,16,126,144,144,0,0,0,24,37,37,37,30,0,0,254,16,16,16,30,0,0,0,0,94,0,0,0,0,2,1,1,94,0,0,0,254,8,20,34,0,0,0,0,0,254,0,0,0,62,32,32,30,32,32,30,0,62,32,32,32,30,0,0,28,34,34,34,28,0,0,126,72,72,48,0,0,0,0,24,36,36,63,0,0,62,16,32,32,32,0,0,18,42,42,42,36,0,0,32,32,124,34,32,0,0,60,2,2,2,60,0,0,56,4,2,4,56,0,60,2,2,12,2,2,60,0,34,20,8,20,34,0,0,56,5,5,5,62,0,0,70,74,82,98,0,0,0,16,108,130,130,0,0,0,0,0,254,0,0,0,0,0,130,130,108,16,0,0,8,16,16,8,8,16}
+	.current_background=0
 };
 
-
-
-
-static void _putchar_write(uint16_t position){
-	struct _CharacterState characterState=_terminalCharacterState.state[position];
-	if (characterState.character<' ' | characterState.character>'~'){
-		characterState.character=' ';
-	}
-	uint16_t heightPosition=position/40u;
-	uint16_t widthPosition=position%40u;
-	uint32_t mem=0x04000000+320;
-	mem+=widthPosition*8+(uint32_t)heightPosition*320*9;
-	uint8_t* fontPosition=(uint8_t*)_terminalCharacterState.font+(characterState.character-' ')*7;
-	*(volatile uint8_t*)(mem+7+7*320lu)=characterState.background;
-	*(volatile uint8_t*)(mem+7+8*320lu)=characterState.background;
-	for (uint16_t i=0;i<7u;i++){
-		uint32_t memi=mem+i;
-		uint8_t fv=*(fontPosition+i);
-		bool b;
-		*(volatile uint8_t*)(memi+320*0)=characterState.background;
-		b=(fv&(1<<7))!=0;
-		*(volatile uint8_t*)(memi+320*1)=b*characterState.foreground | !b*characterState.background;
-		b=(fv&(1<<6))!=0;
-		*(volatile uint8_t*)(memi+320*2)=b*characterState.foreground | !b*characterState.background;
-		b=(fv&(1<<5))!=0;
-		*(volatile uint8_t*)(memi+320*3)=b*characterState.foreground | !b*characterState.background;
-		b=(fv&(1<<4))!=0;
-		*(volatile uint8_t*)(memi+320*4)=b*characterState.foreground | !b*characterState.background;
-		b=(fv&(1<<3))!=0;
-		*(volatile uint8_t*)(memi+320*5)=b*characterState.foreground | !b*characterState.background;
-		b=(fv&(1<<2))!=0;
-		*(volatile uint8_t*)(memi+320*6)=b*characterState.foreground | !b*characterState.background;
-		b=(fv&(1<<1))!=0;
-		*(volatile uint8_t*)(memi+320*7)=b*characterState.foreground | !b*characterState.background;
-		b=(fv&(1<<0))!=0;
-		*(volatile uint8_t*)(memi+320*8)=b*characterState.foreground | !b*characterState.background;
-		*(volatile uint8_t*)(mem+7+i*320)=characterState.background;
-	}
-}
-
 static void _putchar_ensure_cursor_normal(){
-	while (_terminalCharacterState.cursor>=880){
-		_terminalCharacterState.cursor-=40;
+	uint8_t mode_info=*(volatile uint8_t*)(0x80807ffflu);
+	uint8_t font_height=(mode_info &15)+3;
+	unsigned n0=480u/(unsigned)font_height;
+	unsigned n1=n0-1;
+	unsigned n2;
+	if ((mode_info &(1<<4))!=0){
+		n2=80;
+	} else {
+		n2=71;
+	}
+	n0*=n2;
+	n1*=n2;
+	while (_terminalCharacterState.cursor>=n0){
+		_terminalCharacterState.cursor-=n2;
 		uint16_t i;
-		for (i=0;i<840;i++){
-			_terminalCharacterState.state[i]=_terminalCharacterState.state[i+40];
-			_putchar_write(i);
+		for (i=0;i<n1;i++){
+			const uint32_t a0=0x80800000lu+(i+ 0)*3lu;
+			const uint32_t a1=0x80800000lu+(i+n2)*3lu;
+			*(volatile uint8_t*)(a0+0)=*(volatile uint8_t*)(a1+0);
+			*(volatile uint8_t*)(a0+1)=*(volatile uint8_t*)(a1+1);
+			*(volatile uint8_t*)(a0+2)=*(volatile uint8_t*)(a1+2);
 		}
-		for (;i<880;i++){
-			_terminalCharacterState.state[i].character=' ';
-			_putchar_write(i);
+		for (;i<n0;i++){
+			const uint32_t a=0x80800000lu+i*3lu;
+			*(volatile uint8_t*)(a+0)=' ';
+			*(volatile uint8_t*)(a+1)=255;
+			*(volatile uint8_t*)(a+2)=0;
 		}
 	}
 }
 
 
 static void _putchar_screen(char c){
-	*((volatile char*)0x0400FFFF)=1; // set sim to do visual buffering
-	
 	if (c>=' ' & c<='~'){
-		struct _CharacterState characterState;
-		characterState.character=c;
-		characterState.foreground=_terminalCharacterState.current_foreground;
-		characterState.background=_terminalCharacterState.current_background;
-		_terminalCharacterState.state[_terminalCharacterState.cursor]=characterState;
-		_putchar_write(_terminalCharacterState.cursor++);
+		const uint32_t a=0x80800000lu+_terminalCharacterState.cursor*3lu;
+		*(volatile uint8_t*)(a+0)=c;
+		*(volatile uint8_t*)(a+1)=_terminalCharacterState.current_foreground;
+		*(volatile uint8_t*)(a+2)=_terminalCharacterState.current_background;
+		_terminalCharacterState.cursor++;
 		_putchar_ensure_cursor_normal();
 	} else if (c=='\r'){
-		_terminalCharacterState.cursor-=_terminalCharacterState.cursor%40u;
+		unsigned n=(((*(volatile uint8_t*)(0x80807ffflu)&(1<<4))!=0)?80u:71u);
+		_terminalCharacterState.cursor-=_terminalCharacterState.cursor%n;
 	} else if (c=='\n'){
-		_terminalCharacterState.cursor-=_terminalCharacterState.cursor%40u;
-		_terminalCharacterState.cursor+=40;
+		unsigned n=(((*(volatile uint8_t*)(0x80807ffflu)&(1<<4))!=0)?80u:71u);
+		_terminalCharacterState.cursor-=_terminalCharacterState.cursor%n;
+		_terminalCharacterState.cursor+=n;
 		_putchar_ensure_cursor_normal();
 	}
-	
-	*((volatile char*)0x0400FFFF)=0; // set sim to release visual buffering
 }
 
 static void _putstr(struct _print_target* print_target,const char* str){

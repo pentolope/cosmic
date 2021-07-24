@@ -35,12 +35,14 @@ struct GlobalSDL_Information{
 		uint16_t sizeOfUnit;
 	} windowSize;
 	uint8_t* pixelState;
+	uint8_t* memoryState;
+	SDL_Rect* rectToUpdate;
+	uint32_t countOfRectToUpdate;
 	uint16_t eventPullCountdown;
 	bool isSLD_initialized;
 	bool hasPixelBeenWritten;
-	bool hasPixelBeenWrittenSinceVisualDelay;
-	bool isVisualDelaying;
-} globalSDL_Information = {.windowSize = {320,200,3},.eventPullCountdown=1};
+	bool isMemoryStateDirty;
+} globalSDL_Information = {.windowSize = {640,480,2},.eventPullCountdown=1};
 
 
 
@@ -89,12 +91,14 @@ struct MachineState* initialMachineState;
 
 void performTraceback(uint64_t);
 void printProfileResults();
-
+void performUpdateVGAtoSDL();
 
 noreturn void bye(void){
 	printf("\nTotal instructions executed:%llu\n",(unsigned long long)instructionExecutionCount);
 	printProfileResults();
 	fflush(stdout);
+	globalSDL_Information.isMemoryStateDirty=true;// why not I guess
+	performUpdateVGAtoSDL();
 	// these were allocated using normal calloc, not cosmic_calloc
 	free(globalSDL_Information.pixelState);
 	free(machineState);
@@ -120,26 +124,76 @@ noreturn void bye(void){
 	exit(0);
 }
 
-void writePixelToScreenWithSDL(uint16_t a, uint8_t c){
-	if (a==0x0000FFFF){
-		if (!(globalSDL_Information.isVisualDelaying=c!=0) & globalSDL_Information.hasPixelBeenWrittenSinceVisualDelay){
-			const SDL_Rect rect={.x=1,.y=1,.h=globalSDL_Information.windowSize.height*globalSDL_Information.windowSize.sizeOfUnit,.w=globalSDL_Information.windowSize.width*globalSDL_Information.windowSize.sizeOfUnit};
-			SDL_UpdateWindowSurfaceRects(globalSDL_Information.window,&rect,1);
-			globalSDL_Information.hasPixelBeenWrittenSinceVisualDelay=false;
-		}
-	} else if (a<(uint32_t)globalSDL_Information.windowSize.width*globalSDL_Information.windowSize.height && globalSDL_Information.pixelState[a]!=c){
-		globalSDL_Information.pixelState[a]=c;
+void setVisualPixel(uint32_t a, unsigned v){
+	if (a<globalSDL_Information.windowSize.width*globalSDL_Information.windowSize.height && globalSDL_Information.pixelState[a]!=v){
+		v &=255;
+		globalSDL_Information.pixelState[a]=v;
 		globalSDL_Information.hasPixelBeenWritten=true;
-		const uint8_t r=(255u/7u)*(7u&(unsigned)c/32u)+1u;
-		const uint8_t g=(255u/7u)*(7u&(unsigned)c/4u)+1u;
-		const uint8_t b=(255u/3u)*(3u&(unsigned)c);
-		const SDL_Rect rect={.x=(a%320u)*globalSDL_Information.windowSize.sizeOfUnit+1,.y=((a/320u)%200u)*globalSDL_Information.windowSize.sizeOfUnit+1,.h=globalSDL_Information.windowSize.sizeOfUnit,.w=globalSDL_Information.windowSize.sizeOfUnit};
+		assert(globalSDL_Information.countOfRectToUpdate<globalSDL_Information.windowSize.width*globalSDL_Information.windowSize.height);
+		uint8_t r,g,b;
+		r =((v>>5)&7)<<5;
+		r |=(r>>3)|(r>>6);
+		g =((v>>2)&7)<<5;
+		g |=(g>>3)|(g>>6);
+		b =((v>>0)&3)<<6;
+		b |=(b>>2)|(b>>4)|(b>>6);
+		const SDL_Rect rect={.x=(a%640u)*globalSDL_Information.windowSize.sizeOfUnit+1,.y=((a/640u)%480u)*globalSDL_Information.windowSize.sizeOfUnit+1,.h=globalSDL_Information.windowSize.sizeOfUnit,.w=globalSDL_Information.windowSize.sizeOfUnit};
+		globalSDL_Information.rectToUpdate[globalSDL_Information.countOfRectToUpdate++]=rect;
 		SDL_FillRect(globalSDL_Information.surfaceOnWindow,&rect,SDL_MapRGB(globalSDL_Information.surfaceOnWindow->format, r, g, b));
-		
-		if (!globalSDL_Information.isVisualDelaying) SDL_UpdateWindowSurfaceRects(globalSDL_Information.window,&rect,1); // updating is the slow part
-		else globalSDL_Information.hasPixelBeenWrittenSinceVisualDelay=true;
 	}
 }
+
+void performVisualUpdate(){
+	if (globalSDL_Information.countOfRectToUpdate!=0){
+		SDL_UpdateWindowSurfaceRects(globalSDL_Information.window,globalSDL_Information.rectToUpdate,globalSDL_Information.countOfRectToUpdate);
+		globalSDL_Information.countOfRectToUpdate=0;
+	}
+}
+
+
+void performUpdateVGAtoSDL(){
+	if (globalSDL_Information.isMemoryStateDirty){
+		globalSDL_Information.isMemoryStateDirty=false;
+		bool is_wide_font;
+		uint8_t font_height;
+		uint8_t mode_info=globalSDL_Information.memoryState[32767];
+		is_wide_font=(mode_info &(1<<4))==0;
+		font_height=(mode_info &15)+3;
+		bool raw_mode=(mode_info &15)==0;
+		uint16_t font_offset=0;
+		font_offset |=globalSDL_Information.memoryState[32764]<<0;
+		font_offset |=globalSDL_Information.memoryState[32765]<<8;
+		if (raw_mode){
+			printf("\rRAW mode for VGA is not ready\n");
+			bye();
+		} else if (is_wide_font){
+			printf("\rwide font mode for VGA is not ready\n");
+			bye();
+		} else {
+			for (uint16_t i=0;i<80*54;i++){
+				const uint8_t ch_val=globalSDL_Information.memoryState[i * 3 + 0];
+				const uint8_t ch_foreground=globalSDL_Information.memoryState[i * 3 + 1];
+				const uint8_t ch_background=globalSDL_Information.memoryState[i * 3 + 2];
+				const uint16_t font_addr=font_offset + ch_val * font_height;
+				uint8_t font_buff[256];
+				if (font_addr+font_height<32768){
+					memcpy(font_buff,globalSDL_Information.memoryState+font_addr,font_height);
+					const uint32_t xf=i%80u;
+					const uint32_t yf=i/80u;
+					const uint32_t ab=(yf * font_height * 640u) + (xf * 8u);
+					for (uint16_t j=0;j<font_height;j++){
+						const uint32_t aa=ab + j * 640u;
+						for (uint8_t k=0;k<8;k++){
+							setVisualPixel(aa+k,((font_buff[j]>>k)&1)?ch_foreground:ch_background);
+						}
+					}
+				}
+			}
+		}
+		performVisualUpdate();
+	}
+}
+
 
 void initializeSDL(){
 	if (SDL_Init(SDL_INIT_VIDEO)!=0){
@@ -158,7 +212,102 @@ void initializeSDL(){
 	const SDL_Rect fullRect={.x=0,.y=0,.h=globalSDL_Information.windowSize.height*globalSDL_Information.windowSize.sizeOfUnit+2,.w=globalSDL_Information.windowSize.width*globalSDL_Information.windowSize.sizeOfUnit+2};
 	SDL_FillRect(globalSDL_Information.surfaceOnWindow,&fullRect,SDL_MapRGB(globalSDL_Information.surfaceOnWindow->format, 0, 0, 0));
 	SDL_UpdateWindowSurfaceRects(globalSDL_Information.window,&fullRect,1);
+	globalSDL_Information.rectToUpdate=calloc(globalSDL_Information.windowSize.width*globalSDL_Information.windowSize.height,sizeof(SDL_Rect));
+	globalSDL_Information.memoryState=calloc(32768,sizeof(uint8_t));
+	assert(globalSDL_Information.rectToUpdate!=NULL && globalSDL_Information.memoryState!=NULL);
 	globalSDL_Information.isSLD_initialized=true;
+	FILE* mif_file=fopen("InitVGA.mif","r");
+	if (mif_file==NULL){
+		printf("Error initializing memory for VGA text mode simulator: Could not read InitVGA.mif file\n");
+		bye();
+	}
+	char line_buff[256];
+	int line_buff_pos=0;
+	bool hit_begin=false;
+	while (1){
+		memset(line_buff,0,256);
+		line_buff_pos=0;
+		bool hit_end=false;
+		while (1){
+			if (line_buff_pos>253){
+				printf("Error initializing memory for VGA text mode simulator: InitVGA.mif file is invalid [line too long]\n");
+				fclose(mif_file);
+				bye();
+			}
+			int c=fgetc(mif_file);
+			line_buff[line_buff_pos++]=c;
+			if (c=='\n'){
+				break;
+			}
+			if (c==EOF){
+				hit_end=true;
+				break;
+			}
+		}
+		line_buff[--line_buff_pos]=0;
+		if (hit_end && strcmp(line_buff,"END;")!=0){
+			printf("Error initializing memory for VGA text mode simulator: InitVGA.mif file is invalid [execpected eof]\n");
+			fclose(mif_file);
+			bye();
+		}
+		if (!hit_begin && strcmp(line_buff,"BEGIN")==0){
+			hit_begin=true;
+		} else if (strcmp(line_buff,"END;")==0){
+			break;
+		} else if (hit_begin){
+			uint64_t addr=0;
+			uint64_t val=0;
+			bool hit_mid=false;
+			int i=0;
+			while (line_buff[i]){
+				uint8_t c=line_buff[i++];
+				uint8_t v=0;
+				if (c==':'){
+					hit_mid=true;
+					continue;
+				} else if (c==';'){
+					continue;
+				} else if (c>='0' && c<='9'){
+					v=c-'0';
+				} else if (c>='a' && c<='f'){
+					v=(c-'a')+10;
+				} else if (c>='A' && c<='F'){
+					v=(c-'A')+10;
+				} else {
+					printf("Error initializing memory for VGA text mode simulator: InitVGA.mif file is invalid [bad character in content (%c,%d)]\n",c,c);
+					fclose(mif_file);
+					bye();
+				}
+				if (hit_mid){
+					val*=16;
+					val+=v;
+				} else {
+					addr*=16;
+					addr+=v;
+				}
+			}
+			if (!hit_mid){
+				printf("Error initializing memory for VGA text mode simulator: InitVGA.mif file is invalid [line in content was missing seperator]\n");
+				fclose(mif_file);
+				bye();
+			}
+			if (addr*2>=32768){
+				printf("Error initializing memory for VGA text mode simulator: InitVGA.mif file is invalid [address was out of range]\n");
+				fclose(mif_file);
+				bye();
+			}
+			globalSDL_Information.memoryState[addr*2+0]=(val>>0)&255;
+			globalSDL_Information.memoryState[addr*2+1]=(val>>8)&255;
+		}
+	}
+	fclose(mif_file);
+	if (!hit_begin){
+		printf("Error initializing memory for VGA text mode simulator: InitVGA.mif file is invalid [never found begin]\n");
+		fclose(mif_file);
+		bye();
+	}
+	globalSDL_Information.isMemoryStateDirty=true;
+	performUpdateVGAtoSDL();
 }
 
 void stateDump(){
@@ -220,8 +369,7 @@ void restoreMachineState(){
 /*
 all special accesses are performed using byte operations [volatile may be needed] (unless otherwise specified). ranges are given as inclusive ranges
 
-GPU memory may be written to at 0x04000000->0x0400FFFE
-For speed and visual purposes, the simulation's screen pixel changes can be visually delayed by writing a 1 to 0x0400FFFF, then an update may be triggered by writting a 0 to 0x0400FFFF
+GPU memory works identically to cookie's vga driver. Currently, there is no frame counter though.
 
 Halt/Exit is achieved by WORD writing to 0x04010000 , the value is the return value.
 If main terminates, it will set the pc to 0x04010000, at which point the value at 0x0000FFFE will be interpreted as the return value.
@@ -234,7 +382,6 @@ Opening a file for reading or writing may be done by writing mode to 0x04020001 
   Once a file is opened for writing, it's contents can be written to by writting to 0x05000000 repeatedly (there is no sense of position)
 
 [Debug only please] a character may be written to the simulator console by writting to 0x04030000 with the character
-
 
 */
 
@@ -332,6 +479,10 @@ uint16_t readWord(uint32_t a){
 		if (a==0x04020008){
 			return (uint16_t)(fileAccessInfo.length>> 16);
 		}
+		if (a>=0x80800000 && a<=0x808FFFFF){
+			uint32_t m=(a-0x80800000)&0x7FFF;
+			return (globalSDL_Information.memoryState[m+0]<<0)|(globalSDL_Information.memoryState[m+1]<<8);
+		}
 		makeColor(COLOR_TO_TEXT,COLOR_RED);
 		printf("Mem fault:word read out of bounds:%08X\n",a);
 		resetColor();
@@ -357,6 +508,10 @@ uint8_t readByte(uint32_t a){
 	if (aUD!=0){
 		if (a==0x04020003){
 			return fileAccessInfo.isRead?fileAccessInfo.contents!=NULL:fileAccessInfo.outFile!=NULL;
+		}
+		if (a>=0x80800000 && a<=0x808FFFFF){
+			uint32_t m=(a-0x80800000)&0x7FFF;
+			return globalSDL_Information.memoryState[m];
 		}
 		if (a>=0x05000000 & a<=0x05FFFFFF){
 			if (fileAccessInfo.contents==NULL | !fileAccessInfo.isRead){
@@ -415,6 +570,13 @@ void writeWord(uint32_t a,uint16_t w){
 			terminationValue=w;
 			return;
 		}
+		if (a>=0x80800000 && a<=0x808FFFFF){
+			uint32_t m=(a-0x80800000)&0x7FFF;
+			globalSDL_Information.memoryState[m+0]=w>>0;
+			globalSDL_Information.memoryState[m+1]=w>>8;
+			globalSDL_Information.isMemoryStateDirty=true;
+			return;
+		}
 		makeColor(COLOR_TO_TEXT,COLOR_RED);
 		printf("Mem fault:word write out of bounds:%08X\n",a);
 		resetColor();
@@ -467,8 +629,10 @@ void writeByte(uint32_t a,uint8_t b){
 			triggerFileClose();
 			return;
 		}
-		if (a>=0x04000000 && a<=0x0400FFFF){
-			writePixelToScreenWithSDL(a-0x04000000,b);
+		if (a>=0x80800000 && a<=0x808FFFFF){
+			uint32_t m=(a-0x80800000)&0x7FFF;
+			globalSDL_Information.memoryState[m]=b;
+			globalSDL_Information.isMemoryStateDirty=true;
 			return;
 		}
 		if (a==0x05000000){
@@ -691,8 +855,14 @@ void profilerTick(){
 	}
 }
 
+uint32_t vgaFlushCountdown;
+
 void singleExecute(){
 	instructionExecutionCount++;
+	if (vgaFlushCountdown++>8192){
+		vgaFlushCountdown=0;
+		performUpdateVGAtoSDL();
+	}
 	if (printEachInstruction){
 		if (countdownToFlush==0){
 			fflush(stdout);
