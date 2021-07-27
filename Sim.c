@@ -97,8 +97,7 @@ noreturn void bye(void){
 	printf("\nTotal instructions executed:%llu\n",(unsigned long long)instructionExecutionCount);
 	printProfileResults();
 	fflush(stdout);
-	globalSDL_Information.isMemoryStateDirty=true;// why not I guess
-	performUpdateVGAtoSDL();
+	globalSDL_Information.isMemoryStateDirty=true;performUpdateVGAtoSDL();// do a forced update to screen
 	// these were allocated using normal calloc, not cosmic_calloc
 	free(globalSDL_Information.pixelState);
 	free(machineState);
@@ -156,13 +155,13 @@ void performUpdateVGAtoSDL(){
 		globalSDL_Information.isMemoryStateDirty=false;
 		bool is_wide_font;
 		uint8_t font_height;
-		uint8_t mode_info=globalSDL_Information.memoryState[32767];
+		uint8_t mode_info=globalSDL_Information.memoryState[20479];
 		is_wide_font=(mode_info &(1<<4))==0;
 		font_height=(mode_info &15)+3;
 		bool raw_mode=(mode_info &15)==0;
 		uint16_t font_offset=0;
-		font_offset |=globalSDL_Information.memoryState[32764]<<0;
-		font_offset |=globalSDL_Information.memoryState[32765]<<8;
+		font_offset |=globalSDL_Information.memoryState[20476]<<0;
+		font_offset |=globalSDL_Information.memoryState[20477]<<8;
 		if (raw_mode){
 			printf("\rRAW mode for VGA is not ready\n");
 			bye();
@@ -171,20 +170,22 @@ void performUpdateVGAtoSDL(){
 			bye();
 		} else {
 			for (uint16_t i=0;i<80*54;i++){
-				const uint8_t ch_val=globalSDL_Information.memoryState[i * 3 + 0];
-				const uint8_t ch_foreground=globalSDL_Information.memoryState[i * 3 + 1];
-				const uint8_t ch_background=globalSDL_Information.memoryState[i * 3 + 2];
-				const uint16_t font_addr=font_offset + ch_val * font_height;
-				uint8_t font_buff[256];
-				if (font_addr+font_height<32768){
-					memcpy(font_buff,globalSDL_Information.memoryState+font_addr,font_height);
-					const uint32_t xf=i%80u;
-					const uint32_t yf=i/80u;
-					const uint32_t ab=(yf * font_height * 640u) + (xf * 8u);
-					for (uint16_t j=0;j<font_height;j++){
-						const uint32_t aa=ab + j * 640u;
-						for (uint8_t k=0;k<8;k++){
-							setVisualPixel(aa+k,((font_buff[j]>>k)&1)?ch_foreground:ch_background);
+				if ((i * 3 + 2)<20480){
+					const uint8_t ch_val=globalSDL_Information.memoryState[i * 3 + 0];
+					const uint8_t ch_foreground=globalSDL_Information.memoryState[i * 3 + 1];
+					const uint8_t ch_background=globalSDL_Information.memoryState[i * 3 + 2];
+					const uint16_t font_addr=font_offset + ch_val * font_height;
+					uint8_t font_buff[256];
+					if (font_addr+font_height<20480){
+						memcpy(font_buff,globalSDL_Information.memoryState+font_addr,font_height);
+						const uint32_t xf=i%80u;
+						const uint32_t yf=i/80u;
+						const uint32_t ab=(yf * font_height * 640u) + (xf * 8u);
+						for (uint16_t j=0;j<font_height;j++){
+							const uint32_t aa=ab + j * 640u;
+							for (uint8_t k=0;k<8;k++){
+								setVisualPixel(aa+k,((font_buff[j]>>k)&1)?ch_foreground:ch_background);
+							}
 						}
 					}
 				}
@@ -213,7 +214,7 @@ void initializeSDL(){
 	SDL_FillRect(globalSDL_Information.surfaceOnWindow,&fullRect,SDL_MapRGB(globalSDL_Information.surfaceOnWindow->format, 0, 0, 0));
 	SDL_UpdateWindowSurfaceRects(globalSDL_Information.window,&fullRect,1);
 	globalSDL_Information.rectToUpdate=calloc(globalSDL_Information.windowSize.width*globalSDL_Information.windowSize.height,sizeof(SDL_Rect));
-	globalSDL_Information.memoryState=calloc(32768,sizeof(uint8_t));
+	globalSDL_Information.memoryState=calloc(20480,sizeof(uint8_t));
 	assert(globalSDL_Information.rectToUpdate!=NULL && globalSDL_Information.memoryState!=NULL);
 	globalSDL_Information.isSLD_initialized=true;
 	FILE* mif_file=fopen("InitVGA.mif","r");
@@ -291,7 +292,7 @@ void initializeSDL(){
 				fclose(mif_file);
 				bye();
 			}
-			if (addr*2>=32768){
+			if (addr*2>=20480){
 				printf("Error initializing memory for VGA text mode simulator: InitVGA.mif file is invalid [address was out of range]\n");
 				fclose(mif_file);
 				bye();
@@ -451,13 +452,82 @@ void triggerFileClose(){
 }
 
 
-
-
-
 void handleCacheMiss(){
 	
 }
 
+
+struct ps2_state_struct{
+	uint8_t buff_in[256];
+	uint8_t buff_out[256];
+	uint8_t pos_in_write;
+	uint8_t pos_in_read;
+	uint8_t pos_out_write;
+	uint8_t pos_out_read;
+	bool had_overflow;
+} ps2_state;
+
+void ps2ProcessCommands();
+
+void ps2AddBytes(const uint8_t* b){ // this function is for bytes coming in from the "keyboard"
+	while (*b!=0) {
+		ps2_state.buff_in[(++ps2_state.pos_in_write)&255] = *(b++);
+		ps2_state.had_overflow |= ps2_state.pos_in_write == ps2_state.pos_in_read;
+	}
+}
+
+uint8_t ps2ReadTopByte(){
+	return ps2_state.buff_in[ps2_state.pos_in_read];
+}
+
+uint8_t ps2HasTopByte(){
+	return (ps2_state.pos_in_write!=ps2_state.pos_in_read)?1:0;
+}
+
+void ps2PopTopByte(){
+	++ps2_state.pos_in_read;
+}
+
+void ps2PushByte(uint8_t b){
+	ps2_state.buff_in[(++ps2_state.pos_out_write)&255] = b;
+	ps2ProcessCommands();
+}
+
+void ps2ProcessCommands(){
+	static uint8_t ps2_command_state;
+	while (ps2_state.pos_out_read!=ps2_state.pos_out_write){
+		uint8_t b=ps2_state.buff_in[(++ps2_state.pos_out_read)&255];
+		switch (ps2_command_state){
+			case 0:
+			switch (b){
+				case 0xED:ps2_command_state=1;break;
+				case 0xEE:ps2AddBytes((const uint8_t[]){0xEE,0});break;
+				case 0xF0:ps2_command_state=2;break;
+				case 0xF3:ps2AddBytes((const uint8_t[]){0xFA,0});break;
+				case 0xFE:ps2AddBytes((const uint8_t[]){ps2_state.buff_in[ps2_state.pos_in_write],0});break;
+				case 0xFF:ps2AddBytes((const uint8_t[]){0xAA,0});break;
+				default:ps2AddBytes((const uint8_t[]){0xFE,0});break;// unknown command
+			}
+			break;
+			case 1:
+			ps2AddBytes((const uint8_t[]){0xFA,0});// don't care about leds, just say it succeeded
+			ps2_command_state=0;
+			break;
+			case 2:
+			switch (b){
+				case 0:ps2AddBytes((const uint8_t[]){0xFA,2,0});// using scancode 2
+				case 1:ps2AddBytes((const uint8_t[]){0xFE,0});// can't change scancode
+				case 2:ps2AddBytes((const uint8_t[]){0xFA,0});// already using scancode 2
+				case 3:ps2AddBytes((const uint8_t[]){0xFE,0});// can't change scancode
+				default:ps2AddBytes((const uint8_t[]){0xFE,0});// invalid data byte
+				break;
+			}
+			ps2_command_state=0;
+			break;
+			default:assert(0);
+		}
+	}
+}
 
 uint16_t readWord(uint32_t a){
 	//if (a!=machineState->pc) printf("MEM R word:[%08X]\n",a);
@@ -481,6 +551,10 @@ uint16_t readWord(uint32_t a){
 		}
 		if (a>=0x80800000 && a<=0x808FFFFF){
 			uint32_t m=(a-0x80800000)&0x7FFF;
+			if (m>=20480){
+				printf("Mem fault (VGA)[readWord]:address out of bounds:%08X\n",m);
+				bye();
+			}
 			return (globalSDL_Information.memoryState[m+0]<<0)|(globalSDL_Information.memoryState[m+1]<<8);
 		}
 		makeColor(COLOR_TO_TEXT,COLOR_RED);
@@ -511,7 +585,19 @@ uint8_t readByte(uint32_t a){
 		}
 		if (a>=0x80800000 && a<=0x808FFFFF){
 			uint32_t m=(a-0x80800000)&0x7FFF;
+			if (m>=20480){
+				printf("Mem fault (VGA)[readByte]:address out of bounds:%08X\n",m);
+				bye();
+			}
 			return globalSDL_Information.memoryState[m];
+		}
+		if (a>=0x81800000 && a<=0x818FFFFF){
+			switch (a&7){
+				case 0:return ps2ReadTopByte();
+				case 2:return ((unsigned)ps2_state.pos_out_read - (unsigned)ps2_state.pos_out_write)&255;
+				case 3:return ((unsigned)ps2_state.pos_in_read - (unsigned)ps2_state.pos_in_write)&255;// would be surprised if this was not 0 because this is a simulator...
+				case 6:return ps2_state.had_overflow;
+			}
 		}
 		if (a>=0x05000000 & a<=0x05FFFFFF){
 			if (fileAccessInfo.contents==NULL | !fileAccessInfo.isRead){
@@ -572,6 +658,10 @@ void writeWord(uint32_t a,uint16_t w){
 		}
 		if (a>=0x80800000 && a<=0x808FFFFF){
 			uint32_t m=(a-0x80800000)&0x7FFF;
+			if (m>=20480){
+				printf("Mem fault (VGA)[writeWord]:address out of bounds:%08X\n",m);
+				bye();
+			}
 			globalSDL_Information.memoryState[m+0]=w>>0;
 			globalSDL_Information.memoryState[m+1]=w>>8;
 			globalSDL_Information.isMemoryStateDirty=true;
@@ -631,9 +721,20 @@ void writeByte(uint32_t a,uint8_t b){
 		}
 		if (a>=0x80800000 && a<=0x808FFFFF){
 			uint32_t m=(a-0x80800000)&0x7FFF;
+			if (m>=20480){
+				printf("Mem fault (VGA)[writeByte]:address out of bounds:%08X\n",m);
+				bye();
+			}
 			globalSDL_Information.memoryState[m]=b;
 			globalSDL_Information.isMemoryStateDirty=true;
 			return;
+		}
+		if (a>=0x81800000 && a<=0x818FFFFF){
+			switch (a&7){
+				case 0:ps2PopTopByte();return;
+				case 1:ps2PushByte(b);return;
+				case 6:ps2_state.had_overflow=0;return;
+			}
 		}
 		if (a==0x05000000){
 			if (fileAccessInfo.outFile==NULL | fileAccessInfo.isRead){
@@ -1012,12 +1113,179 @@ void singleExecute(){
 void fullExecute(){
 	while (!isTerminationTriggered){
 		if (globalSDL_Information.eventPullCountdown--==0){
-			SDL_PollEvent(&globalSDL_Information.event);
-			if (globalSDL_Information.event.type == SDL_QUIT){
-				printf("Premature Exit Initiated...\n");
-				bye();
+			if (SDL_PollEvent(&globalSDL_Information.event)){
+				globalSDL_Information.eventPullCountdown=16;
+				if (globalSDL_Information.event.type == SDL_QUIT){
+					printf("Premature Exit Initiated...\n");
+					bye();
+				}
+				if ((globalSDL_Information.event.type==SDL_KEYDOWN || globalSDL_Information.event.type==SDL_KEYUP) && globalSDL_Information.event.key.repeat==0){
+					if (globalSDL_Information.event.type==SDL_KEYDOWN){
+						switch (globalSDL_Information.event.key.keysym.scancode){
+							case SDL_SCANCODE_0:ps2AddBytes((const uint8_t[]){0x45,0});break;
+							case SDL_SCANCODE_1:ps2AddBytes((const uint8_t[]){0x16,0});break;
+							case SDL_SCANCODE_2:ps2AddBytes((const uint8_t[]){0x1E,0});break;
+							case SDL_SCANCODE_3:ps2AddBytes((const uint8_t[]){0x26,0});break;
+							case SDL_SCANCODE_4:ps2AddBytes((const uint8_t[]){0x25,0});break;
+							case SDL_SCANCODE_5:ps2AddBytes((const uint8_t[]){0x2E,0});break;
+							case SDL_SCANCODE_6:ps2AddBytes((const uint8_t[]){0x36,0});break;
+							case SDL_SCANCODE_7:ps2AddBytes((const uint8_t[]){0x3D,0});break;
+							case SDL_SCANCODE_8:ps2AddBytes((const uint8_t[]){0x3E,0});break;
+							case SDL_SCANCODE_9:ps2AddBytes((const uint8_t[]){0x46,0});break;
+							case SDL_SCANCODE_KP_0:ps2AddBytes((const uint8_t[]){0x70,0});break;
+							case SDL_SCANCODE_KP_1:ps2AddBytes((const uint8_t[]){0x6B,0});break;
+							case SDL_SCANCODE_KP_2:ps2AddBytes((const uint8_t[]){0x72,0});break;
+							case SDL_SCANCODE_KP_3:ps2AddBytes((const uint8_t[]){0x7A,0});break;
+							case SDL_SCANCODE_KP_4:ps2AddBytes((const uint8_t[]){0x6B,0});break;
+							case SDL_SCANCODE_KP_5:ps2AddBytes((const uint8_t[]){0x73,0});break;
+							case SDL_SCANCODE_KP_6:ps2AddBytes((const uint8_t[]){0x74,0});break;
+							case SDL_SCANCODE_KP_7:ps2AddBytes((const uint8_t[]){0x6C,0});break;
+							case SDL_SCANCODE_KP_8:ps2AddBytes((const uint8_t[]){0x75,0});break;
+							case SDL_SCANCODE_KP_9:ps2AddBytes((const uint8_t[]){0x7D,0});break;
+							case SDL_SCANCODE_KP_MULTIPLY:ps2AddBytes((const uint8_t[]){0x7C,0});break;
+							case SDL_SCANCODE_KP_MINUS:ps2AddBytes((const uint8_t[]){0x7B,0});break;
+							case SDL_SCANCODE_KP_DIVIDE:ps2AddBytes((const uint8_t[]){0xE0,0x4A,0});break;
+							case SDL_SCANCODE_KP_ENTER:ps2AddBytes((const uint8_t[]){0xE0,0x5A,0});break;
+							case SDL_SCANCODE_KP_PERIOD:ps2AddBytes((const uint8_t[]){0x71,0});break;
+							case SDL_SCANCODE_A:ps2AddBytes((const uint8_t[]){0x1C,0});break;
+							case SDL_SCANCODE_B:ps2AddBytes((const uint8_t[]){0x32,0});break;
+							case SDL_SCANCODE_C:ps2AddBytes((const uint8_t[]){0x21,0});break;
+							case SDL_SCANCODE_D:ps2AddBytes((const uint8_t[]){0x23,0});break;
+							case SDL_SCANCODE_E:ps2AddBytes((const uint8_t[]){0x24,0});break;
+							case SDL_SCANCODE_F:ps2AddBytes((const uint8_t[]){0x2B,0});break;
+							case SDL_SCANCODE_G:ps2AddBytes((const uint8_t[]){0x34,0});break;
+							case SDL_SCANCODE_H:ps2AddBytes((const uint8_t[]){0x33,0});break;
+							case SDL_SCANCODE_I:ps2AddBytes((const uint8_t[]){0x43,0});break;
+							case SDL_SCANCODE_J:ps2AddBytes((const uint8_t[]){0x3B,0});break;
+							case SDL_SCANCODE_K:ps2AddBytes((const uint8_t[]){0x42,0});break;
+							case SDL_SCANCODE_L:ps2AddBytes((const uint8_t[]){0x4B,0});break;
+							case SDL_SCANCODE_M:ps2AddBytes((const uint8_t[]){0x3A,0});break;
+							case SDL_SCANCODE_N:ps2AddBytes((const uint8_t[]){0x31,0});break;
+							case SDL_SCANCODE_O:ps2AddBytes((const uint8_t[]){0x44,0});break;
+							case SDL_SCANCODE_P:ps2AddBytes((const uint8_t[]){0x4D,0});break;
+							case SDL_SCANCODE_Q:ps2AddBytes((const uint8_t[]){0x15,0});break;
+							case SDL_SCANCODE_R:ps2AddBytes((const uint8_t[]){0x2D,0});break;
+							case SDL_SCANCODE_S:ps2AddBytes((const uint8_t[]){0x1B,0});break;
+							case SDL_SCANCODE_T:ps2AddBytes((const uint8_t[]){0x2C,0});break;
+							case SDL_SCANCODE_U:ps2AddBytes((const uint8_t[]){0x3C,0});break;
+							case SDL_SCANCODE_V:ps2AddBytes((const uint8_t[]){0x2A,0});break;
+							case SDL_SCANCODE_W:ps2AddBytes((const uint8_t[]){0x1D,0});break;
+							case SDL_SCANCODE_X:ps2AddBytes((const uint8_t[]){0x22,0});break;
+							case SDL_SCANCODE_Y:ps2AddBytes((const uint8_t[]){0x35,0});break;
+							case SDL_SCANCODE_Z:ps2AddBytes((const uint8_t[]){0x1A,0});break;
+							case SDL_SCANCODE_LALT:ps2AddBytes((const uint8_t[]){0x11,0});break;
+							case SDL_SCANCODE_RALT:ps2AddBytes((const uint8_t[]){0xE0,0x11,0});break;
+							case SDL_SCANCODE_LCTRL:ps2AddBytes((const uint8_t[]){0x14,0});break;
+							case SDL_SCANCODE_RCTRL:ps2AddBytes((const uint8_t[]){0xE0,0x14,0});break;
+							case SDL_SCANCODE_LSHIFT:ps2AddBytes((const uint8_t[]){0x12,0});break;
+							case SDL_SCANCODE_RSHIFT:ps2AddBytes((const uint8_t[]){0x59,0});break;
+							case SDL_SCANCODE_COMMA:ps2AddBytes((const uint8_t[]){0x41,0});break;
+							case SDL_SCANCODE_PERIOD:ps2AddBytes((const uint8_t[]){0x49,0});break;
+							case SDL_SCANCODE_SLASH:ps2AddBytes((const uint8_t[]){0x4A,0});break;
+							case SDL_SCANCODE_SEMICOLON:ps2AddBytes((const uint8_t[]){0x4C,0});break;
+							case SDL_SCANCODE_APOSTROPHE:ps2AddBytes((const uint8_t[]){0x52,0});break;
+							case SDL_SCANCODE_RETURN:case SDL_SCANCODE_RETURN2:ps2AddBytes((const uint8_t[]){0x5A,0});break;
+							case SDL_SCANCODE_LEFTBRACKET:ps2AddBytes((const uint8_t[]){0x54,0});break;
+							case SDL_SCANCODE_RIGHTBRACKET:ps2AddBytes((const uint8_t[]){0x5B,0});break;
+							case SDL_SCANCODE_BACKSLASH:ps2AddBytes((const uint8_t[]){0x4A,0});break;
+							case SDL_SCANCODE_GRAVE:ps2AddBytes((const uint8_t[]){0x0E,0});break;
+							case SDL_SCANCODE_MINUS:ps2AddBytes((const uint8_t[]){0x4E,0});break;
+							case SDL_SCANCODE_EQUALS:ps2AddBytes((const uint8_t[]){0x55,0});break;
+							case SDL_SCANCODE_BACKSPACE:ps2AddBytes((const uint8_t[]){0x66,0});break;
+							case SDL_SCANCODE_ESCAPE:ps2AddBytes((const uint8_t[]){0x76,0});break;
+							case SDL_SCANCODE_TAB:ps2AddBytes((const uint8_t[]){0x0D,0});break;
+							case SDL_SCANCODE_UP:ps2AddBytes((const uint8_t[]){0xE0,0x75,0});break;
+							case SDL_SCANCODE_LEFT:ps2AddBytes((const uint8_t[]){0xE0,0x6B,0});break;
+							case SDL_SCANCODE_DOWN:ps2AddBytes((const uint8_t[]){0xE0,0x72,0});break;
+							case SDL_SCANCODE_RIGHT:ps2AddBytes((const uint8_t[]){0xE0,0x74,0});break;
+							// don't care about other keys
+						}
+					} else {
+						switch (globalSDL_Information.event.key.keysym.scancode){
+							case SDL_SCANCODE_0:ps2AddBytes((const uint8_t[]){0xF0,0x45,0});break;
+							case SDL_SCANCODE_1:ps2AddBytes((const uint8_t[]){0xF0,0x16,0});break;
+							case SDL_SCANCODE_2:ps2AddBytes((const uint8_t[]){0xF0,0x1E,0});break;
+							case SDL_SCANCODE_3:ps2AddBytes((const uint8_t[]){0xF0,0x26,0});break;
+							case SDL_SCANCODE_4:ps2AddBytes((const uint8_t[]){0xF0,0x25,0});break;
+							case SDL_SCANCODE_5:ps2AddBytes((const uint8_t[]){0xF0,0x2E,0});break;
+							case SDL_SCANCODE_6:ps2AddBytes((const uint8_t[]){0xF0,0x36,0});break;
+							case SDL_SCANCODE_7:ps2AddBytes((const uint8_t[]){0xF0,0x3D,0});break;
+							case SDL_SCANCODE_8:ps2AddBytes((const uint8_t[]){0xF0,0x3E,0});break;
+							case SDL_SCANCODE_9:ps2AddBytes((const uint8_t[]){0xF0,0x46,0});break;
+							case SDL_SCANCODE_KP_0:ps2AddBytes((const uint8_t[]){0xF0,0x70,0});break;
+							case SDL_SCANCODE_KP_1:ps2AddBytes((const uint8_t[]){0xF0,0x6B,0});break;
+							case SDL_SCANCODE_KP_2:ps2AddBytes((const uint8_t[]){0xF0,0x72,0});break;
+							case SDL_SCANCODE_KP_3:ps2AddBytes((const uint8_t[]){0xF0,0x7A,0});break;
+							case SDL_SCANCODE_KP_4:ps2AddBytes((const uint8_t[]){0xF0,0x6B,0});break;
+							case SDL_SCANCODE_KP_5:ps2AddBytes((const uint8_t[]){0xF0,0x73,0});break;
+							case SDL_SCANCODE_KP_6:ps2AddBytes((const uint8_t[]){0xF0,0x74,0});break;
+							case SDL_SCANCODE_KP_7:ps2AddBytes((const uint8_t[]){0xF0,0x6C,0});break;
+							case SDL_SCANCODE_KP_8:ps2AddBytes((const uint8_t[]){0xF0,0x75,0});break;
+							case SDL_SCANCODE_KP_9:ps2AddBytes((const uint8_t[]){0xF0,0x7D,0});break;
+							case SDL_SCANCODE_KP_MULTIPLY:ps2AddBytes((const uint8_t[]){0xF0,0x7C,0});break;
+							case SDL_SCANCODE_KP_MINUS:ps2AddBytes((const uint8_t[]){0xF0,0x7B,0});break;
+							case SDL_SCANCODE_KP_DIVIDE:ps2AddBytes((const uint8_t[]){0xE0,0xF0,0x4A,0});break;
+							case SDL_SCANCODE_KP_ENTER:ps2AddBytes((const uint8_t[]){0xE0,0xF0,0x5A,0});break;
+							case SDL_SCANCODE_KP_PERIOD:ps2AddBytes((const uint8_t[]){0xF0,0x71,0});break;
+							case SDL_SCANCODE_A:ps2AddBytes((const uint8_t[]){0xF0,0x1C,0});break;
+							case SDL_SCANCODE_B:ps2AddBytes((const uint8_t[]){0xF0,0x32,0});break;
+							case SDL_SCANCODE_C:ps2AddBytes((const uint8_t[]){0xF0,0x21,0});break;
+							case SDL_SCANCODE_D:ps2AddBytes((const uint8_t[]){0xF0,0x23,0});break;
+							case SDL_SCANCODE_E:ps2AddBytes((const uint8_t[]){0xF0,0x24,0});break;
+							case SDL_SCANCODE_F:ps2AddBytes((const uint8_t[]){0xF0,0x2B,0});break;
+							case SDL_SCANCODE_G:ps2AddBytes((const uint8_t[]){0xF0,0x34,0});break;
+							case SDL_SCANCODE_H:ps2AddBytes((const uint8_t[]){0xF0,0x33,0});break;
+							case SDL_SCANCODE_I:ps2AddBytes((const uint8_t[]){0xF0,0x43,0});break;
+							case SDL_SCANCODE_J:ps2AddBytes((const uint8_t[]){0xF0,0x3B,0});break;
+							case SDL_SCANCODE_K:ps2AddBytes((const uint8_t[]){0xF0,0x42,0});break;
+							case SDL_SCANCODE_L:ps2AddBytes((const uint8_t[]){0xF0,0x4B,0});break;
+							case SDL_SCANCODE_M:ps2AddBytes((const uint8_t[]){0xF0,0x3A,0});break;
+							case SDL_SCANCODE_N:ps2AddBytes((const uint8_t[]){0xF0,0x31,0});break;
+							case SDL_SCANCODE_O:ps2AddBytes((const uint8_t[]){0xF0,0x44,0});break;
+							case SDL_SCANCODE_P:ps2AddBytes((const uint8_t[]){0xF0,0x4D,0});break;
+							case SDL_SCANCODE_Q:ps2AddBytes((const uint8_t[]){0xF0,0x15,0});break;
+							case SDL_SCANCODE_R:ps2AddBytes((const uint8_t[]){0xF0,0x2D,0});break;
+							case SDL_SCANCODE_S:ps2AddBytes((const uint8_t[]){0xF0,0x1B,0});break;
+							case SDL_SCANCODE_T:ps2AddBytes((const uint8_t[]){0xF0,0x2C,0});break;
+							case SDL_SCANCODE_U:ps2AddBytes((const uint8_t[]){0xF0,0x3C,0});break;
+							case SDL_SCANCODE_V:ps2AddBytes((const uint8_t[]){0xF0,0x2A,0});break;
+							case SDL_SCANCODE_W:ps2AddBytes((const uint8_t[]){0xF0,0x1D,0});break;
+							case SDL_SCANCODE_X:ps2AddBytes((const uint8_t[]){0xF0,0x22,0});break;
+							case SDL_SCANCODE_Y:ps2AddBytes((const uint8_t[]){0xF0,0x35,0});break;
+							case SDL_SCANCODE_Z:ps2AddBytes((const uint8_t[]){0xF0,0x1A,0});break;
+							case SDL_SCANCODE_LALT:ps2AddBytes((const uint8_t[]){0xF0,0x11,0});break;
+							case SDL_SCANCODE_RALT:ps2AddBytes((const uint8_t[]){0xE0,0xF0,0x11,0});break;
+							case SDL_SCANCODE_LCTRL:ps2AddBytes((const uint8_t[]){0xF0,0x14,0});break;
+							case SDL_SCANCODE_RCTRL:ps2AddBytes((const uint8_t[]){0xE0,0xF0,0x14,0});break;
+							case SDL_SCANCODE_LSHIFT:ps2AddBytes((const uint8_t[]){0xF0,0x12,0});break;
+							case SDL_SCANCODE_RSHIFT:ps2AddBytes((const uint8_t[]){0xF0,0x59,0});break;
+							case SDL_SCANCODE_COMMA:ps2AddBytes((const uint8_t[]){0xF0,0x41,0});break;
+							case SDL_SCANCODE_PERIOD:ps2AddBytes((const uint8_t[]){0xF0,0x49,0});break;
+							case SDL_SCANCODE_SLASH:ps2AddBytes((const uint8_t[]){0xF0,0x4A,0});break;
+							case SDL_SCANCODE_SEMICOLON:ps2AddBytes((const uint8_t[]){0xF0,0x4C,0});break;
+							case SDL_SCANCODE_APOSTROPHE:ps2AddBytes((const uint8_t[]){0xF0,0x52,0});break;
+							case SDL_SCANCODE_RETURN:case SDL_SCANCODE_RETURN2:ps2AddBytes((const uint8_t[]){0xF0,0x5A,0});break;
+							case SDL_SCANCODE_LEFTBRACKET:ps2AddBytes((const uint8_t[]){0xF0,0x54,0});break;
+							case SDL_SCANCODE_RIGHTBRACKET:ps2AddBytes((const uint8_t[]){0xF0,0x5B,0});break;
+							case SDL_SCANCODE_BACKSLASH:ps2AddBytes((const uint8_t[]){0xF0,0x4A,0});break;
+							case SDL_SCANCODE_GRAVE:ps2AddBytes((const uint8_t[]){0xF0,0x0E,0});break;
+							case SDL_SCANCODE_MINUS:ps2AddBytes((const uint8_t[]){0xF0,0x4E,0});break;
+							case SDL_SCANCODE_EQUALS:ps2AddBytes((const uint8_t[]){0xF0,0x55,0});break;
+							case SDL_SCANCODE_BACKSPACE:ps2AddBytes((const uint8_t[]){0xF0,0x66,0});break;
+							case SDL_SCANCODE_ESCAPE:ps2AddBytes((const uint8_t[]){0xF0,0x76,0});break;
+							case SDL_SCANCODE_TAB:ps2AddBytes((const uint8_t[]){0xF0,0x0D,0});break;
+							case SDL_SCANCODE_UP:ps2AddBytes((const uint8_t[]){0xE0,0xF0,0x75,0});break;
+							case SDL_SCANCODE_LEFT:ps2AddBytes((const uint8_t[]){0xE0,0xF0,0x6B,0});break;
+							case SDL_SCANCODE_DOWN:ps2AddBytes((const uint8_t[]){0xE0,0xF0,0x72,0});break;
+							case SDL_SCANCODE_RIGHT:ps2AddBytes((const uint8_t[]){0xE0,0xF0,0x74,0});break;
+							// don't care about other keys
+						}
+					}
+				}
+				//todo: add processing to transform SDL's key presses into scancodes and act as the ps2 controller
+			} else {
+				globalSDL_Information.eventPullCountdown=8192;
 			}
-			globalSDL_Information.eventPullCountdown=20;
 		}
 		if (machineState->pc==0x04010000){
 			isTerminationTriggered=true;
@@ -1062,7 +1330,7 @@ void performTraceback(uint64_t iicTarget){
 				printf("Premature Exit Initiated...\n");
 				bye();
 			}
-			globalSDL_Information.eventPullCountdown=20;
+			globalSDL_Information.eventPullCountdown=1024;
 		}
 		singleExecute();
 	}

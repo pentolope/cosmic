@@ -33,7 +33,7 @@ static struct {
 };
 
 static void _putchar_ensure_cursor_normal(){
-	uint8_t mode_info=*(volatile uint8_t*)(0x80807ffflu);
+	uint8_t mode_info=*(volatile uint8_t*)(0x80804ffflu);
 	uint8_t font_height=(mode_info &15)+3;
 	unsigned n0=480u/(unsigned)font_height;
 	unsigned n1=n0-1;
@@ -74,10 +74,10 @@ static void _putchar_screen(char c){
 		_terminalCharacterState.cursor++;
 		_putchar_ensure_cursor_normal();
 	} else if (c=='\r'){
-		unsigned n=(((*(volatile uint8_t*)(0x80807ffflu)&(1<<4))!=0)?80u:71u);
+		unsigned n=(((*(volatile uint8_t*)(0x80804ffflu)&(1<<4))!=0)?80u:71u);
 		_terminalCharacterState.cursor-=_terminalCharacterState.cursor%n;
 	} else if (c=='\n'){
-		unsigned n=(((*(volatile uint8_t*)(0x80807ffflu)&(1<<4))!=0)?80u:71u);
+		unsigned n=(((*(volatile uint8_t*)(0x80804ffflu)&(1<<4))!=0)?80u:71u);
 		_terminalCharacterState.cursor-=_terminalCharacterState.cursor%n;
 		_terminalCharacterState.cursor+=n;
 		_putchar_ensure_cursor_normal();
