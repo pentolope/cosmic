@@ -150,7 +150,7 @@ void finalOutputFromCompile(const char* filePath){
 			safe_fputc(cis_global_static_data.byteCode[i]);
 		}
 		// null terminator for static data is already placed by the loop above
-		if (fclose(safe_fputc_file)!=0) err_10_1_(strMerge3("Could not close \'",safe_fputc_file_path,"\' after writting"));
+		if (fclose(safe_fputc_file)!=0) err_10_1_(strMerge3("Could not close \'",safe_fputc_file_path,"\' after writing"));
 		safe_fputc_file=NULL;
 		safe_fputc_file_path=NULL;
 		cosmic_free(cis_global_static_data.byteCode);

@@ -380,9 +380,9 @@ Opening a file for reading or writing may be done by writing mode to 0x04020001 
   closing a file may be done by writing a 0 to 0x04020003
   only one file may be opened at a time
   Once a file is opened for reading, it's contents are in the range 0x05000000->0x05FFFFFF and the length [which may be word read/written] is at 0x04020006->0x04020009
-  Once a file is opened for writing, it's contents can be written to by writting to 0x05000000 repeatedly (there is no sense of position)
+  Once a file is opened for writing, it's contents can be written to by writing to 0x05000000 repeatedly (there is no sense of position)
 
-[Debug only please] a character may be written to the simulator console by writting to 0x04030000 with the character
+[Debug only please] a character may be written to the simulator console by writing to 0x04030000 with the character
 
 */
 

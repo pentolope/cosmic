@@ -67,7 +67,7 @@ void intrinsicBuild(){
 		safe_fputc(se.type);
 		cosmic_free(se.name);
 	}
-	if (fclose(safe_fputc_file)!=0) err_10_1_("Could not close required file after writting");
+	if (fclose(safe_fputc_file)!=0) err_10_1_("Could not close required file after writing");
 	
 	safe_fputc_file_path="IntrinsicBuiltFiles/_intrinsics_functions.bin";
 	safe_fputc_file = fopen("IntrinsicBuiltFiles/_intrinsics_functions.bin","wb");
@@ -75,7 +75,7 @@ void intrinsicBuild(){
 	for (uint32_t i=0;i<cib0.allocLen;i++){
 		safe_fputc(cib0.byteCode[i]);
 	}
-	if (fclose(safe_fputc_file)!=0) err_10_1_("Could not close required file after writting");
+	if (fclose(safe_fputc_file)!=0) err_10_1_("Could not close required file after writing");
 	
 	safe_fputc_file_path="IntrinsicBuiltFiles/_intrinsics_static.bin";
 	safe_fputc_file = fopen("IntrinsicBuiltFiles/_intrinsics_static.bin","wb");
@@ -83,7 +83,7 @@ void intrinsicBuild(){
 	for (uint32_t i=0;i<cib1.allocLen;i++){
 		safe_fputc(cib1.byteCode[i]);
 	}
-	if (fclose(safe_fputc_file)!=0) err_10_1_("Could not close required file after writting");
+	if (fclose(safe_fputc_file)!=0) err_10_1_("Could not close required file after writing");
 	
 	safe_fputc_file=NULL;
 	safe_fputc_file_path=NULL;
