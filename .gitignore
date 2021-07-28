@@ -23,8 +23,6 @@ $RECYCLE.BIN/
 *.bat
 *.sh
 *.o
-FastSimGen.c
-FastSimInitGen.c
 input.c
 input*.c
 *.exe

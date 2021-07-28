@@ -56,7 +56,6 @@ uint32_t addressToInstructionTranslationLen;
 uint64_t instructionExecutionCount;
 bool printEachInstruction;
 bool doFPGAbootGeneration;
-bool doGenerateFastSim;
 bool doCacheSim;
 bool isTerminationTriggered;
 uint16_t terminationValue;
@@ -1580,10 +1579,8 @@ int main(int argc, char** argv){
 		printEachInstruction=true;
 	} else if (doStringsMatch(argv[1],"-fpga")){
 		doFPGAbootGeneration=true;
-	} else if (doStringsMatch(argv[1],"-fast")){
-		doGenerateFastSim=true;
 	}
-	if ((printEachInstruction || doFPGAbootGeneration || doGenerateFastSim) && argc<3){
+	if ((printEachInstruction || doFPGAbootGeneration) && argc<3){
 		printf("No arguments given, you give me no reason to start\n");
 		exit(0);
 	}
@@ -1596,7 +1593,7 @@ int main(int argc, char** argv){
 	machineState->pc=1LU<<16;
 	machineState->sp=0xFFFE;
 	printf("Loading Binary...\n");
-	struct BinContainer binContainer=loadFileContentsAsBinContainer(argv[1+(printEachInstruction+doFPGAbootGeneration+doGenerateFastSim)]);
+	struct BinContainer binContainer=loadFileContentsAsBinContainer(argv[1+(printEachInstruction+doFPGAbootGeneration)]);
 	printf("Integrating Binary...\n");
 	uint32_t mainLabelNumber=0;
 	for (uint32_t i=0;i<binContainer.len_symbols;i++){
@@ -1609,7 +1606,7 @@ int main(int argc, char** argv){
 		printf("Could not find \'main\' in that binary.\n");
 		bye();
 	}
-	if (!(doFPGAbootGeneration || doGenerateFastSim)){
+	if (!(doFPGAbootGeneration)){
 		setvbuf(stdout,printf_buffer,_IOFBF,120000);
 	}
 	InstructionBuffer allData;
@@ -1837,9 +1834,9 @@ int main(int argc, char** argv){
 		cosmic_free(temporaryStorageBuffer);
 		destroyInstructionBuffer(&allData);
 		// now insert the arguments
-		int argcSim=(argc-(printEachInstruction+doFPGAbootGeneration+doGenerateFastSim))-1;
+		int argcSim=(argc-(printEachInstruction+doFPGAbootGeneration))-1;
 		int w=0;
-		for (int i=1+(printEachInstruction+doFPGAbootGeneration+doGenerateFastSim);i<argc;i++){
+		for (int i=1+(printEachInstruction+doFPGAbootGeneration);i<argc;i++){
 			for (int ii=0;argv[i][ii];ii++){
 				initMemWrite(storageSize+ w++,argv[i][ii]);
 			}
@@ -1851,7 +1848,7 @@ int main(int argc, char** argv){
 		storageSize+=storageSize&1;
 		uint32_t argvSim=storageSize;
 		int w2=0;
-		for (int i=1+(printEachInstruction+doFPGAbootGeneration+doGenerateFastSim);i<argc;i++){
+		for (int i=1+(printEachInstruction+doFPGAbootGeneration);i<argc;i++){
 			initMemWrite(storageSize+0,0xFF&((prevStorageSize0+w2)>> 0));
 			initMemWrite(storageSize+1,0xFF&((prevStorageSize0+w2)>> 8));
 			initMemWrite(storageSize+2,0xFF&((prevStorageSize0+w2)>>16));
@@ -1880,242 +1877,16 @@ int main(int argc, char** argv){
 		
 		machineState->pc=mainAddress;// set pc to main address
 		createInitialMachineState();
-		
-		if (doGenerateFastSim){
-			printf("Generating Fast Sim...\n");
-			FILE* fastSimFile;
-			fastSimFile=fopen("FastSimInitGen.c","w");
-			if (fastSimFile==NULL){
-				printf("Failed to open \"FastSimInitGen.c\"\n");
-				bye();
-			}
-			fprintf(fastSimFile,"%s","#include <stdint.h>\n");
-			fprintf(fastSimFile,"%s","void memInit(uint8_t* mem){");
-			for (uint32_t i0=0;i0<(1LLU<<26);i0++){
-				uint8_t b=initMemRead(i0);
-				if (b!=0){
-					fprintf(fastSimFile,"mem[%lu]=%u;\n",(unsigned long)i0,(unsigned)b);
-				}
-			}
-			fprintf(fastSimFile,"%s","}\n");
-			if (fclose(fastSimFile)!=0){
-				printf("Failed to finish writing to \"FastSimInitGen.c\"\n");
-				bye();
-			}
-			fastSimFile=fopen("FastSimGen.c","w");
-			if (fastSimFile==NULL){
-				printf("Failed to open \"FastSimGen.c\"\n");
-				bye();
-			}
-			fprintf(fastSimFile,"%s","#include <stdint.h>\n");
-			fprintf(fastSimFile,"%s","#include <stddef.h>\n");
-			fprintf(fastSimFile,"%s","#include <stdlib.h>\n");
-			fprintf(fastSimFile,"%s","#include <stdio.h>\n");
-			fprintf(fastSimFile,"%s","struct MachineState{uint8_t* mem;uint32_t pc;uint16_t sp;uint16_t reg[16];};\n");
-			fprintf(fastSimFile,"%s","extern void bye();\n");
-			fprintf(fastSimFile,"%s","extern uint8_t readByte(uint32_t a);\n");
-			fprintf(fastSimFile,"%s","extern void writeByte(uint32_t a,uint8_t b);\n");
-			fprintf(fastSimFile,"%s","extern void writeWord(uint32_t a,uint16_t w);\n");
-			fprintf(fastSimFile,"%s","extern uint16_t readWord(uint32_t a);\n");
-			fprintf(fastSimFile,"%s","extern void sdl_pull_event();\n");
-			fprintf(fastSimFile,"%s","void run(struct MachineState ms){\n");
-			fprintf(fastSimFile,"%s","uint32_t tp0,tp1,tp2,tp3;\n");
-			fprintf(fastSimFile,"%s","uint32_t upperExBound;\n");
-			for (unsigned i0=0;i0<16;i0++){
-				fprintf(fastSimFile,"ms.reg[%u]=%u;\n",(unsigned)i0,(unsigned)machineState->reg[i0]);
-			}
-			fprintf(fastSimFile,"ms.sp=%u;\n",(unsigned)machineState->sp);
-			fprintf(fastSimFile,"upperExBound=%lu;\n",(unsigned long)endOfExecutable);
-			fprintf(fastSimFile,"ms.pc=%lu;\n",(unsigned long)machineState->pc);
-			
-			fprintf(fastSimFile,"LJUMP:;\n");
-			//fprintf(fastSimFile,"printf(\"$%%08X\\n\",(unsigned)ms.pc);");
-			//fprintf(fastSimFile,"stateDump(ms);\n");
-			//fprintf(fastSimFile,"sdl_pull_event();\n");
-			fprintf(fastSimFile,"switch (ms.pc){\n");
-			for (uint32_t i1=0;i1<numberOfLabels;i1++){
-				if ((labelAddresses[i1]&1)==0 && labelAddresses[i1]<=endOfExecutable) fprintf(fastSimFile,"case %lu:goto LN%08X;\n",(unsigned long)labelAddresses[i1],(unsigned)labelNumbers[i1]);
-			}
-			for (uint32_t i0=1LU<<16;i0<(1LLU<<26) && i0<=endOfExecutable;i0+=2){
-				uint8_t b0=initMemRead(i0+0);
-				uint8_t b1=initMemRead(i0+1);
-				uint16_t w=(b1<<8)|b0;
-				uint8_t type=((w&0xF000u)!=0xF000u)?((w>>12)&0xFu):(((w>>8)&0xFu)|0x10u);
-				bool dup=false;
-				if (type==0x1A){
-					for (uint32_t i1=0;i1<numberOfLabels;i1++){
-						if ((labelAddresses[i1]&1)==0 && labelAddresses[i1]<=endOfExecutable){
-							if ((i0+2u)==labelAddresses[i1]){
-								dup=true;
-								break;
-							}
-						}
-					}
-					if (!dup){
-						fprintf(fastSimFile,"case %u:goto AR%08X;\n",(unsigned)(i0+2u),(unsigned)(i0+2u));
-					}
-				}
-			}
-			fprintf(fastSimFile,"default:printf(\"Error: bad jump address [it was not a label or after a CALL] {%%08X}\\n\",ms.pc);bye();return;\n");
-			fprintf(fastSimFile,"}\n");
-			fprintf(fastSimFile,"ms.pc=1LU<<16;\n");
-			
-			for (uint32_t i0=1LU<<16;i0<(1LLU<<26) && i0<=endOfExecutable;i0+=2){
-				for (uint32_t i1=0;i1<numberOfLabels;i1++){
-					if (labelAddresses[i1]==i0){
-						fprintf(fastSimFile,"LN%08X:;\n",(unsigned)labelNumbers[i1]);
-					}
-				}
-				fprintf(fastSimFile,"ms.pc+=2;");
-				uint8_t b0=initMemRead(i0+0);
-				uint8_t b1=initMemRead(i0+1);
-				uint16_t w=(b1<<8)|b0;
-				uint8_t type=((w&0xF000u)!=0xF000u)?((w>>12)&0xFu):(((w>>8)&0xFu)|0x10u);
-				uint8_t r0=(w>>0)&0xFu;
-				uint8_t r1=(w>>4)&0xFu;
-				uint8_t r2=(w>>8)&0xFu;
-				uint8_t imm=(w>>4)&0xFFu;
-				//fprintf(fastSimFile,"printf(\"#%02X @%08X\\n\");",(unsigned)type,(unsigned)i0);
-				switch (type){
-					case 0x00:
-					fprintf(fastSimFile,"ms.reg[%u]=%u;\n",(unsigned)r0,(unsigned)imm);
-					break;
-					case 0x01:
-					fprintf(fastSimFile,"ms.reg[%u]&=0xFF;ms.reg[%u]|=((unsigned)%u<<8)& 0xFF00u;\n",(unsigned)r0,(unsigned)r0,(unsigned)imm);
-					break;
-					case 0x02:
-					fprintf(fastSimFile,"tp0=ms.reg[1];");
-					fprintf(fastSimFile,"ms.reg[%u] =(unsigned)ms.mem[(unsigned)(tp0+%u*2+0)& 0xFFFFu]<<0;",(unsigned)r0,(unsigned)imm);
-					fprintf(fastSimFile,"ms.reg[%u]|=(unsigned)ms.mem[(unsigned)(tp0+%u*2+1)& 0xFFFFu]<<8;",(unsigned)r0,(unsigned)imm);
-					fprintf(fastSimFile,"tp0=0;\n");
-					break;
-					case 0x03:
-					fprintf(fastSimFile,"ms.mem[(unsigned)(ms.reg[1]+%u*2+0)& 0xFFFFu]=(unsigned)ms.reg[%u]>>0;"  ,(unsigned)imm,(unsigned)r0);
-					fprintf(fastSimFile,"ms.mem[(unsigned)(ms.reg[1]+%u*2+1)& 0xFFFFu]=(unsigned)ms.reg[%u]>>8;\n",(unsigned)imm,(unsigned)r0);
-					break;
-					case 0x04:
-					fprintf(fastSimFile,"ms.reg[%u]=ms.reg[%u] & ms.reg[%u];\n",(unsigned)r0,(unsigned)r1,(unsigned)r2);
-					break;
-					case 0x05:
-					fprintf(fastSimFile,"ms.reg[%u]=ms.reg[%u] | ms.reg[%u];\n",(unsigned)r0,(unsigned)r1,(unsigned)r2);
-					break;
-					case 0x06:
-					fprintf(fastSimFile,"ms.reg[%u]=ms.reg[%u] ^ ms.reg[%u];\n",(unsigned)r0,(unsigned)r1,(unsigned)r2);
-					break;
-					case 0x07:
-					fprintf(fastSimFile,"tp0=(uint32_t)ms.reg[%u] + (uint32_t)ms.reg[%u] + (uint32_t)(~ms.reg[%u]&0xFFFF);",(unsigned)r0,(unsigned)r1,(unsigned)r2);
-					fprintf(fastSimFile,"ms.reg[%u]=(uint16_t)tp0;ms.reg[%u]=(tp0&0x00030000)!=0;tp0=0;\n",(unsigned)r1,(unsigned)r0);
-					break;
-					case 0x08:
-					fprintf(fastSimFile,"tp1=((uint32_t)ms.reg[%u]<<16)|ms.reg[%u];ms.reg[%u]=((tp1^(tp1&0x3FFFFFE))!=0)?readWord(tp1):(ms.mem[(tp1&0x3FFFFFE)+1]<<8)|(ms.mem[(tp1&0x3FFFFFE)+0]<<0);tp1=0;\n",(unsigned)r2,(unsigned)r1,(unsigned)r0);
-					break;
-					case 0x09:
-					fprintf(fastSimFile,"tp1=((uint32_t)ms.reg[%u]<<16)|ms.reg[%u];((tp1^(tp1&0x3FFFFFE))!=0)?writeWord(tp1,ms.reg[%u]):((ms.mem[(tp1&0x3FFFFFE)+1]=(unsigned)ms.reg[%u]>>8),(ms.mem[(tp1&0x3FFFFFE)+0]=(unsigned)ms.reg[%u]>>0));tp1=0;\n",(unsigned)r2,(unsigned)r1,(unsigned)r0,(unsigned)r0,(unsigned)r0);
-					break;
-					case 0x0A:
-					fprintf(fastSimFile,"ms.reg[%u]=ms.reg[%u] + ms.reg[%u];\n",(unsigned)r0,(unsigned)r1,(unsigned)r2);
-					break;
-					case 0x0B:
-					fprintf(fastSimFile,"tp0=(uint32_t)ms.reg[%u] + (uint32_t)ms.reg[%u] + (uint32_t)ms.reg[15];",(unsigned)r1,(unsigned)r2);
-					fprintf(fastSimFile,"ms.reg[%u]=(uint16_t)tp0;ms.reg[15]=(tp0&0x00030000)!=0;tp0=0;\n",(unsigned)r0);
-					break;
-					case 0x0C:
-					fprintf(fastSimFile,"ms.reg[%u]=(uint32_t)ms.reg[%u]+(~(uint32_t)ms.reg[%u]&0xFFFFu)+(uint32_t)1;\n",(unsigned)r0,(unsigned)r1,(unsigned)r2);
-					break;
-					case 0x0D:
-					fprintf(fastSimFile,"ms.reg[%u]=(((uint32_t)ms.reg[%u]+(~(uint32_t)ms.reg[%u]&0xFFFFu)+(uint32_t)1)&0x00010000)!=0;\n",(unsigned)r0,(unsigned)r1,(unsigned)r2);
-					break;
-					case 0x0E:
-					fprintf(fastSimFile,"if (ms.reg[%u]==0u){ms.pc=((uint32_t)ms.reg[%u]<<16)|((uint32_t)ms.reg[%u]<<0);goto LJUMP;}\n",(unsigned)r2,(unsigned)r1,(unsigned)r0);
-					break;
-					case 0x10:
-					fprintf(fastSimFile,"ms.sp-=2;ms.mem[(ms.sp+0)&0xFFFF]=(unsigned)ms.reg[%u]>>0;ms.mem[(ms.sp+1)&0xFFFF]=(unsigned)ms.reg[%u]>>8;\n",(unsigned)r0,(unsigned)r0);
-					break;
-					case 0x11:
-					fprintf(fastSimFile,"ms.sp-=2;ms.mem[(ms.sp+0)&0xFFFF]=(unsigned)ms.reg[%u]>>0;ms.mem[(ms.sp+1)&0xFFFF]=(unsigned)ms.reg[%u]>>8;"  ,(unsigned)r0,(unsigned)r0);
-					fprintf(fastSimFile,"ms.sp-=2;ms.mem[(ms.sp+0)&0xFFFF]=(unsigned)ms.reg[%u]>>0;ms.mem[(ms.sp+1)&0xFFFF]=(unsigned)ms.reg[%u]>>8;\n",(unsigned)r1,(unsigned)r1);
-					break;
-					case 0x12:
-					fprintf(fastSimFile,"ms.reg[%u]=(unsigned)ms.mem[(ms.sp+0)&0xFFFF];ms.reg[%u]|=(unsigned)ms.mem[(ms.sp+1)&0xFFFF]<<8;ms.sp+=2;\n",(unsigned)r0,(unsigned)r0);
-					break;
-					case 0x13:
-					fprintf(fastSimFile,"ms.reg[%u]=(unsigned)ms.mem[(ms.sp+0)&0xFFFF];ms.reg[%u]|=(unsigned)ms.mem[(ms.sp+1)&0xFFFF]<<8;ms.sp+=2;"  ,(unsigned)r0,(unsigned)r0);
-					fprintf(fastSimFile,"ms.reg[%u]=(unsigned)ms.mem[(ms.sp+0)&0xFFFF];ms.reg[%u]|=(unsigned)ms.mem[(ms.sp+1)&0xFFFF]<<8;ms.sp+=2;\n",(unsigned)r1,(unsigned)r1);
-					break;
-					case 0x14:
-					fprintf(fastSimFile,"ms.reg[%u]=ms.reg[%u];\n",(unsigned)r0,(unsigned)r1);
-					break;
-					case 0x15:
-					fprintf(fastSimFile,"ms.reg[%u]=((ms.reg[%u]<<8)&0xFF00u)|((ms.reg[%u]>>8)&0x00FFu);\n",(unsigned)r0,(unsigned)r1,(unsigned)r1);
-					break;
-					case 0x16:
-					fprintf(fastSimFile,"ms.reg[%u]=(ms.reg[%u]>>1)&0x7FFFu;\n",(unsigned)r0,(unsigned)r1);
-					break;
-					case 0x17:
-					fprintf(fastSimFile,"ms.reg[%u]*=ms.reg[%u];\n",(unsigned)r0,(unsigned)r1);
-					break;
-					case 0x18:
-					fprintf(fastSimFile,"tp0=(((uint32_t)ms.reg[%u]<<16) | ((uint32_t)ms.reg[%u]<<0)) * (((uint32_t)ms.reg[14]<<16)|((uint32_t)ms.reg[13]<<0));ms.reg[13]=tp0;ms.reg[14]=tp0>>16;tp0=0;\n",(unsigned)r1,(unsigned)r0);
-					break;
-					case 0x19:
-					fprintf(fastSimFile,"tp0=ms.reg[%u] / ms.reg[%u];ms.reg[%u]=ms.reg[%u] %s ms.reg[%u];ms.reg[%u]=tp0;tp0=0;\n",(unsigned)r0,(unsigned)r1,(unsigned)r1,(unsigned)r0,"%",(unsigned)r1,(unsigned)r0);
-					break;
-					case 0x1A:
-					fprintf(fastSimFile,"ms.sp-=2;ms.mem[(ms.sp+0)&0xFFFF]=(unsigned)ms.reg[0]>>0;ms.mem[(ms.sp+1)&0xFFFF]=(unsigned)ms.reg[0]>>8;");
-					fprintf(fastSimFile,"ms.sp-=2;ms.mem[(ms.sp+0)&0xFFFF]=(unsigned)ms.reg[1]>>0;ms.mem[(ms.sp+1)&0xFFFF]=(unsigned)ms.reg[1]>>8;");
-					fprintf(fastSimFile,"ms.sp-=2;ms.mem[(ms.sp+0)&0xFFFF]=ms.pc>>16;ms.mem[(ms.sp+1)&0xFFFF]=ms.pc>>24;");
-					fprintf(fastSimFile,"ms.sp-=2;ms.mem[(ms.sp+0)&0xFFFF]=ms.pc>> 0;ms.mem[(ms.sp+1)&0xFFFF]=ms.pc>> 8;");
-					fprintf(fastSimFile,"ms.reg[0]=ms.sp;\n");
-					fprintf(fastSimFile,"ms.pc=((uint32_t)ms.reg[%u]<<16)|((uint32_t)ms.reg[%u]<<0);goto LJUMP;",(unsigned)r1,(unsigned)r0);
-					fprintf(fastSimFile,"AR%08X:;\n",(unsigned)(i0+2u));
-					break;
-					case 0x1B:
-					fprintf(fastSimFile,"ms.sp=ms.reg[0]&0xFFFE;");
-					fprintf(fastSimFile,"tp0=(unsigned)ms.mem[(ms.sp+0)&0xFFFF];tp0|=(unsigned)ms.mem[(ms.sp+1)&0xFFFF]<<8;ms.sp+=2;");
-					fprintf(fastSimFile,"tp1=(unsigned)ms.mem[(ms.sp+0)&0xFFFF];tp1|=(unsigned)ms.mem[(ms.sp+1)&0xFFFF]<<8;ms.sp+=2;");
-					fprintf(fastSimFile,"ms.reg[1]=(unsigned)ms.mem[(ms.sp+0)&0xFFFF];ms.reg[1]|=(unsigned)ms.mem[(ms.sp+1)&0xFFFF]<<8;ms.sp+=2;");
-					fprintf(fastSimFile,"ms.reg[0]=(unsigned)ms.mem[(ms.sp+0)&0xFFFF];ms.reg[0]|=(unsigned)ms.mem[(ms.sp+1)&0xFFFF]<<8;ms.sp+=2;");
-					fprintf(fastSimFile,"tp2=(unsigned)ms.mem[(ms.sp+0)&0xFFFF];tp2|=(unsigned)ms.mem[(ms.sp+1)&0xFFFF]<<8;ms.sp+=2;");
-					fprintf(fastSimFile,"tp0=tp0&0xFFFF;tp1=tp1&0xFFFF;tp2=tp2&0xFFFF;");
-					fprintf(fastSimFile,"ms.sp=(ms.sp+tp2)&0xFFFE;ms.pc=(tp1<<16)|tp0;tp0=0;tp1=0;tp2=0;\n");
-					fprintf(fastSimFile,"sdl_pull_event();\n");
-					fprintf(fastSimFile,"goto LJUMP;\n");
-					break;
-					case 0x1C:
-					fprintf(fastSimFile,"tp1=((uint32_t)ms.reg[%u]<<16)|ms.reg[13];ms.reg[%u]=(((tp1^(tp1&0x3FFFFFF))!=0)?readByte(tp1):(ms.mem[tp1&0x3FFFFFF]<<0))&0xFF;tp1=0;\n",(unsigned)r1,(unsigned)r0);
-					break;
-					case 0x1D:
-					fprintf(fastSimFile,"tp1=((uint32_t)ms.reg[%u]<<16)|ms.reg[13];((tp1^(tp1&0x3FFFFFF))!=0)?writeByte(tp1,ms.reg[%u]&0xFF):(ms.mem[tp1&0x3FFFFFF]=ms.reg[%u]&0xFF);tp1=0;\n",(unsigned)r1,(unsigned)r0,(unsigned)r0);
-					break;
-					case 0x1E:
-					fprintf(fastSimFile,"ms.pc=((uint32_t)ms.reg[%u]<<16)|ms.reg[%u];goto LJUMP;\n",(unsigned)r1,(unsigned)r0);
-					break;
-					case 0x1F:
-					fprintf(fastSimFile,"ms.sp-=ms.reg[%u];ms.sp=ms.sp&0xFFFE;ms.reg[%u]=ms.sp;\n",(unsigned)r0,(unsigned)r0);
-					break;
-					case 0x0F:
-					default:assert(false);
-				}
-				//fprintf(fastSimFile,"stateDump(ms);\n");
-			}
-			fprintf(fastSimFile,"printf(\"Error: execution ran off the end of executable\");bye();return;}\n");
-			if (fclose(fastSimFile)!=0){
-				printf("Failed to finish writing to \"FastSimGen.c\"\n");
-				bye();
-			}
-			printf("Finished Generating Fast Sim\n");
-		} else {
-			printf("Starting SDL...\n");
-			initializeSDL();
-			printf("Running...\n");
-			if (!printEachInstruction){
-				printf("Call Stack:\n|\n%5d:main()\n",0);
-			}
-			fullExecute();
-			
-			
-			printf("Finished Normally. Return Value is `%d`\n",terminationValue);
+		printf("Starting SDL...\n");
+		initializeSDL();
+		printf("Running...\n");
+		if (!printEachInstruction){
+			printf("Call Stack:\n|\n%5d:main()\n",0);
 		}
+		fullExecute();
+		
+		
+		printf("Finished Normally. Return Value is `%d`\n",terminationValue);
 	}
 	bye();
 }
