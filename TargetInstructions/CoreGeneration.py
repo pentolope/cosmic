@@ -2062,7 +2062,7 @@ if 2!=len(splitInstructionString(dictionaryOfInitializationContents['IB_load_wor
 if 2!=len(splitInstructionString(dictionaryOfInitializationContents['IB_load_dword'])):
     print "Warning: 'IB_load_dword' does not have two instructions in it. Make sure to change the LiteralLoadsAndCall.c file to respect this."
 if 3!=len(splitInstructionString(dictionaryOfInitializationContents['IB_STPA'])):
-    print "Warning: 'IB_STPA' does not have two instructions in it. Make sure to change the LiteralLoadsAndCall.c file to respect this."
+    print "Warning: 'IB_STPA' does not have three instructions in it. Make sure to change the LiteralLoadsAndCall.c file to respect this."
 
 f.write('\n')
 f.close()
