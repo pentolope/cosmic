@@ -96,7 +96,7 @@ bool attemptJmpOpt(InstructionBuffer* ib){
 						InstructionSingle* temp_IS_3 = temp_IS_2+1;
 						InstructionSingle* temp_IS_4 = temp_IS_3+1;
 						if ((temp_IS_1->id==I_SYRD & temp_IS_2->id==I_SYCL & temp_IS_3->id==I_SYRE & temp_IS_4->id==I_AJMP) &&
-							(temp_IS_1->arg.B2.a_0==temp_IS_4->arg.B2.a_0 & temp_IS_1->arg.B2.a_1==temp_IS_4->arg.B2.a_1)){
+							(temp_IS_1->arg.B2.a_0==temp_IS_4->arg.B2.a_0 & temp_IS_1->arg.B2.a_1==temp_IS_4->arg.B2.a_1 & locationOfLabel+1!=labelLoadLocation)){
 							
 							buffer[labelLoadLocation+1].arg.D.a_0=temp_IS_2->arg.D.a_0;
 							didSucceedAtLeastOnce_1=true;
