@@ -1662,7 +1662,7 @@ int main(int argc, char** argv){
 		addressToInstructionTranslation=cosmic_malloc(addressToInstructionTranslationLen*sizeof(struct AddressInstructionPair));
 	}
 	labelCount=0;
-	uint32_t storageAddress=1LU<<16;
+	uint32_t storageAddress=(doFPGAbootGeneration?0x03ffc000:(1LU<<16));
 	for (uint32_t i=0;i<allData.numberOfSlotsTaken;i++){
 		InstructionSingle IS=allData.buffer[i];
 		if (printEachInstruction){
@@ -1712,8 +1712,8 @@ int main(int argc, char** argv){
 	uint32_t storageSize=storageAddress;
 	uint16_t func_stack_size;
 	uint8_t func_stack_initial;
-	uint8_t* temporaryStorageBuffer=cosmic_calloc(storageAddress,sizeof(uint8_t));
-	uint8_t* temporaryStorageBufferWalk=temporaryStorageBuffer+(1LU<<16);
+	uint8_t* temporaryStorageBuffer=calloc(storageAddress,sizeof(uint8_t));
+	uint8_t* temporaryStorageBufferWalk=temporaryStorageBuffer+(doFPGAbootGeneration?0x03ffc000:(1LU<<16));
 	for (uint32_t i=0;i<allData.numberOfSlotsTaken;i++){
 		InstructionSingle IS=allData.buffer[i];
 		uint16_t intrinsicID=getIntrinsicID(IS.id);
@@ -1789,8 +1789,8 @@ int main(int argc, char** argv){
 		if (fpga_boot_asm_file==NULL){
 			goto failure_to_write_fpga_boot_asm_file;
 		}
-		fprintf(fpga_boot_asm_file,"%s","\n.org !00010000\n");
-		for (uint32_t i=0;i<storageSize;i++){
+		fprintf(fpga_boot_asm_file,"%s","\n.org !03ffc000\n");
+		for (uint32_t i=0x03ffc000;i<storageSize;i++){
 			fprintf(fpga_boot_asm_file,".datab $%02X\n",(unsigned int)(temporaryStorageBuffer[i]));
 		}
 		if ((storageSize & 1)!=0){
@@ -1831,7 +1831,7 @@ int main(int argc, char** argv){
 		for (uint32_t i=1LU<<16;i<storageSize;i++){
 			initMemWrite(i,temporaryStorageBuffer[i]);
 		}
-		cosmic_free(temporaryStorageBuffer);
+		free(temporaryStorageBuffer);
 		destroyInstructionBuffer(&allData);
 		// now insert the arguments
 		int argcSim=(argc-(printEachInstruction+doFPGAbootGeneration))-1;
