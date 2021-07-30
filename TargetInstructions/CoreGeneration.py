@@ -1751,7 +1751,7 @@ AND_ %D %2 %C
 SUBC %D %D %C
 ADDN %2 %2 %2
 ADDN %3 %3 %3
-OR__ %2 %2 %D
+OR__ %3 %3 %D
 ADDN %E %E %B
 SUBC %D %E %A
 CJMP %6 %7 %D
