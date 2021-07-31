@@ -25,7 +25,7 @@
 //#define FORCE_EXP_BUFFER_NULL
 
 
-#define ERR_MSG_LEN 25 // controls the length of error messages (60 is generally good)
+#define ERR_MSG_LEN 40 // controls the length of error messages
 
 
 //#define STATEMENT_DEBUG
