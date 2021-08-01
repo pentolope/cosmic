@@ -565,7 +565,7 @@ void applySymbolicOperator(ExpressionTreeNode* thisNode){
 			singleMergeIB(ib,ibRight);
 		break;
 		case 11:{
-			if (operatorTypeID==2){
+			if (operatorTypeID==1){
 				writeIS.id=I_SYCD;
 				writeIS.arg.D.a_0=0;
 				addInstruction(ib,writeIS);
@@ -584,7 +584,7 @@ void applySymbolicOperator(ExpressionTreeNode* thisNode){
 		break;
 		case 18:{
 			dualMergeIB(ib,ibLeft,ibRight);
-			if (operatorTypeID==2){
+			if (operatorTypeID==1){
 				writeIS.id=I_SYD2;
 			} else {
 				writeIS.id=I_SYW2;
