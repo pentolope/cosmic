@@ -1486,8 +1486,9 @@ bool attemptRepeatedConstantOpt(InstructionBuffer* ib){
 				uint8_t r0=repeatedConstInfo.II_0.regIN[repeatedConstInfo.types[0]^1];
 				uint8_t r2=repeatedConstInfo.II_0.regOUT[0];
 				uint8_t r3=r0!=r2?r0:r1;
+				bool replaceConstant= r1!=r2;
 				assert(r0!=r2 | r1!=r2); // this transform would be invalid if this fails, but I don't think that should fail
-				createNopPocket(ib,repeatedConstInfo.i0+1,3);
+				createNopPocket(ib,repeatedConstInfo.i0+1,3+replaceConstant);
 				if (repeatedConstInfo.id==I_MULS){
 					writeIS.arg.B2.a_0=r2;
 					writeIS.arg.B2.a_1=r3;
@@ -1498,6 +1499,13 @@ bool attemptRepeatedConstantOpt(InstructionBuffer* ib){
 				}
 				writeIS.id=repeatedConstInfo.id;
 				buffer[repeatedConstInfo.i0]=writeIS;
+				
+				if (replaceConstant){
+					writeIS.id=I_RL1_;
+					writeIS.arg.BW.a_0=repeatedConstInfo.II_0.regIN[repeatedConstInfo.types[0]];
+					writeIS.arg.BW.a_1=repeatedConstInfo.cvBuff[0];
+					insertInstructionAt(ib,repeatedConstInfo.i0+1,writeIS);
+				}
 				
 				writeIS.id=I_RL1_;
 				writeIS.arg.BW.a_0=r2;
@@ -1513,7 +1521,6 @@ bool attemptRepeatedConstantOpt(InstructionBuffer* ib){
 				insertInstructionAt(ib,repeatedConstInfo.indexBuff[0],writeIS);
 				
 				//printInstructionBufferWithMessageAndNumber(ib,"After",repeatedConstInfo.i0);
-				//exit(0);
 				buffer=ib->buffer;
 				didSucceedAtLeastOnce=true;
 #ifdef OPT_DEBUG_SANITY
