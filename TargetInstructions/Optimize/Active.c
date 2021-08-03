@@ -1536,8 +1536,10 @@ sanityCheck(ib);
 				uint32_t cvLarge=(repeatedConstInfo.cvBuff[0] | ((uint32_t)repeatedConstInfo.cvBuff[1]<<16)) + (repeatedConstInfo.cvBuff[2] | ((uint32_t)repeatedConstInfo.cvBuff[3]<<16));
 				bool does0have2ConstInputRegisters=repeatedConstInfo.normalizedReg0[3]!=16;
 				bool does1have2NonconstInputRegisters=repeatedConstInfo.normalizedReg1[3]!=16;
+				bool requiresExtraZeroing=false;
 				
 				if (!does0have2ConstInputRegisters & (cvLarge&0xFFFF0000LU)!=0){
+					requiresExtraZeroing = !does1have2NonconstInputRegisters;
 					uint8_t extraReg=16;
 					for (uint8_t r=2;r<15;r++){
 						if (!doesRegListContain(repeatedConstInfo.II_0.regIN,r)){
@@ -1599,13 +1601,17 @@ sanityCheck(ib);
 					writeIS.id=I_PU1_;
 					writeIS.arg.B1.a_0=repeatedConstInfo.normalizedReg1[3];
 					insertInstructionAt(ib,repeatedConstInfo.indexBuff[0],writeIS);
+				} else if (requiresExtraZeroing){
+					writeIS.id=I_BL1_;
+					writeIS.arg.B2.a_0=repeatedConstInfo.normalizedReg0[1];
+					writeIS.arg.B2.a_1=0;
+					insertInstructionAt(ib,repeatedConstInfo.i0,writeIS);
 				}
 				writeIS.id=I_PU1_;
 				writeIS.arg.B1.a_0=repeatedConstInfo.normalizedReg1[2];
 				insertInstructionAt(ib,repeatedConstInfo.indexBuff[0],writeIS);
 				
 				//printInstructionBufferWithMessageAndNumber(ib,"After",repeatedConstInfo.i0);
-				//exit(0);
 				didSucceedAtLeastOnce=true;
 				buffer=ib->buffer;
 #ifdef OPT_DEBUG_SANITY
