@@ -55,7 +55,8 @@ uint32_t addressToInstructionTranslationLen;
 
 uint64_t instructionExecutionCount;
 bool printEachInstruction;
-bool doFPGAbootGeneration;
+bool doFPGAboot1Generation;
+bool doFPGAboot2Generation;
 bool doCacheSim;
 bool isTerminationTriggered;
 uint16_t terminationValue;
@@ -93,6 +94,7 @@ void printProfileResults();
 void performUpdateVGAtoSDL();
 
 noreturn void bye(void){
+	if (doFPGAboot1Generation || doFPGAboot2Generation) exit(0);
 	printf("\nTotal instructions executed:%llu\n",(unsigned long long)instructionExecutionCount);
 	printProfileResults();
 	fflush(stdout);
@@ -1571,16 +1573,21 @@ static void symbolicResolutionSingle(InstructionSingle* IS_temp){
 
 
 int main(int argc, char** argv){
+	uint32_t startupAddress=0x00010000;
 	if (argc<2){
 		printf("No arguments given, you give me no reason to start\n");
 		exit(0);
 	}
 	if (doStringsMatch(argv[1],"-p")){
 		printEachInstruction=true;
-	} else if (doStringsMatch(argv[1],"-fpga")){
-		doFPGAbootGeneration=true;
+	} else if (doStringsMatch(argv[1],"-fpga1")){
+		doFPGAboot1Generation=true;
+		startupAddress=0x03ffc000;
+	} else if (doStringsMatch(argv[1],"-fpga2")){
+		doFPGAboot2Generation=true;
+		startupAddress=0x00010010;
 	}
-	if ((printEachInstruction || doFPGAbootGeneration) && argc<3){
+	if ((printEachInstruction || doFPGAboot1Generation) && argc<3){
 		printf("No arguments given, you give me no reason to start\n");
 		exit(0);
 	}
@@ -1590,10 +1597,10 @@ int main(int argc, char** argv){
 	machineState=calloc(1,sizeof(struct MachineState));
 	initialMachineState=calloc(1,sizeof(struct MachineState));
 	assert(globalSDL_Information.pixelState!=NULL && machineState!=NULL && initialMachineState!=NULL);
-	machineState->pc=1LU<<16;
+	machineState->pc=startupAddress;
 	machineState->sp=0xFFFE;
 	printf("Loading Binary...\n");
-	struct BinContainer binContainer=loadFileContentsAsBinContainer(argv[1+(printEachInstruction+doFPGAbootGeneration)]);
+	struct BinContainer binContainer=loadFileContentsAsBinContainer(argv[1+(printEachInstruction+doFPGAboot1Generation+doFPGAboot2Generation)]);
 	printf("Integrating Binary...\n");
 	uint32_t mainLabelNumber=0;
 	for (uint32_t i=0;i<binContainer.len_symbols;i++){
@@ -1606,7 +1613,7 @@ int main(int argc, char** argv){
 		printf("Could not find \'main\' in that binary.\n");
 		bye();
 	}
-	if (!(doFPGAbootGeneration)){
+	if (!(doFPGAboot1Generation) && !(doFPGAboot2Generation)){
 		setvbuf(stdout,printf_buffer,_IOFBF,120000);
 	}
 	InstructionBuffer allData;
@@ -1662,7 +1669,7 @@ int main(int argc, char** argv){
 		addressToInstructionTranslation=cosmic_malloc(addressToInstructionTranslationLen*sizeof(struct AddressInstructionPair));
 	}
 	labelCount=0;
-	uint32_t storageAddress=(doFPGAbootGeneration?0x03ffc000:(1LU<<16));
+	uint32_t storageAddress=startupAddress;
 	for (uint32_t i=0;i<allData.numberOfSlotsTaken;i++){
 		InstructionSingle IS=allData.buffer[i];
 		if (printEachInstruction){
@@ -1713,7 +1720,7 @@ int main(int argc, char** argv){
 	uint16_t func_stack_size;
 	uint8_t func_stack_initial;
 	uint8_t* temporaryStorageBuffer=calloc(storageAddress,sizeof(uint8_t));
-	uint8_t* temporaryStorageBufferWalk=temporaryStorageBuffer+(doFPGAbootGeneration?0x03ffc000:(1LU<<16));
+	uint8_t* temporaryStorageBufferWalk=temporaryStorageBuffer+startupAddress;
 	for (uint32_t i=0;i<allData.numberOfSlotsTaken;i++){
 		InstructionSingle IS=allData.buffer[i];
 		uint16_t intrinsicID=getIntrinsicID(IS.id);
@@ -1783,14 +1790,23 @@ int main(int argc, char** argv){
 	assert(temporaryStorageBufferWalk==(temporaryStorageBuffer+storageSize));
 	uint32_t mainAddress=getLabelAddress(mainLabelNumber);
 	stackLabelIndexes[0]=getLabelIndex(mainLabelNumber);
-	if (doFPGAbootGeneration){
+	if (doFPGAboot1Generation || doFPGAboot2Generation){
 		FILE* fpga_boot_asm_file=NULL;
-		fpga_boot_asm_file=fopen("boot.asm","w");
-		if (fpga_boot_asm_file==NULL){
-			goto failure_to_write_fpga_boot_asm_file;
+		if (doFPGAboot1Generation){
+			fpga_boot_asm_file=fopen("boot1.asm","w");
+			if (fpga_boot_asm_file==NULL){
+				goto failure_to_write_fpga_boot_asm_file;
+			}
+			fprintf(fpga_boot_asm_file,"%s","\n.org !03ffc000\n");
+		} else {
+			assert(doFPGAboot2Generation);
+			fpga_boot_asm_file=fopen("boot2.asm","w");
+			if (fpga_boot_asm_file==NULL){
+				goto failure_to_write_fpga_boot_asm_file;
+			}
+			fprintf(fpga_boot_asm_file,"%s","\n.org !00010010\n");
 		}
-		fprintf(fpga_boot_asm_file,"%s","\n.org !03ffc000\n");
-		for (uint32_t i=0x03ffc000;i<storageSize;i++){
+		for (uint32_t i=startupAddress;i<storageSize;i++){
 			fprintf(fpga_boot_asm_file,".datab $%02X\n",(unsigned int)(temporaryStorageBuffer[i]));
 		}
 		if ((storageSize & 1)!=0){
@@ -1823,20 +1839,26 @@ int main(int argc, char** argv){
 		fprintf(fpga_boot_asm_file,"%s",".datab $00\n"); // an extra byte. probably not needed, but it's here anyway
 		if (fclose(fpga_boot_asm_file)!=0){
 			failure_to_write_fpga_boot_asm_file:;
-			printf("Failed to write \"boot.asm\" for the fpga\n");
+			if (doFPGAboot1Generation)
+				printf("Failed to write \"boot1.asm\" for the fpga\n");
+			else
+				printf("Failed to write \"boot2.asm\" for the fpga\n");
 			bye();
 		}
-		printf("Wrote \"boot.asm\" for the fpga\n");
+		if (doFPGAboot1Generation)
+			printf("Wrote \"boot1.asm\" for the fpga\n");
+		else
+			printf("Wrote \"boot2.asm\" for the fpga\n");
 	} else {
-		for (uint32_t i=1LU<<16;i<storageSize;i++){
+		for (uint32_t i=startupAddress;i<storageSize;i++){
 			initMemWrite(i,temporaryStorageBuffer[i]);
 		}
 		free(temporaryStorageBuffer);
 		destroyInstructionBuffer(&allData);
 		// now insert the arguments
-		int argcSim=(argc-(printEachInstruction+doFPGAbootGeneration))-1;
+		int argcSim=(argc-(printEachInstruction))-1;
 		int w=0;
-		for (int i=1+(printEachInstruction+doFPGAbootGeneration);i<argc;i++){
+		for (int i=1+(printEachInstruction);i<argc;i++){
 			for (int ii=0;argv[i][ii];ii++){
 				initMemWrite(storageSize+ w++,argv[i][ii]);
 			}
@@ -1848,7 +1870,7 @@ int main(int argc, char** argv){
 		storageSize+=storageSize&1;
 		uint32_t argvSim=storageSize;
 		int w2=0;
-		for (int i=1+(printEachInstruction+doFPGAbootGeneration);i<argc;i++){
+		for (int i=1+(printEachInstruction);i<argc;i++){
 			initMemWrite(storageSize+0,0xFF&((prevStorageSize0+w2)>> 0));
 			initMemWrite(storageSize+1,0xFF&((prevStorageSize0+w2)>> 8));
 			initMemWrite(storageSize+2,0xFF&((prevStorageSize0+w2)>>16));
