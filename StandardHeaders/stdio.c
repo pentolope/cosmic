@@ -1,7 +1,6 @@
 
 
 
-#define __STD_IO_REAL
 #include <stdio.h>
 #include <alloc.h>
 #include <printf_.h>
@@ -12,8 +11,7 @@ static const char* _file_modes[16]={NULL,"r","rb","w","wb","a","ab","r+","rb+","
 
 static _Bool _isStrEql(const char* s0,const char* s1){
 	unsigned long i=0;
-	char c0;
-	char c1;
+	char c0,c1;
 	while ((c0=s0[i])!=0 & (c1=s1[i])!=0){
 		i++;
 		if (c0!=c1) return false;
