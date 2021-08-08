@@ -57,39 +57,24 @@ uint64_t instructionExecutionCount;
 bool printEachInstruction;
 bool doFPGAboot1Generation;
 bool doFPGAboot2Generation;
-bool doCacheSim;
 bool isTerminationTriggered;
 uint16_t terminationValue;
 uint32_t endOfExecutable;
 
-uint32_t tracebackLevel;
 bool hadTypicalEnd=true;
+bool avoidStackPrint=true;
 
-struct MemSeg{
-	uint8_t seg[1LU<<11];
-	uint64_t ieCountAtSet[1LU<<11];
-};
 
 struct MachineState{
 	uint32_t pc;
 	uint16_t sp;
 	uint16_t reg[16];
 	
-	uint64_t ieCountAtSetPc;
-	uint64_t ieCountAtSetSp;
-	uint64_t ieCountAtSetReg[16];
-	
-	uint8_t walk_cache;
-	uint16_t back_cache[16];
-	struct MemSeg cache[1LU<<5];
-	uint8_t in_cache[1LU<<15];
-	struct MemSeg mainMem[1LU<<15];
+	uint8_t mem[1LU<<26];
 };
 
 struct MachineState* machineState;
-struct MachineState* initialMachineState;
 
-void performTraceback(uint64_t);
 void printProfileResults();
 void performUpdateVGAtoSDL();
 
@@ -102,7 +87,6 @@ noreturn void bye(void){
 	// these were allocated using normal calloc, not cosmic_calloc
 	free(globalSDL_Information.pixelState);
 	free(machineState);
-	free(initialMachineState);
 	
 	if (globalSDL_Information.isSLD_initialized){
 		if (globalSDL_Information.hasPixelBeenWritten){
@@ -326,46 +310,25 @@ void stateDump(){
 
 
 void initMemWrite(uint32_t a,uint8_t b){
-	uint32_t aL=a&((1LU<<11)-1);
-	uint32_t aU=(a>>11);
-	uint32_t aU_=aU&((1LU<<15)-1);
-	uint32_t aUD=(aU-aU_)>>15;
-	if (aUD!=0){
+	if ((a&~((1LU<<26)-1u))!=0u){
 		printf("Binary won't fit in memory\n");
 		bye();
 	}
-	machineState->mainMem[aU_].seg[aL]=b;
+	machineState->mem[a]=b;
 }
 
 uint8_t initMemRead(uint32_t a){
-	uint32_t aL=a&((1LU<<11)-1);
-	uint32_t aU=(a>>11);
-	uint32_t aU_=aU&((1LU<<15)-1);
-	uint32_t aUD=(aU-aU_)>>15;
-	assert(aUD==0);
-	return machineState->mainMem[aU_].seg[aL];
+	assert((a&~((1LU<<26)-1u))==0u);
+	return machineState->mem[a];
 }
 
 void initPush(unsigned int w){
 	w&=0xFFFFu;
 	machineState->sp-=2;
 	uint32_t a=machineState->sp;
-	uint32_t aL=a&((1LU<<11)-1);
-	uint32_t aU=(a>>11);
-	uint32_t aU_=aU&((1LU<<15)-1);
-	uint32_t aUD=(aU-aU_)>>15;
-	machineState->mainMem[aU_].seg[aL+0]=(uint8_t)((unsigned)w>>0);
-	machineState->mainMem[aU_].seg[aL+1]=(uint8_t)((unsigned)w>>8);
+	machineState->mem[a+0u]=(uint8_t)((unsigned)w>>0);
+	machineState->mem[a+1u]=(uint8_t)((unsigned)w>>8);
 }
-
-void createInitialMachineState(){
-	*initialMachineState=*machineState;
-}
-
-void restoreMachineState(){
-	*machineState=*initialMachineState;
-}
-
 
 
 /*
@@ -453,10 +416,6 @@ void triggerFileClose(){
 }
 
 
-void handleCacheMiss(){
-	
-}
-
 
 struct ps2_state_struct{
 	uint8_t buff_in[256];
@@ -532,10 +491,6 @@ void ps2ProcessCommands(){
 
 uint16_t readWord(uint32_t a){
 	//if (a!=machineState->pc) printf("MEM R word:[%08X]\n",a);
-	uint32_t aL=a&((1LU<<11)-1);
-	uint32_t aU=(a>>11);
-	uint32_t aU_=aU&((1LU<<15)-1);
-	uint32_t aUD=(aU-aU_)>>15;
 	if ((a&1)!=0){
 		makeColor(COLOR_TO_TEXT,COLOR_RED);
 		printf("Mem fault:word read misalligned:%08X\n",a);
@@ -543,7 +498,7 @@ uint16_t readWord(uint32_t a){
 		stateDump();
 		bye();
 	}
-	if (aUD!=0){
+	if ((a&~((1LU<<26)-1))!=0u){
 		if (a==0x04020006){
 			return (uint16_t)(fileAccessInfo.length>> 0);
 		}
@@ -556,7 +511,7 @@ uint16_t readWord(uint32_t a){
 				printf("Mem fault (VGA)[readWord]:address out of bounds:%08X\n",m);
 				bye();
 			}
-			return (globalSDL_Information.memoryState[m+0]<<0)|(globalSDL_Information.memoryState[m+1]<<8);
+			return (globalSDL_Information.memoryState[m+0u]<<0)|(globalSDL_Information.memoryState[m+1u]<<8);
 		}
 		makeColor(COLOR_TO_TEXT,COLOR_RED);
 		printf("Mem fault:word read out of bounds:%08X\n",a);
@@ -564,23 +519,14 @@ uint16_t readWord(uint32_t a){
 		stateDump();
 		bye();
 	}
-	if (doCacheSim){
-		printf("cache sim not ready\n");
-		bye();
-	} else {
-		uint16_t w=machineState->mainMem[aU_].seg[aL+0];
-		w|=(unsigned)machineState->mainMem[aU_].seg[aL+1]<<8;
-		return w;
-	}
+	uint16_t w=machineState->mem[a+0u];
+	w|=(unsigned)machineState->mem[a+1u]<<8;
+	return w;
 }
 
 uint8_t readByte(uint32_t a){
 	//printf("MEM R byte:[%08X]\n",a);
-	uint32_t aL=a&((1LU<<11)-1);
-	uint32_t aU=(a>>11);
-	uint32_t aU_=aU&((1LU<<15)-1);
-	uint32_t aUD=(aU-aU_)>>15;
-	if (aUD!=0){
+	if ((a&~((1LU<<26)-1))!=0u){
 		if (a==0x04020003){
 			return fileAccessInfo.isRead?fileAccessInfo.contents!=NULL:fileAccessInfo.outFile!=NULL;
 		}
@@ -630,20 +576,11 @@ uint8_t readByte(uint32_t a){
 		stateDump();
 		bye();
 	}
-	if (doCacheSim){
-		printf("cache sim not ready\n");
-		bye();
-	} else {
-		return machineState->mainMem[aU_].seg[aL];
-	}
+	return machineState->mem[a];
 }
 
 void writeWord(uint32_t a,uint16_t w){
 	//printf("MEM W word:[%08X,%04X]\n",a,w);
-	uint32_t aL=a&((1LU<<11)-1);
-	uint32_t aU=(a>>11);
-	uint32_t aU_=aU&((1LU<<15)-1);
-	uint32_t aUD=(aU-aU_)>>15;
 	if ((a&1)!=0){
 		makeColor(COLOR_TO_TEXT,COLOR_RED);
 		printf("Mem fault:word write misalligned:%08X\n",a);
@@ -651,7 +588,7 @@ void writeWord(uint32_t a,uint16_t w){
 		stateDump();
 		bye();
 	}
-	if (aUD!=0){
+	if ((a&~((1LU<<26)-1))!=0u){
 		if (a==0x04010000){
 			isTerminationTriggered=true;
 			terminationValue=w;
@@ -674,25 +611,13 @@ void writeWord(uint32_t a,uint16_t w){
 		stateDump();
 		bye();
 	}
-	if (doCacheSim){
-		printf("cache sim not ready\n");
-		bye();
-	} else {
-		machineState->mainMem[aU_].seg[aL+0]=(uint8_t)((unsigned)w>>0);
-		machineState->mainMem[aU_].seg[aL+1]=(uint8_t)((unsigned)w>>8);
-		machineState->mainMem[aU_].ieCountAtSet[aL+0]=instructionExecutionCount;
-		machineState->mainMem[aU_].ieCountAtSet[aL+1]=instructionExecutionCount;
-		return;
-	}
+	machineState->mem[a+0u]=(uint8_t)((unsigned)w>>0);
+	machineState->mem[a+1u]=(uint8_t)((unsigned)w>>8);
 }
 
 void writeByte(uint32_t a,uint8_t b){
 	//printf("MEM W byte:[%08X,%02X]\n",a,b);
-	uint32_t aL=a&((1LU<<11)-1);
-	uint32_t aU=(a>>11);
-	uint32_t aU_=aU&((1LU<<15)-1);
-	uint32_t aUD=(aU-aU_)>>15;
-	if (aUD!=0){
+	if ((a&~((1LU<<26)-1))!=0u){
 		if (a==0x04030000){
 			printf("%c",b);
 			fflush(stdout);
@@ -761,14 +686,7 @@ void writeByte(uint32_t a,uint8_t b){
 		stateDump();
 		bye();
 	}
-	if (doCacheSim){
-		printf("cache sim not ready\n");
-		bye();
-	} else {
-		machineState->mainMem[aU_].seg[aL]=b;
-		machineState->mainMem[aU_].ieCountAtSet[aL]=instructionExecutionCount;
-		return;
-	}
+	machineState->mem[a]=b;
 }
 
 void push(uint16_t w){
@@ -906,12 +824,12 @@ void handleFunctionStackPrint(uint32_t address, bool isCall){
 			stackPosition++;
 			return;
 		}
-		if (!printEachInstruction) printf("%5d:",stackPosition);
+		if (!printEachInstruction & !avoidStackPrint) printf("%5d:",stackPosition);
 		if (name==NULL){
-			if (!printEachInstruction) printf("@ %08X\n",address);
+			if (!printEachInstruction & !avoidStackPrint) printf("@ %08X\n",address);
 			stackLengths[stackPosition++]=16;
 		} else {
-			if (!printEachInstruction) printf("%s()\n",name);
+			if (!printEachInstruction & !avoidStackPrint) printf("%s()\n",name);
 			stackLengths[stackPosition++]=strlen(name)+8;
 		}
 		//fflush(stdout);
@@ -924,16 +842,12 @@ void handleFunctionStackPrint(uint32_t address, bool isCall){
 			stackPosition--;
 			return;
 		}
-		if (!printEachInstruction) printf("%c%c%c%c",
-			 27,
-			'[',
-			'1',
-			'F');
+		if (!printEachInstruction & !avoidStackPrint) printf("%c%c%c%c",27,'[','1','F');
 		const uint16_t l=stackLengths[--stackPosition];
 		for (uint16_t j=0;j<l;j++){
-			if (!printEachInstruction) printf(" ");
+			if (!printEachInstruction & !avoidStackPrint) printf(" ");
 		}
-		if (!printEachInstruction) printf("\r");
+		if (!printEachInstruction & !avoidStackPrint) printf("\r");
 		//fflush(stdout);
 	}
 }
@@ -1006,69 +920,59 @@ void singleExecute(){
 		
 	}
 	machineState->pc+=2;
+	uint16_t stupid=machineState->sp;
 	switch (type){
-		case 0x00:machineState->reg[r0]=imm;machineState->ieCountAtSetReg[r0]=instructionExecutionCount;break;
-		case 0x01:machineState->reg[r0]|=((unsigned)imm<<8)&0xFF00u;machineState->ieCountAtSetReg[r0]=instructionExecutionCount;break;
-		case 0x02:machineState->reg[r0]=readWord(machineState->reg[1]+2*imm);machineState->ieCountAtSetReg[r0]=instructionExecutionCount;break;
+		case 0x00:machineState->reg[r0]=imm;break;
+		case 0x01:machineState->reg[r0]|=((unsigned)imm<<8)&0xFF00u;break;
+		case 0x02:machineState->reg[r0]=readWord(machineState->reg[1]+2*imm);break;
 		case 0x03:writeWord(machineState->reg[1]+2*imm,machineState->reg[r0]);break;
-		case 0x04:machineState->reg[r0]=machineState->reg[r1]&machineState->reg[r2];machineState->ieCountAtSetReg[r0]=instructionExecutionCount;break;
-		case 0x05:machineState->reg[r0]=machineState->reg[r1]|machineState->reg[r2];machineState->ieCountAtSetReg[r0]=instructionExecutionCount;break;
-		case 0x06:machineState->reg[r0]=machineState->reg[r1]^machineState->reg[r2];machineState->ieCountAtSetReg[r0]=instructionExecutionCount;break;
+		case 0x04:machineState->reg[r0]=machineState->reg[r1]&machineState->reg[r2];break;
+		case 0x05:machineState->reg[r0]=machineState->reg[r1]|machineState->reg[r2];break;
+		case 0x06:machineState->reg[r0]=machineState->reg[r1]^machineState->reg[r2];break;
 		case 0x07:
 		temp=(uint32_t)machineState->reg[r0]+(uint32_t)machineState->reg[r1]+(uint32_t)(~machineState->reg[r2]&0xFFFFu);
 		machineState->reg[r1]=(uint16_t)temp;
 		machineState->reg[r0]=(temp&0x00030000)!=0;
-		machineState->ieCountAtSetReg[r0]=instructionExecutionCount;
-		machineState->ieCountAtSetReg[r1]=instructionExecutionCount;
 		break;
-		case 0x08:machineState->reg[r0]=readWord(((uint32_t)machineState->reg[r2]<<16)|machineState->reg[r1]);machineState->ieCountAtSetReg[r0]=instructionExecutionCount;break;
+		case 0x08:machineState->reg[r0]=readWord(((uint32_t)machineState->reg[r2]<<16)|machineState->reg[r1]);break;
 		case 0x09:writeWord(((uint32_t)machineState->reg[r2]<<16)|machineState->reg[r1],machineState->reg[r0]);break;
-		case 0x0A:machineState->reg[r0]=machineState->reg[r1]+machineState->reg[r2];machineState->ieCountAtSetReg[r0]=instructionExecutionCount;break;
+		case 0x0A:machineState->reg[r0]=machineState->reg[r1]+machineState->reg[r2];break;
 		case 0x0B:
 		temp=(uint32_t)machineState->reg[r1]+(uint32_t)machineState->reg[r2]+(uint32_t)machineState->reg[15];
 		machineState->reg[r0]=(uint16_t)temp;
 		machineState->reg[15]=(temp&0x00030000)!=0;
-		machineState->ieCountAtSetReg[r0]=instructionExecutionCount;
-		machineState->ieCountAtSetReg[15]=instructionExecutionCount;
 		break;
 		case 0x0C:
 		temp=(uint32_t)machineState->reg[r1]+(~(uint32_t)machineState->reg[r2]&0xFFFFu)+(uint32_t)1;
 		machineState->reg[r0]=(uint16_t)temp;
-		machineState->ieCountAtSetReg[r0]=instructionExecutionCount;
 		break;
 		case 0x0D:
 		temp=(uint32_t)machineState->reg[r1]+(~(uint32_t)machineState->reg[r2]&0xFFFFu)+(uint32_t)1;
 		machineState->reg[r0]=(temp&0x00010000)!=0;
-		machineState->ieCountAtSetReg[r0]=instructionExecutionCount;
 		break;
 		case 0x0E:
 		if (machineState->reg[r2]==0){
 			machineState->pc=((uint32_t)machineState->reg[r0])|((uint32_t)machineState->reg[r1]<<16);
-			machineState->ieCountAtSetPc=instructionExecutionCount;
 		}
 		break;
 		case 0x10:push(machineState->reg[r0]);break;
 		case 0x11:push(machineState->reg[r0]);push(machineState->reg[r1]);break;
-		case 0x12:machineState->reg[r0]=pop();machineState->ieCountAtSetReg[r0]=instructionExecutionCount;break;
-		case 0x13:machineState->reg[r0]=pop();machineState->reg[r1]=pop();machineState->ieCountAtSetReg[r0]=instructionExecutionCount;machineState->ieCountAtSetReg[r1]=instructionExecutionCount;break;
-		case 0x14:machineState->reg[r0]=machineState->reg[r1];machineState->ieCountAtSetReg[r0]=instructionExecutionCount;break;
-		case 0x15:machineState->reg[r0]=(((unsigned)machineState->reg[r1]<<8)&0xFF00u)|(((unsigned)machineState->reg[r1]>>8)&0x00FFu);machineState->ieCountAtSetReg[r0]=instructionExecutionCount;break;
-		case 0x16:machineState->reg[r0]=((unsigned)machineState->reg[r1]>>1)&0x7FFFu;machineState->ieCountAtSetReg[r0]=instructionExecutionCount;break;
-		case 0x17:machineState->reg[r0]*=machineState->reg[r1];machineState->ieCountAtSetReg[r0]=instructionExecutionCount;break;
+		case 0x12:machineState->reg[r0]=pop();break;
+		case 0x13:machineState->reg[r0]=pop();machineState->reg[r1]=pop();break;
+		case 0x14:machineState->reg[r0]=machineState->reg[r1];break;
+		case 0x15:machineState->reg[r0]=(((unsigned)machineState->reg[r1]<<8)&0xFF00u)|(((unsigned)machineState->reg[r1]>>8)&0x00FFu);break;
+		case 0x16:machineState->reg[r0]=((unsigned)machineState->reg[r1]>>1)&0x7FFFu;break;
+		case 0x17:machineState->reg[r0]*=machineState->reg[r1];break;
 		case 0x18:
 		temp=((uint32_t)machineState->reg[14]<<16)|(uint32_t)machineState->reg[13];
 		temp*=((uint32_t)machineState->reg[r1]<<16)|(uint32_t)machineState->reg[r0];
 		machineState->reg[13]=(uint16_t)temp;
 		machineState->reg[14]=(uint16_t)(temp>>16);
-		machineState->ieCountAtSetReg[13]=instructionExecutionCount;
-		machineState->ieCountAtSetReg[14]=instructionExecutionCount;
 		break;
 		case 0x19:
 		temp=machineState->reg[r0]/machineState->reg[r1];
 		machineState->reg[r1]=machineState->reg[r0]%machineState->reg[r1];
 		machineState->reg[r0]=temp;
-		machineState->ieCountAtSetReg[r0]=instructionExecutionCount;
-		machineState->ieCountAtSetReg[r1]=instructionExecutionCount;
 		break;
 		case 0x1A:
 		push(machineState->reg[0]);
@@ -1077,8 +981,6 @@ void singleExecute(){
 		push(machineState->pc&0xFFFFu);
 		machineState->reg[0]=machineState->sp;
 		machineState->pc=(uint32_t)machineState->reg[r0]|((uint32_t)machineState->reg[r1]<<16);
-		machineState->ieCountAtSetReg[r0]=instructionExecutionCount;
-		machineState->ieCountAtSetPc=instructionExecutionCount;
 		handleFunctionStackPrint(machineState->pc,true);
 		break;
 		case 0x1B:
@@ -1089,16 +991,12 @@ void singleExecute(){
 		machineState->reg[0]=pop();
 		temp=pop();
 		machineState->sp+=temp;
-		machineState->ieCountAtSetReg[1]=instructionExecutionCount;
-		machineState->ieCountAtSetReg[0]=instructionExecutionCount;
-		machineState->ieCountAtSetPc=instructionExecutionCount;
-		machineState->ieCountAtSetSp=instructionExecutionCount;
 		handleFunctionStackPrint(machineState->pc,false);
 		break;
-		case 0x1C:machineState->reg[r0]=readByte(((uint32_t)machineState->reg[r1]<<16)|machineState->reg[13]);machineState->ieCountAtSetReg[r0]=instructionExecutionCount;break;
+		case 0x1C:machineState->reg[r0]=readByte(((uint32_t)machineState->reg[r1]<<16)|machineState->reg[13]);break;
 		case 0x1D:writeByte(((uint32_t)machineState->reg[r1]<<16)|machineState->reg[13],machineState->reg[r0]&0x00FFu);break;
-		case 0x1E:machineState->pc=((uint32_t)machineState->reg[r0])|((uint32_t)machineState->reg[r1]<<16);machineState->ieCountAtSetPc=instructionExecutionCount;break;
-		case 0x1F:machineState->sp-=machineState->reg[r0];machineState->reg[r0]=machineState->sp;machineState->ieCountAtSetSp=instructionExecutionCount;break;
+		case 0x1E:machineState->pc=((uint32_t)machineState->reg[r0])|((uint32_t)machineState->reg[r1]<<16);break;
+		case 0x1F:machineState->sp-=machineState->reg[r0];machineState->reg[r0]=machineState->sp;break;
 		
 		
 		case 0x0F:
@@ -1283,7 +1181,6 @@ void fullExecute(){
 						}
 					}
 				}
-				//todo: add processing to transform SDL's key presses into scancodes and act as the ps2 controller
 			} else {
 				globalSDL_Information.eventPullCountdown=8192;
 			}
@@ -1292,9 +1189,6 @@ void fullExecute(){
 			isTerminationTriggered=true;
 			terminationValue=readWord(0x0000FFFE);
 			return;
-		}
-		if (machineState->sp>machineState->reg[1]){
-			//printf("Over %08X:%08X\n",(unsigned int)machineState->pc,(unsigned int)instructionExecutionCount);
 		}
 		if (machineState->pc<0x00010000 | machineState->pc>=endOfExecutable){
 // this will need to be disabled when using the loader
@@ -1315,33 +1209,6 @@ bye();
 	}
 }
 
-
-void performTraceback(uint64_t iicTarget){
-	printf("Traceback not ready yet\n");
-	bye();
-	restoreMachineState();
-	instructionExecutionCount=0;
-	globalSDL_Information.eventPullCountdown=1;
-	tracebackLevel++;
-	while (iicTarget>instructionExecutionCount){
-		assert(!isTerminationTriggered);
-		if (globalSDL_Information.eventPullCountdown--==0){
-			SDL_PollEvent(&globalSDL_Information.event);
-			if (globalSDL_Information.event.type == SDL_QUIT){
-				printf("Premature Exit Initiated...\n");
-				bye();
-			}
-			globalSDL_Information.eventPullCountdown=1024;
-		}
-		singleExecute();
-	}
-	if (iicTarget!=instructionExecutionCount){
-		printf("Traceback Not Possible\n");
-	} else {
-		
-	}
-	tracebackLevel--;
-}
 
 
 uint16_t getIntrinsicID(enum InstructionTypeID id){
@@ -1587,7 +1454,7 @@ int main(int argc, char** argv){
 		doFPGAboot2Generation=true;
 		startupAddress=0x00010010;
 	}
-	if ((printEachInstruction || doFPGAboot1Generation) && argc<3){
+	if ((printEachInstruction || doFPGAboot1Generation || doFPGAboot2Generation) && argc<3){
 		printf("No arguments given, you give me no reason to start\n");
 		exit(0);
 	}
@@ -1595,8 +1462,7 @@ int main(int argc, char** argv){
 	// These allocations use normal calloc, not cosmic_calloc
 	globalSDL_Information.pixelState=calloc((uint32_t)globalSDL_Information.windowSize.width*globalSDL_Information.windowSize.height,sizeof(uint8_t));
 	machineState=calloc(1,sizeof(struct MachineState));
-	initialMachineState=calloc(1,sizeof(struct MachineState));
-	assert(globalSDL_Information.pixelState!=NULL && machineState!=NULL && initialMachineState!=NULL);
+	assert(globalSDL_Information.pixelState!=NULL && machineState!=NULL);
 	machineState->pc=startupAddress;
 	machineState->sp=0xFFFE;
 	printf("Loading Binary...\n");
@@ -1898,7 +1764,6 @@ int main(int argc, char** argv){
 		initMemWrite(3,0xFF&(storageSize>>24));
 		
 		machineState->pc=mainAddress;// set pc to main address
-		createInitialMachineState();
 		printf("Starting SDL...\n");
 		initializeSDL();
 		printf("Running...\n");
