@@ -61,7 +61,7 @@ bool isTerminationTriggered;
 uint16_t terminationValue;
 uint32_t endOfExecutable;
 
-bool hadTypicalEnd=true;
+bool avoidProfile=true;
 bool avoidStackPrint=true;
 
 
@@ -810,6 +810,7 @@ void printProfileResults(){
 }
 
 void handleFunctionStackPrint(uint32_t address, bool isCall){
+	if (avoidProfile) return;
 	if (isCall){
 		if (stackPosition>2000){
 			printf("Error: Too many call instructions for profiler\n");
@@ -853,6 +854,7 @@ void handleFunctionStackPrint(uint32_t address, bool isCall){
 }
 
 void profilerTick(){
+	if (avoidProfile) return;
 	totalExecutionCountSkipped+=1;
 	if (stackPosition>0 && stackLabelIndexes[stackPosition-1]!=-1){
 		labelExecutionCountTopSkipped[stackLabelIndexes[stackPosition-1]]+=1;
@@ -886,7 +888,7 @@ void singleExecute(){
 		}
 		countdownToFlush--;
 		countdownToFlush &= 0xFFF;
-	} else {
+	} else if (!avoidProfile){
 		fflush(stdout);
 		profilerTick();
 	}
