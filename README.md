@@ -1,8 +1,7 @@
 Suggested initial compile command for cosmic:\
 `clang Cosmic.c -O1 -Wno-parentheses -o cosmic.exe`\
 Obviously, if on Linux, the '.exe' is likely not desired.\
-clang is not required. Other compilers such as gcc should work flawlessly.\
-Other optimization levels should all work flawlessly, and should produce identical output.\
+clang is not required. Other compilers such as gcc should work flawlessly. Other optimization levels should also work flawlessly.\
 If compiled at `-O3`, cosmic is very fast ;)\
 \
 There are 2 other tools that can be made in addition to `cosmic`: `sim` and `_Loader_Sim`.\
