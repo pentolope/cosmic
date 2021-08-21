@@ -1356,7 +1356,7 @@ char* advanceToNameInCrackedType(char* crackedType){
 			while (*(crackedType++)!='|'){
 			}
 			return crackedType;
-		} else if (c!='*'){
+		} else if (c!='*' & c!='g' & c!='f'){
 			return crackedType+1;
 		}
 		c=*(++crackedType);

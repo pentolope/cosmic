@@ -236,8 +236,6 @@ typedef struct InstructionSingle{
 	} arg;
 } InstructionSingle;
 
-void printSingleInstructionOptCode(const InstructionSingle instructionSingle);
-
 typedef struct CompressedInstructionBuffer{
 	uint8_t* byteCode;
 	uint32_t allocLen;
@@ -254,7 +252,116 @@ typedef struct InstructionBuffer{
 
 
 #ifdef INCLUDE_BACKEND
-uint32_t backendInstructionSize(const InstructionSingle IS){
+uint32_t backendInstructionSize(const InstructionSingle* IS){
+	switch (IS->id){
+		case I_SYDB:
+		case I_BYTE:
+		return 1;
+		case I_RET_:
+		case I_PU1_:
+		case I_PU2_:
+		case I_PUA1:
+		case I_PUA2:
+		case I_POP1:
+		case I_POP2:
+		case I_CALL:
+		case I_MULS:
+		case I_MULL:
+		case I_DIVM:
+		case I_SHFT:
+		case I_BSWP:
+		case I_MOV_:
+		case I_AND_:
+		case I_OR__:
+		case I_XOR_:
+		case I_ADDN:
+		case I_SSUB:
+		case I_SUBN:
+		case I_SUBC:
+		case I_MWBN:
+		case I_MRBN:
+		case I_MWBV:
+		case I_MRBV:
+		case I_MWWN:
+		case I_MRWN:
+		case I_MWWV:
+		case I_MRWV:
+		case I_STWN:
+		case I_STRN:
+		case I_STWV:
+		case I_STRV:
+		case I_CJMP:
+		case I_JJMP:
+		case I_AJMP:
+		case I_SYRB:
+		case I_BL1_:
+		case I_SYDW:
+		case I_WORD:
+		return 2;
+		case I_SYRW:
+		case I_RL1_:
+		case I_STPS:
+		case I_JTEN:
+		case I_SYDD:
+		case I_DWRD:
+		return 4;
+		case I_STPA:
+		case I_ALOC:
+		case I_LAD0:
+		case I_LAD1:
+		case I_LAD2:
+		case I_LSU0:
+		return 6;
+		case I_RL2_:
+		case I_SYRD:
+		case I_SYDQ:
+		return 8;
+		case I_LAD3:
+		return 10;
+		case I_D32U:
+		case I_R32U:
+		case I_D32S:
+		case I_R32S:
+		case I_D64U:
+		case I_D64S:
+		case I_R64U:
+		case I_R64S:
+		case I_LAD4:
+		case I_LAD5:
+		case I_LSU4:
+		case I_LSU5:
+		case I_LMU4:
+		case I_LMU5:
+		case I_LDI4:
+		case I_LDI5:
+		case I_LLS6:
+		case I_LLS7:
+		case I_LRS6:
+		case I_LRS7:
+		return 14;
+		case I_SYRQ:
+		return 16;
+		
+		case I_ALCR:return 4u+(((unsigned)IS->arg.BW.a_1&0xFF00u)!=0u)*2u;
+		case I_STOF:return 8u+(((unsigned)IS->arg.BW.a_1&0xFF00u)!=0u)*2u;
+		case I_ZNXB:return IS->arg.D.a_0;
+		
+		case I_LSU3:
+		case I_LMU3:
+		assert(false);// backend not ready for those instructions yet
+		default:;
+	}
+	return 0;
+}
+
+uint8_t decompressInstruction(const uint8_t* byteCode,InstructionSingle* IS_parent);
+
+uint32_t backendInstructionSizeFromByteCode(const uint8_t* byteCode){
+	InstructionSingle IS;
+	IS.id=byteCode[0];
+	if (IS.id==I_ALCR | IS.id==I_STOF | IS.id==I_ZNXB){
+		decompressInstruction(byteCode,&IS);
+	}
 	switch (IS.id){
 		case I_SYDB:
 		case I_BYTE:
@@ -618,7 +725,6 @@ void backendInstructionWrite(uint8_t** byte,uint32_t symVal,uint16_t func_stack_
 		return;
 		default:;
 	}
-	printSingleInstructionOptCode(IS);printf("\n");fflush(stdout);
 	assert(false); // invalid operator id
 	exit(1);
 }
@@ -794,6 +900,7 @@ uint8_t instructionContentCatagory(enum InstructionTypeID id){
 	exit(1);
 }
 
+#ifndef IGNORE_NONBACKEND
 #define INIT_INSTRUCTION_BUFFER_SIZE 1024
 
 void initInstructionBuffer(InstructionBuffer* ib){
@@ -817,6 +924,7 @@ void addInstruction(InstructionBuffer* ib, const InstructionSingle instructionSi
 	}
 	ib->buffer[ib->numberOfSlotsTaken++]=instructionSingle;
 }
+#endif // #ifndef IGNORE_NONBACKEND
 
 struct {
 	const char* corruptionErrorMessage;
@@ -835,111 +943,6 @@ void binaryFile_isEOF_fgetc(){
 	if (fgetc(binaryFileLoadState.binaryFile)!=EOF) err_10_1_(binaryFileLoadState.corruptionErrorMessage);
 }
 
-
-InstructionBuffer decompressInstructionBufferOnLoad(){
-	InstructionBuffer ib;
-	initInstructionBuffer(&ib);
-	while (true){
-		unsigned int byteCode[8];
-		InstructionSingle IS;
-		IS.id=(byteCode[0]=binaryFile_noEOF_fgetc());
-		if (byteCode[0]==0) return ib;
-		uint8_t icc = instructionContentCatagory(IS.id);
-		static uint8_t icc_to_delta[] = {[0]=0,[1]=1,[2]=2,[3]=2,[4]=2,[5]=3,[6]=3,[7]=3,[8]=4,[9]=5,[10]=6,[11]=8,[12]=3,[13]=4,[14]=4,[15]=5};
-		const uint8_t delta=icc_to_delta[icc];
-		for (uint8_t deltaTemp=1;deltaTemp<delta;deltaTemp++){
-			byteCode[deltaTemp]=binaryFile_noEOF_fgetc();
-		}
-		switch (icc){
-			case 0:
-			case 1:
-			break;
-			case 2:
-			IS.arg.B1.a_0=byteCode[1]&15;
-			break;
-			case 3:
-			IS.arg.B1.a_0=byteCode[1];
-			break;
-			case 4:
-			IS.arg.B2.a_0=(unsigned)byteCode[1]&15u;
-			IS.arg.B2.a_1=(unsigned)byteCode[1]/16u;
-			break;
-			case 5:
-			IS.arg.B3.a_0=(unsigned)byteCode[1]&15u;
-			IS.arg.B3.a_1=(unsigned)byteCode[1]/16u;
-			IS.arg.B3.a_2=(unsigned)byteCode[2]&15u;
-			break;
-			case 6:
-			IS.arg.B2.a_0=(unsigned)byteCode[1]&15u;
-			IS.arg.B2.a_1=byteCode[2];
-			break;
-			case 7:
-			IS.arg.W.a_0=(unsigned)byteCode[1]|(unsigned)byteCode[2]*256u;
-			break;
-			case 8:
-			IS.arg.BW.a_0=(unsigned)byteCode[1]&15u;
-			IS.arg.BW.a_1=(unsigned)byteCode[2]|(unsigned)byteCode[3]*256u;
-			break;
-			case 9:
-			IS.arg.D.a_0=
-			(uint32_t)((unsigned)byteCode[1]|(unsigned)byteCode[2]*256u)|
-			(uint32_t)((unsigned)byteCode[3]|(unsigned)byteCode[4]*256u)*65536lu;
-			break;
-			case 10:
-			IS.arg.BBD.a_0=(uint16_t)byteCode[1]&15u;
-			IS.arg.BBD.a_1=(uint16_t)byteCode[1]/16u;
-			IS.arg.BBD.a_2=
-			(uint32_t)((unsigned)byteCode[2]|(unsigned)byteCode[3]*256u)|
-			(uint32_t)((unsigned)byteCode[4]|(unsigned)byteCode[5]*256u)*65536lu;
-			break;
-			case 11:
-			IS.arg.BWD.a_0=byteCode[1];
-			IS.arg.BWD.a_1=(unsigned)byteCode[2]|(unsigned)byteCode[3]*256u;
-			IS.arg.BWD.a_2=
-			(uint32_t)((unsigned)byteCode[4]|(unsigned)byteCode[5]*256u)|
-			(uint32_t)((unsigned)byteCode[6]|(unsigned)byteCode[7]*256u)*65536lu;
-			break;
-			case 12:
-			IS.arg.B4.a_0=(unsigned)byteCode[1]&15u;
-			IS.arg.B4.a_1=(unsigned)byteCode[1]/16u;
-			IS.arg.B4.a_2=(unsigned)byteCode[2]&15u;
-			IS.arg.B4.a_3=(unsigned)byteCode[2]/16u;
-			break;
-			case 13:
-			IS.arg.B5.a_0=(unsigned)byteCode[1]&15u;
-			IS.arg.B5.a_1=(unsigned)byteCode[1]/16u;
-			IS.arg.B5.a_2=(unsigned)byteCode[2]&15u;
-			IS.arg.B5.a_3=(unsigned)byteCode[2]/16u;
-			IS.arg.B5.a_4=(unsigned)byteCode[3]&15u;
-			break;
-			case 14:
-			IS.arg.B6.a_0=(unsigned)byteCode[1]&15u;
-			IS.arg.B6.a_1=(unsigned)byteCode[1]/16u;
-			IS.arg.B6.a_2=(unsigned)byteCode[2]&15u;
-			IS.arg.B6.a_3=(unsigned)byteCode[2]/16u;
-			IS.arg.B6.a_4=(unsigned)byteCode[3]&15u;
-			IS.arg.B6.a_5=(unsigned)byteCode[3]/16u;
-			break;
-			case 15:
-			IS.arg.B8.a_0=(unsigned)byteCode[1]&15u;
-			IS.arg.B8.a_1=(unsigned)byteCode[1]/16u;
-			IS.arg.B8.a_2=(unsigned)byteCode[2]&15u;
-			IS.arg.B8.a_3=(unsigned)byteCode[2]/16u;
-			IS.arg.B8.a_4=(unsigned)byteCode[3]&15u;
-			IS.arg.B8.a_5=(unsigned)byteCode[3]/16u;
-			IS.arg.B8.a_6=(unsigned)byteCode[4]&15u;
-			IS.arg.B8.a_7=(unsigned)byteCode[4]/16u;
-			break;
-		}
-		addInstruction(&ib,IS);
-	}
-}
-
-
-
-
-
-#ifndef IS_BUILDING_RUN
 
 // returns the delta
 uint8_t decompressInstruction(const uint8_t* byteCode,InstructionSingle* IS_parent){
@@ -1047,6 +1050,26 @@ uint8_t decompressInstruction(const uint8_t* byteCode,InstructionSingle* IS_pare
 	return delta;
 }
 
+#ifndef IGNORE_NONBACKEND
+
+InstructionBuffer decompressInstructionBufferOnLoad(){
+	InstructionBuffer ib;
+	initInstructionBuffer(&ib);
+	while (true){
+		uint8_t byteCode[8];
+		InstructionSingle IS;
+		IS.id=(byteCode[0]=binaryFile_noEOF_fgetc());
+		if (byteCode[0]==0) return ib;
+		uint8_t icc = instructionContentCatagory(IS.id);
+		static uint8_t icc_to_delta[] = {[0]=0,[1]=1,[2]=2,[3]=2,[4]=2,[5]=3,[6]=3,[7]=3,[8]=4,[9]=5,[10]=6,[11]=8,[12]=3,[13]=4,[14]=4,[15]=5};
+		const uint8_t delta=icc_to_delta[icc];
+		for (uint8_t deltaTemp=1;deltaTemp<delta;deltaTemp++){
+			byteCode[deltaTemp]=binaryFile_noEOF_fgetc();
+		}
+		decompressInstruction(byteCode,&IS);
+		addInstruction(&ib,IS);
+	}
+}
 
 
 void printInstructionBufferWithMessageAndNumber(const InstructionBuffer*,const char*,const uint32_t);
@@ -1195,7 +1218,7 @@ uint8_t compressInstruction(uint8_t* byteCode,const InstructionSingle IS){
 
 uint8_t getStorageDeltaForInstruction(enum InstructionTypeID id){
 	// if something changes, do not just change this, there are other places
-	const uint8_t deltas[]={ // could be static
+	static const uint8_t deltas[]={
 		[ 0]=0,[ 1]=1,[ 2]=2,[ 3]=2,[ 4]=2,[ 5]=3,[ 6]=3,[ 7]=3,[ 8]=4,[ 9]=5,[10]=6,[11]=8,[12]=3,[13]=4,[14]=4,[15]=5
 	};
 	return deltas[instructionContentCatagory(id)];
@@ -1476,13 +1499,5 @@ void convertSTPI_STPA(InstructionBuffer* ib, uint16_t offsetToAdd){
 		}
 	}
 }
-#endif //ifndef IS_BUILDING_RUN
 
-
-
-
-
-
-
-
-
+#endif // #ifndef IGNORE_NONBACKEND

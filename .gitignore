@@ -34,9 +34,6 @@ out.txt
 out*.txt
 a.out
 a*.out
-trimOut.py
-optTesting.py
-StandardHeaders/mpaland/
 SDL2.dll
 SDL/
 

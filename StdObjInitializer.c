@@ -1,0 +1,60 @@
+
+// this is an automatically generated file. see `GenStrObjInitializer.py` for it's generation code.
+#define NUM_STD_SYMBOLS 50
+struct {
+	const char* symbol;
+	void* address;
+	uint32_t label;
+	uint8_t expectedType;
+} stdObjects[NUM_STD_SYMBOLS]={
+	[0].address=&_assert,[0].symbol="_assert",[0].expectedType=5,
+	[1].address=&_static_var_strtok,[1].symbol="_static_var_strtok",[1].expectedType=1,
+	[2].address=&abort,[2].symbol="abort",[2].expectedType=5,
+	[3].address=&calloc,[3].symbol="calloc",[3].expectedType=5,
+	[4].address=&clearerr,[4].symbol="clearerr",[4].expectedType=5,
+	[5].address=&exit,[5].symbol="exit",[5].expectedType=5,
+	[6].address=&fclose,[6].symbol="fclose",[6].expectedType=5,
+	[7].address=&feof,[7].symbol="feof",[7].expectedType=5,
+	[8].address=&ferror,[8].symbol="ferror",[8].expectedType=5,
+	[9].address=&fflush,[9].symbol="fflush",[9].expectedType=5,
+	[10].address=&fgetc,[10].symbol="fgetc",[10].expectedType=5,
+	[11].address=&fgetpos,[11].symbol="fgetpos",[11].expectedType=5,
+	[12].address=&fopen,[12].symbol="fopen",[12].expectedType=5,
+	[13].address=&fprintf,[13].symbol="fprintf",[13].expectedType=5,
+	[14].address=&fputc,[14].symbol="fputc",[14].expectedType=5,
+	[15].address=&fread,[15].symbol="fread",[15].expectedType=5,
+	[16].address=&free,[16].symbol="free",[16].expectedType=5,
+	[17].address=&fseek,[17].symbol="fseek",[17].expectedType=5,
+	[18].address=&fsetpos,[18].symbol="fsetpos",[18].expectedType=5,
+	[19].address=&ftell,[19].symbol="ftell",[19].expectedType=5,
+	[20].address=&fwrite,[20].symbol="fwrite",[20].expectedType=5,
+	[21].address=&malloc,[21].symbol="malloc",[21].expectedType=5,
+	[22].address=&memchr,[22].symbol="memchr",[22].expectedType=5,
+	[23].address=&memcmp,[23].symbol="memcmp",[23].expectedType=5,
+	[24].address=&memcpy,[24].symbol="memcpy",[24].expectedType=5,
+	[25].address=&memmove,[25].symbol="memmove",[25].expectedType=5,
+	[26].address=&memset,[26].symbol="memset",[26].expectedType=5,
+	[27].address=&printf,[27].symbol="printf",[27].expectedType=5,
+	[28].address=&realloc,[28].symbol="realloc",[28].expectedType=5,
+	[29].address=&rewind,[29].symbol="rewind",[29].expectedType=5,
+	[30].address=&snprintf,[30].symbol="snprintf",[30].expectedType=5,
+	[31].address=&stderr,[31].symbol="stderr",[31].expectedType=1,
+	[32].address=&stdin,[32].symbol="stdin",[32].expectedType=1,
+	[33].address=&stdout,[33].symbol="stdout",[33].expectedType=1,
+	[34].address=&strcat,[34].symbol="strcat",[34].expectedType=5,
+	[35].address=&strchr,[35].symbol="strchr",[35].expectedType=5,
+	[36].address=&strcmp,[36].symbol="strcmp",[36].expectedType=5,
+	[37].address=&strcpy,[37].symbol="strcpy",[37].expectedType=5,
+	[38].address=&strcspn,[38].symbol="strcspn",[38].expectedType=5,
+	[39].address=&strlen,[39].symbol="strlen",[39].expectedType=5,
+	[40].address=&strncat,[40].symbol="strncat",[40].expectedType=5,
+	[41].address=&strncmp,[41].symbol="strncmp",[41].expectedType=5,
+	[42].address=&strncpy,[42].symbol="strncpy",[42].expectedType=5,
+	[43].address=&strpbrk,[43].symbol="strpbrk",[43].expectedType=5,
+	[44].address=&strrchr,[44].symbol="strrchr",[44].expectedType=5,
+	[45].address=&strspn,[45].symbol="strspn",[45].expectedType=5,
+	[46].address=&strstr,[46].symbol="strstr",[46].expectedType=5,
+	[47].address=&strtok,[47].symbol="strtok",[47].expectedType=5,
+	[48].address=&ungetc,[48].symbol="ungetc",[48].expectedType=5,
+	[49].address=&vsprintf,[49].symbol="vsprintf",[49].expectedType=5
+};

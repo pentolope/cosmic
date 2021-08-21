@@ -4,10 +4,10 @@
 
 #ifdef __STD_REAL
 
-static void* malloc(unsigned long size);
-static void* calloc(unsigned long nitems, unsigned long size);
-static void free(void* ptr);
-static void* realloc(void* ptr, unsigned long size);
+void* malloc(unsigned long size);
+void* calloc(unsigned long nitems, unsigned long size);
+void free(void* ptr);
+void* realloc(void* ptr, unsigned long size);
 
 #include <alloc.c>
 

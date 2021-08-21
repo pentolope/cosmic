@@ -1,5 +1,4 @@
 
-
 #ifndef __STD_LIB
 #define __STD_LIB
 
@@ -7,11 +6,10 @@
 #define NULL ((void*)0)
 #endif
 
-
 #ifdef __STD_REAL
 
-static void abort(void);
-static void exit(int);
+void abort(void);
+void exit(int);
 
 #else // #ifdef __STD_REAL
 
@@ -24,7 +22,3 @@ extern void exit(int);
 #include "printf_.h"
 
 #endif
-
-
-
-

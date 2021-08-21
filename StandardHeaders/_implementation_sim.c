@@ -1,38 +1,155 @@
 
 
-
-// probably temporary implementation
-
+#include <stdio.h>
+#include <alloc.h>
 #include <printf_.h>
+#include <stdlib.h>
+#include <stdint.h>
 
-static void _print_target_char(struct _print_target* print_target,char c){
+struct _print_target{
+	_Bool isStr;
+	_Bool strMaxHit;
+	char* str;
+	FILE* stream;
+	unsigned long strMax;
+	unsigned long writeCount;
+};
+
+
+void _print_target_char(struct _print_target*,char);
+
+const char* _file_modes[16]={NULL,"r","rb","w","wb","a","ab","r+","rb+","r+b","w+","wb+","w+b","a+","ab+","a+b"};
+
+_Bool _isStrEql(const char* s0,const char* s1){
+	unsigned long i=0;
+	char c0,c1;
+	while ((c0=s0[i])!=0 & (c1=s1[i])!=0){
+		i++;
+		if (c0!=c1) return false;
+	}
+	return c0==c1;
+}
+
+void _putchar_screen(char);
+
+int fflush(FILE* stream){
+	// simulator doesn't use buffers
+	return 0;
+}
+
+int fputc(int c, FILE* stream){
+	if (stream->buffType<3) return EOF;
+	if (stream<=__open_files+2){
+		_putchar_screen(c);
+	} else {
+		if (stream->buffType==3 | stream->buffType==4){
+			*((volatile char*)(0x05000000))=c;
+		} else {
+			*((volatile char*)(0x05000000+stream->buffPos++))=c;
+			if (*((volatile unsigned long*)0x04020006)<=stream->buffPos){
+				*((volatile unsigned long*)0x04020006)=stream->buffPos+1;
+			}
+		}
+		return c;
+	}
+}
+
+int fgetc(FILE* stream){
+	if (stream->buffType==0 | (stream->buffType>=3 & stream->buffType<=6)) return EOF;
+	if (*((volatile unsigned long*)0x04020006)<=stream->buffPos){
+		return EOF;
+	}
+	return *((volatile char*)(0x05000000+stream->buffPos++));
+}
+
+int fgetpos(FILE* stream,fpos_t* pos){
+	pos->position=stream->buffPos;
+	return 0;
+}
+
+int fsetpos(FILE* stream,fpos_t* pos){
+	stream->buffPos=pos->position;
+	return 0;
+}
+
+FILE* fopen(const char* file,const char* mode){
+	FILE* fileObjPtr;
+	{
+		unsigned int i=2; // open slots start at 3 because 0,1,2 are taken by default
+		while (++i<256){
+			if (__open_files[i].buffType==0){
+				fileObjPtr=__open_files+i;
+				goto L0;
+			}
+		}
+		return NULL; // no more open file slots
+	}
+	L0:;
+	fileObjPtr->buffPos=0;
+	{
+		
+		unsigned char mode_id=0;
+		while (++mode_id<16){
+			if (_isStrEql(_file_modes[mode_id],mode)){
+				fileObjPtr->buffType=mode_id;
+				goto L1;
+			}
+		}
+		return NULL; // invalid mode string
+	}
+	L1:;
+	{
+		const char* mode_a=_file_modes[fileObjPtr->buffType];
+		unsigned long i=0;
+		while ((*((volatile char*)0x04020001)=mode_a[i++])!=0){
+		}
+		i=0;
+		while ((*((volatile char*)0x04020002)=file[i++])!=0){
+		}
+		if (*((volatile char*)0x04020003)==0){
+			return NULL;
+		}
+	}
+	return fileObjPtr;
+}
+
+int fclose(FILE* stream){
+	if (stream==NULL) return EOF;
+	if (stream==__open_files+0 | stream==__open_files+1 | stream==__open_files+2) return EOF;
+	*((volatile char*)0x04020003)=0;
+	stream->buffType=0;
+	return 0;
+}
+
+
+
+void _print_target_char(struct _print_target* print_target,char c){
 	if (print_target->isStr){
 		if (!print_target->strMaxHit){
 			print_target->str[print_target->writeCount++]=c;
-			print_target->strMaxHit=(uint32_t)print_target->writeCount>print_target->strMax;
+			print_target->strMaxHit=print_target->writeCount>print_target->strMax;
 		} else {
 			print_target->writeCount++;
 		}
 	} else {
-		//*((volatile char*)0x04030000)=c;
 		fputc(c,print_target->stream);
 	}
 }
 
 
 
-static struct {
+struct {
 	uint8_t ansiBuffer[8];
 	bool isAnsiEscapeOccuring;
 	uint8_t current_foreground;
 	uint8_t current_background;
 	uint16_t cursor;
 } _terminalCharacterState={
-	.current_foreground=224,
+	.current_foreground=255,
 	.current_background=0
 };
 
-static void _putchar_ensure_cursor_normal(){
+void _putchar_ensure_cursor_normal(){
 	uint8_t mode_info=*(volatile uint8_t*)(0x80804ffflu);
 	uint8_t font_height=(mode_info &15)+3;
 	unsigned n0=480u/(unsigned)font_height;
@@ -65,7 +182,7 @@ static void _putchar_ensure_cursor_normal(){
 }
 
 
-static void _putchar_screen(char c){
+void _putchar_screen(char c){
 	if (c>=' ' & c<='~'){
 		const uint32_t a=0x80800000lu+_terminalCharacterState.cursor*3lu;
 		*(volatile uint8_t*)(a+0)=c;
@@ -84,14 +201,14 @@ static void _putchar_screen(char c){
 	}
 }
 
-static void _putstr(struct _print_target* print_target,const char* str){
+void _putstr(struct _print_target* print_target,const char* str){
 	if (str==NULL) str="(null)";
 	while (*str!=0){
 		_print_target_char(print_target,*(str++));
 	}
 }
 
-static void _put_udeci(struct _print_target* print_target,unsigned long uv){
+void _put_udeci(struct _print_target* print_target,unsigned long uv){
 	bool t=false;
 	const uint8_t iStart=(uv&0xFFFF0000)!=0?9:4;
 	uint8_t i=iStart;
@@ -117,7 +234,7 @@ static void _put_udeci(struct _print_target* print_target,unsigned long uv){
 	if (!t) _print_target_char(print_target,'0');
 }
 
-static void _put_sdeci(struct _print_target* print_target,long sv){
+void _put_sdeci(struct _print_target* print_target,long sv){
 	unsigned long uv=sv;
 	bool s = (sv&0x80000000)!=0;
 	unsigned long uvc=(uv^(s*0xFFFFFFFF))+s;
@@ -125,7 +242,7 @@ static void _put_sdeci(struct _print_target* print_target,long sv){
 	_put_udeci(print_target,uvc);
 }
 
-static void _putinthex(struct _print_target* print_target,unsigned int v){
+void _putinthex(struct _print_target* print_target,unsigned int v){
 	for (unsigned int i=0;i<2u;i++){
 		unsigned int byte0=((char*)&v)[1u-i];
 		unsigned int digit0=(byte0>>4)&0xFu;
@@ -138,7 +255,7 @@ static void _putinthex(struct _print_target* print_target,unsigned int v){
 }
 
 
-static void _print(struct _print_target* print_target,const char* format,va_list args){
+void _print(struct _print_target* print_target,const char* format,va_list args){
 	while (1){
 		char c;
 		bool formatFinished;
@@ -265,7 +382,7 @@ static void _print(struct _print_target* print_target,const char* format,va_list
 }
 
 
-static int vsprintf(char *dest, const char *format, va_list args){
+int vsprintf(char *dest, const char *format, va_list args){
 	struct _print_target print_target={0};
 	print_target.isStr=1;
 	print_target.str=dest;
@@ -277,7 +394,7 @@ static int vsprintf(char *dest, const char *format, va_list args){
 	return print_target.writeCount;
 }
 
-static int fprintf(FILE* stream, const char* format, ...){
+int fprintf(FILE* stream, const char* format, ...){
 	struct _print_target print_target={0};
 	print_target.stream=stream;
 	
@@ -288,7 +405,7 @@ static int fprintf(FILE* stream, const char* format, ...){
 	return print_target.writeCount;
 }
 
-static int printf(const char* format, ...){
+int printf(const char* format, ...){
 	struct _print_target print_target={0};
 	print_target.stream=stdout;
 	
@@ -299,7 +416,7 @@ static int printf(const char* format, ...){
 	return print_target.writeCount;
 }
 
-static int snprintf(char* dest, unsigned long size, const char* format, ...){
+int snprintf(char* dest, unsigned long size, const char* format, ...){
 	struct _print_target print_target={0};
 	print_target.isStr=1;
 	print_target.str=dest;
@@ -313,9 +430,36 @@ static int snprintf(char* dest, unsigned long size, const char* format, ...){
 	return print_target.writeCount;
 }
 
+void _give_not_implemented_message(const char* f_name){
+	fprintf(stderr," The function `%s` is not implemented in the simulator definitions. The simulator will now exit.",f_name);
+	exit(1);
+}
 
-
-
-
-
+unsigned long fread(void* buffer,unsigned long size,unsigned long count,FILE* file){
+	_give_not_implemented_message("fread");
+}
+unsigned long fwrite(const void* buffer,unsigned long size,unsigned long count,FILE* file){
+	_give_not_implemented_message("fwrite");
+}
+int fseek(FILE* file,long offset,int whence){
+	_give_not_implemented_message("fseek");
+}
+long ftell(FILE* file){
+	_give_not_implemented_message("ftell");
+}
+int ungetc(int ch, FILE* file){
+	_give_not_implemented_message("ungetc");
+}
+int rewind(FILE* file){
+	_give_not_implemented_message("rewind");
+}
+void clearerr(FILE* file){
+	_give_not_implemented_message("clearerr");
+}
+int feof(FILE* file){
+	_give_not_implemented_message("feof");
+}
+int ferror(FILE* file){
+	_give_not_implemented_message("ferror");
+}
 

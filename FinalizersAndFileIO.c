@@ -295,7 +295,7 @@ void applyFinalizeToGlobalStaticData(){
 						for (uint32_t i2=0;i2<blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots;i2++){
 							if (blockFrameArray.globalBlockFrame.globalVariableEntries[i2].labelID==unusedLabelNumber){
 								if (!blockFrameArray.globalBlockFrame.globalVariableEntries[i2].usedStatic){
-									// if the declaration used 'static', then it cannot be verified that this can be removed, it may be used elsewhere at link time
+									// if the declaration didn't use 'static', then it cannot be verified that this can be removed, it may be used elsewhere at link time
 									goto ContinueUnusedSearch;
 								}
 								err_010_0("This static variable is effectively unused. It\'s data is being removed. Remove the keyword 'static' to avoid removal.",blockFrameArray.globalBlockFrame.globalVariableEntries[i2].indexOfDeclaration);

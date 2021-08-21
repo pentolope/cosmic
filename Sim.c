@@ -1546,9 +1546,9 @@ int main(int argc, char** argv){
 			printf("\n");
 			addressToInstructionTranslation[i].address=storageAddress;
 			addressToInstructionTranslation[i].IS=IS;
-			addressToInstructionTranslation[i].skipThis=0==backendInstructionSize(IS);
+			addressToInstructionTranslation[i].skipThis=0==backendInstructionSize(&IS);
 		}
-		storageAddress+=backendInstructionSize(IS);
+		storageAddress+=backendInstructionSize(&IS);
 		if (IS.id==I_LABL){
 			labelNumbers[labelCount]=allData.buffer[i].arg.D.a_0;
 			labelAddresses[labelCount]=storageAddress;

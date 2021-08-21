@@ -1,4 +1,4 @@
-
+/*
 #ifdef __COSMIC
 #define __STD_REAL
 #define __BUILDING_SIM_LOADER
@@ -10,11 +10,10 @@ static unsigned int _exit_ret_val_ptr;
 #include <assert.h>
 
 #include <stdlib.c>
-#include <stdio.c>
-#include <printf.c>
 #include <string.c>
+#include <_implementation_sim.c>
 #endif
-
+*/
 
 
 #include "StatementWalk.c"
@@ -42,6 +41,7 @@ void intrinsicBuild(){
 	compileSettings.optLevel=4;
 	globalLabelID = 0x2F;
 	runPreprocessCompile("TargetInstructions/ComplexIntrinsics/source.c","IntrinsicBuiltFiles/_intrinsics.bin",false);
+	if (globalLabelID>=0xFF) err_10_1_("Intrinsic build failed due to \'source.c\' having too many labels declared");
 	printf("Compilation of \'source.c\' finished, inserting smaller intrinsics...\n");
 	struct BinContainer bc=loadFileContentsAsBinContainer("IntrinsicBuiltFiles/_intrinsics.bin");
 	quadMergeIB(&bc.functions,&ib_intrinsic_back_div32_u_u,&ib_intrinsic_back_mod32_u_u,&ib_intrinsic_back_div32_s_s,&ib_intrinsic_back_mod32_s_s);

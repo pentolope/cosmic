@@ -10,6 +10,7 @@ typedef unsigned long uint32_t;
 typedef   signed long  int32_t;
 
 typedef unsigned long size_t;
+typedef   signed long ssize_t;
 typedef   signed long ptrdiff_t;
 typedef unsigned long uintptr_t;
 typedef   signed long  intptr_t;
