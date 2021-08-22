@@ -2988,6 +2988,11 @@ void _putchar_screen(char c){
 	}
 }
 
+void _putstr_screen(const char* s){
+	char c;
+	while ((c=*(s++))!=0){_putchar_screen(c);}
+}
+
 void _inc_cursor(int m){
 	if (m==0) return;
 	if (m<0){
