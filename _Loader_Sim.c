@@ -1,5 +1,11 @@
 
 #define __BUILDING_SIM_LOADER
+#define __STD_REAL
+
+static unsigned long _exit_ret_address;
+static unsigned int _exit_ret_val_ptr;
+
+#include <_implementation_sim.c>
 #include "_Loader_Base.c"
 
 

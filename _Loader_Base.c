@@ -1,11 +1,11 @@
 
+#ifndef __STD_REAL
 #define __STD_REAL
+#endif
 
 #define INCLUDE_BACKEND
 #define IGNORE_NONBACKEND
 
-static unsigned long _exit_ret_address;
-static unsigned int _exit_ret_val_ptr;
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -13,7 +13,6 @@ static unsigned int _exit_ret_val_ptr;
 
 #include <stdlib.c>
 #include <string.c>
-#include <_implementation_sim.c>
 
 
 #define err_00__0(message)     _err_(message)
@@ -36,6 +35,7 @@ static void _err_(const char* message){
 	fprintf(stderr,"%s\n",message);
 	exit(1);
 }
+
 
 #include "TargetInstructions/InstructionBase.c"
 #include "IntrinsicBuiltFiles/_intrinsic_c_functions.c"
@@ -731,6 +731,7 @@ static int _exec_springboard0(int argc, char** argv){
 
 
 int run_binary(int argc, char** argv){
+	_isKernelExecuting=0;
 	*((int*)__FUNCTION_RET_VALUE_PTR)=0;
 	_exit_ret_address=__FUNCTION_RET_INSTRUCTION_ADDRESS;
 	_exit_ret_val_ptr=__FUNCTION_RET_VALUE_PTR;

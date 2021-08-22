@@ -10,10 +10,13 @@
 #define NULL ((void*)0)
 #endif
 
-
 #define IOFBF 1
 #define IOLBF 2
 #define IONBF 3
+
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
 
 #define _MAX_UNGET 4
 
@@ -70,9 +73,9 @@ struct All_Open_Files {
 	bool file_auto_buff_taken[MAX_AUTO_BUFF];
 	struct Auto_Buff file_auto_buff_content[MAX_AUTO_BUFF];
 } all_open_files = {0};
-FILE* stdout=&all_open_files.file_descriptor_handles[0];
-FILE* stderr=&all_open_files.file_descriptor_handles[1];
-FILE* stdin =&all_open_files.file_descriptor_handles[2];
+FILE* stdout=all_open_files.file_descriptor_handles+0;
+FILE* stderr=all_open_files.file_descriptor_handles+1;
+FILE* stdin =all_open_files.file_descriptor_handles+2;
 
 #endif // #ifdef __BUILDING_SIM_LOADER
 

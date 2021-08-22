@@ -1,9 +1,5 @@
 
-#include <assert.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 #include <stdbool.h>
 
 #define FAT16_CLUSTER_FREE         0x0000
@@ -29,11 +25,6 @@
 #define FAT_ATTRIB_DIR      (1 << 4)
 #define FAT_ATTRIB_ARCHIVE  (1 << 5)
 
-#define SEEK_SET 0
-#define SEEK_CUR 1
-#define SEEK_END 2
-
-
 
 uint16_t read2(const uint8_t* p){
 	return ((uint16_t)p[0] << 0) | ((uint16_t)p[1] << 8);
@@ -47,10 +38,6 @@ void write2(uint8_t* p, uint16_t v){
 void write4(uint8_t* p, uint32_t v){
 	p[0]=v >> 0;p[1]=v >> 8;p[2]=v >>16;p[3]=v >>24;
 }
-
-
-
-
 
 // struct Folder_File_Object represents a folder that is targetting a subfolder or file contained inside
 struct Folder_File_Object {
@@ -72,8 +59,6 @@ struct Folder_File_Object {
 	bool is_target_root; // if this is true then what struct Folder_File_Object represents is actually just the root directory of the filesystem. In which case, non of the other information is relevent.
 };
 
-
-
 struct File_System {
 	bool isFAT16;
 	uint8_t sectors_per_cluster; // the number of sectors in one cluster
@@ -89,7 +74,10 @@ struct File_System {
 	uint32_t cluster_size; // cluster_size is in units of bytes
 } file_system = {0};
 
-
+#include <assert.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
 #define CACHE_SIZE 15
 #define CACHE_SECTOR_DATA_ADDRESS(index,offset) ((uint8_t*)((unsigned long)(index)*512lu+((0x80000000lu|0x1000000lu|512lu)+(unsigned long)(offset))))
@@ -489,6 +477,7 @@ bool is_filename_match(const uint8_t* source_name, const uint8_t* test_name, uin
 // return value string is allocated on heap
 uint8_t* normalize_path(const uint8_t* path){
 	uint32_t length=strlen((const char*)path);
+	_isNextAllocFromKernel=1;
 	uint8_t* normalized_path=malloc(length+1);
 	uint32_t i;
 	for (i=0;i<=length;i++){
@@ -1447,6 +1436,7 @@ returns:
 */
 uint8_t fat_clean_folder(const struct Folder_File_Object* ffo_const){
 	if ((ffo_const->target.attributes & FAT_ATTRIB_DIR)==0) return 3;
+	_isNextAllocFromKernel=1;
 	struct Folder_File_Object* ffo=malloc(sizeof(struct Folder_File_Object));
 	if (ffo==NULL) return 4;
 	memcpy(ffo,ffo_const,sizeof(struct Folder_File_Object));
@@ -1500,9 +1490,8 @@ uint8_t fat_clean_folder(const struct Folder_File_Object* ffo_const){
 
 
 
-void ex_stdout(int16_t c);
-void ex_stderr(int16_t c);
-int16_t ex_stdin_block();
+void _putchar_screen(char c);
+int16_t ex_stdin_block_appropriate();
 
 bool file_buff_flush(FILE* file){
 	if (file==NULL) return 1;
@@ -1531,7 +1520,7 @@ bool file_buff_flush(FILE* file){
 	} else {
 		if (file->file_descriptor==1){
 			for (uint32_t i=0;i<file->buffPos;i++){
-				ex_stdout(file->buffPtr[i]);
+				_putchar_screen(file->buffPtr[i]);
 			}
 			file->buffPos=0;
 			file->curIObuffMode=0;
@@ -1539,7 +1528,7 @@ bool file_buff_flush(FILE* file){
 			return 0;
 		} else if (file->file_descriptor==2){
 			for (uint32_t i=0;i<file->buffPos;i++){
-				ex_stderr(file->buffPtr[i]);
+				_putchar_screen(file->buffPtr[i]);
 			}
 			file->buffPos=0;
 			file->curIObuffMode=0;
@@ -1586,6 +1575,7 @@ bool file_buff_flush(FILE* file){
 FILE* fopen(const char* pathname, const char* mode){
 	if (pathname==NULL | mode==NULL | !all_open_files.fs_init_performed) return NULL;
 	if (all_open_files.working_directory==NULL){
+		_isNextAllocFromKernel=1;
 		all_open_files.working_directory=malloc(2);
 		if (all_open_files.working_directory==NULL) return NULL;
 		all_open_files.working_directory[0]='/';
@@ -1617,6 +1607,7 @@ FILE* fopen(const char* pathname, const char* mode){
 				const uint32_t l1=strlen(pathname);
 				if (pathname[0]!='/' & pathname[0]!='\\'){
 					const uint32_t l0=strlen((const char*)all_open_files.working_directory);
+					_isNextAllocFromKernel=1;
 					full_pathname=malloc(l0+l1+2);
 					if (full_pathname==NULL) return NULL;
 					memcpy(full_pathname,all_open_files.working_directory,l0);
@@ -1624,6 +1615,7 @@ FILE* fopen(const char* pathname, const char* mode){
 					full_pathname[l0]='/';
 					full_pathname[l0+l1+1]=0;
 				} else {
+					_isNextAllocFromKernel=1;
 					full_pathname=malloc(l1+1);
 					if (full_pathname==NULL) return NULL;
 					memcpy(full_pathname,pathname,l1);
@@ -1810,7 +1802,7 @@ uint32_t fread(void* buffer,uint32_t size,uint32_t count,FILE* file){
 		while (total_left!=0){
 			total_left--;
 			total_read++;
-			*bufferc++=ex_stdin_block();
+			*bufferc++=ex_stdin_block_appropriate();
 		}
 		goto Return;
 	} else {
@@ -1903,14 +1895,14 @@ uint32_t fwrite(const void* buffer,uint32_t size,uint32_t count,FILE* file){
 		while (total_left!=0){
 			total_left--;
 			total_wrote++;
-			ex_stdout(*bufferc++);
+			_putchar_screen(*bufferc++);
 		}
 	} else if (file->file_descriptor==2){
 		// STDERR
 		while (total_left!=0){
 			total_left--;
 			total_wrote++;
-			ex_stderr(*bufferc++);
+			_putchar_screen(*bufferc++);
 		}
 	} else {
 		uint8_t res;
@@ -1994,7 +1986,7 @@ int16_t fgetpos(FILE* file,fpos_t* pos){
 			r -= file->buffLen - file->buffPos;
 		}
 	}
-	pos->file_position=r;
+	pos->position=r;
 	return 0;
 }
 
@@ -2004,9 +1996,9 @@ int16_t fsetpos(FILE* file,fpos_t* pos){
 	if (file->file_descriptor<3) return -1; // no fsetpos on stdio,stdout,stderr
 	if (file_buff_flush(file)) return -1;
 	struct Folder_File_Object* ffo=&(all_open_files.file_object_handles[file->file_descriptor - 3]);
-	if (ffo->target.file_size < pos->file_position) return -1;
-	if (ffo->target.walking_position==pos->file_position) return 0; // if it's the same position, then there is no need to set the position
-	ffo->target.walking_position=pos->file_position;
+	if (ffo->target.file_size < pos->position) return -1;
+	if (ffo->target.walking_position==pos->position) return 0; // if it's the same position, then there is no need to set the position
+	ffo->target.walking_position=pos->position;
 	ffo->target.walking_cluster=0;
 	return 0;
 }
@@ -2166,8 +2158,6 @@ struct {
 	.current_foreground=255,
 	.current_background=0
 };
-
-void _putchar_screen(char c);
 
 void _print_target_char(struct _print_target* print_target,char c){
 	if (print_target->isStr){
@@ -2822,8 +2812,10 @@ void flasher_switch(){
 	*(volatile uint8_t*)(a+2)=v1;
 }
 
-int16_t getchar(){
-	// waits until ex_stdin() returns non-EOF
+// waits until ex_stdin() returns non-EOF
+// shows cursor position with visual flashing
+// performs no lasting visual changes from the character it reads (the caller will have to print the character to the screen if they want it to be shown)
+int16_t ex_stdin_block_character(){
 	int16_t c;
 	*((volatile uint8_t*)(0x80000000lu|0x00lu))=1;
 	uint32_t flasher_inc=0;
@@ -2843,10 +2835,99 @@ int16_t getchar(){
 	return c;
 }
 
+uint16_t getTerminalCursorLimit();
+void _inc_cursor(int m);
+void _setchar_screen(uint16_t position, uint8_t character, uint8_t foreground, uint8_t background);
+char ex_stdin_line_buffer[256];
+int16_t ex_stdin_line_position=-1;
+bool stdin_do_line_block;
 
+// reads an entire line and performs visual updating
+int16_t ex_stdin_block_line(){
+	uint16_t length=0;
+	uint16_t position=0;
+	ex_stdin_line_buffer[0]=0;
+	uint16_t cursorLimit=getTerminalCursorLimit();
+	int16_t c=-1;
+	while (c!='\n'){
+		c=ex_stdin_block_character();
+		switch (c){
+			case 8:// backspace
+			if (position!=0){
+				_inc_cursor(-1);
+				memmove(ex_stdin_line_buffer+position,ex_stdin_line_buffer+(position+1u),length-position);
+				length--;
+				position--;
+			}
+			break;
+			case 17://up arrow
+			// not implemented
+			//_inc_cursor(-80);
+			break;
+			case 18://left arrow
+			if (position!=0){
+				_inc_cursor(-1);
+				position--;
+			}
+			break;
+			case 19:// down arrow
+			// not implemented
+			//_inc_cursor(80);
+			break;
+			case 20://right arrow
+			if (position<length){
+				_inc_cursor(1);
+				position++;
+			}
+			break;
+			case '\n':
+			if (position!=length) _inc_cursor(length-position);
+			position=length;
+			break;
+			default:
+			if (length<254 & c>=' ' & c<='~'){
+				_inc_cursor(1);
+				memmove(ex_stdin_line_buffer+(position+1u),ex_stdin_line_buffer+position,(length-position)+1u);
+				ex_stdin_line_buffer[position]=c;
+				length++;
+				position++;
+			}
+		}
+		for (uint16_t i=0;i<=length;i++){
+			int32_t target=(int32_t)_terminalCharacterState.cursor+((int32_t)position-(int32_t)i);
+			if (target>=0 & target<cursorLimit){
+				_setchar_screen((uint16_t)target,(i==length)?' ':ex_stdin_line_buffer[i],_terminalCharacterState.current_foreground,_terminalCharacterState.current_background);
+			}
+		}
+		if (c=='\n' & length!=0){
+			_putchar_screen('\n');
+			ex_stdin_line_position=1;
+			return ex_stdin_line_buffer[0];
+		}
+	}
+}
 
+int16_t ex_stdin_block_appropriate(){
+	if (ex_stdin_line_position!=-1){
+		if (ex_stdin_line_buffer[ex_stdin_line_position]!=0){
+			return ex_stdin_line_buffer[ex_stdin_line_position++];
+		} else {
+			ex_stdin_line_position=-1;
+		}
+	}
+	if (stdin_do_line_block){return ex_stdin_block_line();} else {return ex_stdin_block_character();}
+}
 
-
+uint16_t getTerminalCursorLimit(){
+	uint8_t mode_info=*(volatile uint8_t*)(0x80804ffflu);
+	uint8_t font_height=(mode_info &15)+3;
+	unsigned n0=480u/(unsigned)font_height;
+	if ((mode_info &(1<<4))!=0){
+		return n0*80u;
+	} else {
+		return n0*71u;
+	}
+}
 void _putchar_ensure_cursor_normal(){
 	uint8_t mode_info=*(volatile uint8_t*)(0x80804ffflu);
 	uint8_t font_height=(mode_info &15)+3;
@@ -2879,6 +2960,12 @@ void _putchar_ensure_cursor_normal(){
 	}
 }
 
+void _setchar_screen(uint16_t position, uint8_t character, uint8_t foreground, uint8_t background){
+	const uint32_t a=0x80800000lu+position*3lu;
+	*(volatile uint8_t*)(a+0)=character;
+	*(volatile uint8_t*)(a+1)=foreground;
+	*(volatile uint8_t*)(a+2)=background;
+}
 
 void _putchar_screen(char c){
 	if (c>=' ' & c<='~'){

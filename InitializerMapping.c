@@ -559,6 +559,14 @@ void applySymbolicOperator(ExpressionTreeNode* thisNode){
 		if (!(thisNode->operatorID==5 | thisNode->operatorID==6)) ibRight=&(rn->ib);
 	}
 	switch (thisNode->operatorID){
+		case 5:
+			singleMergeIB(ib,ibLeft);
+			writeIS.id=I_SYCD;
+			writeIS.arg.D.a_0=extraVal;
+			addInstruction(ib,writeIS);
+			writeIS.id=I_SYD0;
+			addInstruction(ib,writeIS);
+		break;
 		case 10:
 		case 14:
 		case 16:
@@ -1266,8 +1274,7 @@ void initializerImplementNonstaticExpression(
 			const char* message;
 			if (isSU) message="Cannot initialize non-struct and non-union with struct or union expression";
 			else message="Cannot initialize struct or union with non-struct and non-union expression";
-			printInformativeMessageAtSourceContainerIndex(true,message,ime->strStart,0);
-			exit(1);
+			err_1101_(message,ime->strStart);
 		}
 	} else if (!isSU) applyTypeCast(thisNode,typeStringCast,warnValue);
 	singleMergeIB(ib,&thisNode->ib);
@@ -1281,12 +1288,10 @@ void initializerImplementNonstaticExpression(
 			if the initializer can't write to it then initializing const values wouldn't be possible)
 		*/
 		if (!doStringsMatch(thisNode->post.typeStringNQ,typeStringCastNQ)){
-			printInformativeMessageAtSourceContainerIndex(true,"Cannot initialize differing struct or union types",ime->strStart,ime->strEnd);
-			exit(1);
+			err_1111_("Cannot initialize differing struct or union types",ime->strStart,ime->strEnd);
 		}
 		if (typeSize==0){
-			printInformativeMessageAtSourceContainerIndex(true,"Cannot initialize incomplete struct or union",ime->strStart,0);
-			exit(1);
+			err_1101_("Cannot initialize incomplete struct or union",ime->strStart);
 		}
 		
 		insert_IB_STPI(ib,stackOffset);
@@ -1413,8 +1418,7 @@ void calcPotentialDesignatorAndSize(int32_t entryIndex,char* crackedType, uint32
 			uint32_t suggestedLength=readHexInString(crackedTypeNQ+1);
 			if (thisBaseDesignation>=suggestedLength){
 				if (cts=='#'){
-					printInformativeMessageAtSourceContainerIndex(true,"Array is too small for this list",designatorSourceStart,designatorSourceEnd);
-					exit(1);
+					err_1111_("Array is too small for this list",designatorSourceStart,designatorSourceEnd);
 				}
 				*crackedTypeNQ='!';
 				writeHexInString(crackedTypeNQ+1,thisBaseDesignation+1);
@@ -1423,8 +1427,7 @@ void calcPotentialDesignatorAndSize(int32_t entryIndex,char* crackedType, uint32
 		} else {
 			subCrackedType = gotoMemberAtIndex(crackedTypeNQ,thisBaseDesignation);
 			if (subCrackedType==NULL){
-				printInformativeMessageAtSourceContainerIndex(true,"No more members to initialize",designatorSourceStart,designatorSourceEnd);
-				exit(1);
+				err_1111_("No more members to initialize",designatorSourceStart,designatorSourceEnd);
 			}
 		}
 		baseDesignation=thisBaseDesignation;
@@ -1440,16 +1443,14 @@ void calcPotentialDesignatorAndSize(int32_t entryIndex,char* crackedType, uint32
 		if ((ime->typeOfEntry==5 & cts!='?' & cts!='!' & cts!='#') |
 			(ime->typeOfEntry==6 & isArray)){
 			
-			printInformativeMessageAtSourceContainerIndex(true,"This designator and the type do not match",ime->strStart,ime->strEnd);
-			exit(1);
+			err_1111_("This designator and the type do not match",ime->strStart,ime->strEnd);
 		}
 		if (isArray){
 			uint32_t suggestedLength=readHexInString(crackedTypeNQ+1);
 			thisBaseDesignation=ime->arrayConstVal;
 			if (thisBaseDesignation>=suggestedLength){
 				if (cts=='#'){
-					printInformativeMessageAtSourceContainerIndex(true,"This designator\'s index is out of bounds",ime->strStart,ime->strEnd);
-					exit(1);
+					err_1111_("This designator\'s index is out of bounds",ime->strStart,ime->strEnd);
 				}
 				*crackedTypeNQ='!';
 				writeHexInString(crackedTypeNQ+1,thisBaseDesignation+1);
@@ -1458,8 +1459,7 @@ void calcPotentialDesignatorAndSize(int32_t entryIndex,char* crackedType, uint32
 		} else {
 			thisBaseDesignation = findMemberIndexForName(crackedTypeNQ,ime->strStart,ime->strEnd);
 			if ((uint16_t)thisBaseDesignation==0xFFFFu){
-				printInformativeMessageAtSourceContainerIndex(true,"No member of this name in this type",ime->strStart,ime->strEnd);
-				exit(1);
+				err_1111_("No member of this name in this type",ime->strStart,ime->strEnd);
 			}
 			subCrackedType=gotoMemberAtIndex(crackedTypeNQ,thisBaseDesignation);
 		}
@@ -1556,12 +1556,10 @@ void initializerPreImplementList(
 		}
 	} else if (isBase){
 		if (imeChain->chainEntry!=-1){
-			printInformativeMessageAtSourceContainerIndex(true,"Cannot use multiple expressions to initialize a type that isn't an array, struct, or union",ime->strStart,ime->strEnd);
-			exit(1);
+			err_1111_("Cannot use multiple expressions to initialize a type that isn't an array, struct, or union",ime->strStart,ime->strEnd);
 		}
 		if (imeChain->descriptionBranchEntry!=-1){
-			printInformativeMessageAtSourceContainerIndex(true,"Cannot use designator to initialize a type that isn't an array, struct, or union",ime->strStart,ime->strEnd);
-			exit(1);
+			err_1111_("Cannot use designator to initialize a type that isn't an array, struct, or union",ime->strStart,ime->strEnd);
 		}
 		if (imeChain->typeOfEntry==1){
 			initializerPreImplementList(ime->subEntry,crackedType);
@@ -1687,20 +1685,18 @@ bool initializerImplementRoot(
 		
 		char* crackedType = crackTypeString(*typeStringPtr);
 		if (crackedType==NULL){
-			printInformativeMessageAtSourceContainerIndex(true,strMerge2(strMerge2("typeString \'",*typeStringPtr),"\' is or contains an incomplete struct or union"),ime->strStart,0);
-			exit(1);
+			err_1101_(strMerge2(strMerge2("typeString \'",*typeStringPtr),"\' is or contains an incomplete struct or union"),ime->strStart);
 		}
 		for (int32_t i=0;crackedType[i];i++){
 			if (crackedType[i]=='?' & i!=0){
-				printInformativeMessageAtSourceContainerIndex(false,"Initializing an incomplete type like this is typically invalid.\n    However, this compiler can probably still calculate the array size",ime->strStart,0);
+				err_010_0("Initializing an incomplete type like this is typically invalid.\n    However, this compiler can probably still calculate the array size",ime->strStart);
 				break;
 			}
 		}
 		initializerPreImplementList(root,crackedType);
 		for (int32_t i=0;crackedType[i];i++){
 			if (crackedType[i]=='?'){
-				printInformativeMessageAtSourceContainerIndex(true,"An array type remains incomplete, this initializer is insufficient for this type declaration",ime->strStart,0);
-				exit(1);
+				err_1101_("An array type remains incomplete, this initializer is insufficient for this type declaration",ime->strStart);
 			}
 		}
 		uint16_t arrayCount=0;
@@ -1751,19 +1747,16 @@ bool initializerImplementRoot(
 		return isStatic;
 	} else if (initializerMap.typeOfInit==2 &!useExpressionForString){
 		if (localTypeString[0]!='['){
-			printInformativeMessageAtSourceContainerIndex(true,"Initializer invalid for declared type",ime->strStart,ime->strEnd);
-			exit(1);
+			err_1111_("Initializer invalid for declared type",ime->strStart,ime->strEnd);
 		}
 		bool isWideLiteral=sourceContainer.string[ime->strStart]=='L';
 		if (isWideLiteral){
-			printInformativeMessageAtSourceContainerIndex(true,"Wide string literals not ready yet",ime->strStart,ime->strEnd);
-			exit(1);
+			err_1111_("Wide string literals not ready yet",ime->strStart,ime->strEnd);
 		}
 		int32_t enclosementIndex=getIndexOfMatchingEnclosement(localTypeString,0);
 		char* temp=stripQualifiers(localTypeString+enclosementIndex+2,NULL,NULL);
 		if (!doStringsMatch(temp,"char") & !doStringsMatch(temp,"unsigned char")){
-			printInformativeMessageAtSourceContainerIndex(true,"String literal is trying to initialize a type that isn\'t a char[] or char*",ime->strStart,ime->strEnd);
-			exit(1);
+			err_1111_("String literal is trying to initialize a type that isn\'t a char[] or char*",ime->strStart,ime->strEnd);
 		}
 		uint32_t suggestedLength=findLengthOfDataOfStringLiteral(ime->strStart+isWideLiteral,ime->strEnd,isWideLiteral);
 		uint8_t* data=cosmic_malloc(suggestedLength*sizeof(uint8_t));
@@ -1779,8 +1772,7 @@ bool initializerImplementRoot(
 			typeSize=getSizeofForTypeString(localTypeString,true);
 			assert(typeSize!=0); // typeString corruption
 			if (typeSize<suggestedLength-1){
-				printInformativeMessageAtSourceContainerIndex(true,"String literal is too large for the indicated array size",ime->strStart,ime->strEnd);
-				exit(1);
+				err_1111_("String literal is too large for the indicated array size",ime->strStart,ime->strEnd);
 			}
 		}
 		InstructionSingle IS_temp;
@@ -1808,19 +1800,16 @@ bool initializerImplementRoot(
 		return isStatic;
 	} else {
 		if (localTypeString[0]=='['){
-			printInformativeMessageAtSourceContainerIndex(true,"Cannot initialize array with expression",ime->strStart,ime->strEnd);
-			exit(1);
+			err_1111_("Cannot initialize array with expression",ime->strStart,ime->strEnd);
 		}
 		uint32_t typeSize=getSizeofForTypeString(localTypeString,true);
 		if (typeSize==0){
-			printInformativeMessageAtSourceContainerIndex(true,"Cannot initialize incomplete struct or union",ime->strStart,0);
-			exit(1);
+			err_1101_("Cannot initialize incomplete struct or union",ime->strStart);
 		}
 		typeSize+=typeSize&1;
 		if (isStatic){
 			if (isTypeStringOfStructOrUnion(localTypeString)){
-				printInformativeMessageAtSourceContainerIndex(true,"Initializing by expression to a struct or union of static storage\n    is not possible with the current implementation of static expressions",ime->strStart,0);
-				exit(1);
+				err_1101_("Initializing by expression to a struct or union of static storage\n    is not possible with the current implementation of static expressions",ime->strStart);
 			}
 			initMemoryOrganizerForInitializer(&mofi,typeSize);
 			initializerImplementStaticExpression(root,&mofi,*typeStringPtr,0,false);

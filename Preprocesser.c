@@ -1415,7 +1415,7 @@ bool insertMacroIntoEmptySlot(Macro macroToPlace){
 			if (isInputComplex) hasConflict = isMacroComplex(i) && doesStringMatchUntilParen(i_def,macroToPlace.definition);
 			else hasConflict = doStringsMatch(i_def,macroToPlace.definition);
 			if (hasConflict){
-				char* temp=strMerge3("Warning: macro with name \"",i_def,"\" is being redefined");
+				char* temp=strMerge3("macro with name \"",i_def,"\" is being redefined");
 				printInformativeMessageAtSourceContainerIndex(false,temp,-1,0);
 				cosmic_free(temp);
 				removeMacro(i);

@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #define _MemorySize 67108864lu // 2**26
 #define _AlignExtend(size) (((size)+7u)&0x03FFFFFClu)
@@ -10,6 +11,7 @@
 
 static uint32_t _heapStart;
 static bool _isKernelExecuting;
+static bool _isNextAllocFromKernel;
 
 
 // _freeNonKernel should only be called by the kernel, it will effectively free any allocations made by applications
@@ -94,6 +96,7 @@ void* malloc(uint32_t size){
 	while (1){
 		if (currentBlockSize==0u | (currentBlockSize&3u)!=0u | (currentBlockAddr&3u)!=0u){
 			// heap corruption
+			_isNextAllocFromKernel=0;
 			exit(0x0373);
 		}
 		if (!isCurrentAllocated & currentBlockSize>=bsize & currentBlockSize<bestBlockSize){
@@ -109,6 +112,7 @@ void* malloc(uint32_t size){
 		nextBlockAddr=currentBlockSize+currentBlockAddr;
 		if (nextBlockAddr>_MemorySize){
 			// heap corruption
+			_isNextAllocFromKernel=0;
 			exit(0x0374);
 		}
 		
@@ -129,16 +133,19 @@ void* malloc(uint32_t size){
 	}
 	if (bestBlockAddr==0u){
 		// no space
+		_isNextAllocFromKernel=0;
 		return NULL;
 	}
 	uint32_t leftoverSize=bestBlockSize-bsize;
 	if (leftoverSize<=16u){
 		// if the best block size is close (or exact), just pretend the asked-for size is exactly the block size
-		_MemoryWrite32(bestBlockAddr,(_isKernelExecuting?0x80000000lu:0x0lu)|(bestBlockSize^1u));
+		_MemoryWrite32(bestBlockAddr,((_isKernelExecuting|_isNextAllocFromKernel)?0x80000000lu:0x0lu)|(bestBlockSize^1u));
+		_isNextAllocFromKernel=0;
 		return (void*)(bestBlockAddr+4u);
 	} else {
 		_MemoryWrite32(bestBlockAddr+bsize,leftoverSize);
-		_MemoryWrite32(bestBlockAddr,(_isKernelExecuting?0x80000000lu:0x0lu)|((bestBlockSize-leftoverSize)^1u));
+		_MemoryWrite32(bestBlockAddr,((_isKernelExecuting|_isNextAllocFromKernel)?0x80000000lu:0x0lu)|((bestBlockSize-leftoverSize)^1u));
+		_isNextAllocFromKernel=0;
 		return (void*)(bestBlockAddr+4u);
 	}
 }
@@ -173,10 +180,12 @@ void* realloc(void* ptr, uint32_t size_new){
 	uint32_t bsize_old=(*((uint32_t*)ptr-1u)^1u)&0x7FFFFFFFlu;
 	if ((bsize_old&3u)!=0u | ((uint32_t)ptr&3u)!=0u){
 		// ptr already free-d or heap corruption
+		_isNextAllocFromKernel=0;
 		exit(0x0377);
 	}
 	if (bsize_new==bsize_old | (bsize_new<bsize_old & bsize_old-bsize_new<=16u)){
 		// close enough to ignore the request
+		_isNextAllocFromKernel=0;
 		return ptr;
 	}
 	// I'm not doing anything clever right now

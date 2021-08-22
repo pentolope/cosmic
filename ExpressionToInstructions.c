@@ -2605,8 +2605,7 @@ void expressionToAssemblyWithCast(
 		if (isVoidCast){
 			return;
 		} else {
-			printInformativeMessageAtSourceContainerIndex(true,"Expression is required here",startIndexForExpression,endIndexForExpression);
-			exit(1);
+			err_1111_("Expression is required here",startIndexForExpression,endIndexForExpression);
 		}
 	}
 	ExpressionTreeNode* rootNode=expressionTreeGlobalBuffer.expressionTreeNodes+indexOfRoot;
@@ -2627,8 +2626,7 @@ void expressionToAssemblyWithReturn(
 {
 	int16_t indexOfRoot = buildExpressionTreeToGlobalBufferAndReturnRootIndex(startIndexForExpression,endIndexForExpression,true);
 	if (indexOfRoot==-1){
-		printInformativeMessageAtSourceContainerIndex(true,"Expression is required here",startIndexForExpression,endIndexForExpression);
-		exit(1);
+		err_1111_("Expression is required here",startIndexForExpression,endIndexForExpression);
 	}
 	int16_t indexForReturnIdentifier=partitionNewExpressionTreeNodeInGlobalBufferAndReturnIndex();
 	int16_t indexForAssignment=partitionNewExpressionTreeNodeInGlobalBufferAndReturnIndex();
@@ -2696,8 +2694,7 @@ void expressionToAssemblyWithInitializer(
 		bool usedStatic)
 {
 	if (usedRegister&usedStatic){
-		printInformativeMessageAtSourceContainerIndex(true,"Cannot use 'register' and 'static' at the same time",startIndexForDeclaration,0);
-		exit(1);
+		err_1101_("Cannot use 'register' and 'static' at the same time",startIndexForDeclaration);
 	}
 	int32_t initializerRoot=initializerMapRoot(startIndexForInitializer,endIndexForInitializer);
 	char* typeString;
