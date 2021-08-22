@@ -10,8 +10,14 @@ static unsigned int _exit_ret_val_ptr;
 
 
 int main(){
-	stdin_do_line_block=1;
 	_isKernelExecuting=1;
+	all_open_files=calloc(1,sizeof(struct All_Open_Files));
+	if (all_open_files==NULL) return 1;// that would be highly unexpected...
+	stdout=all_open_files->file_descriptor_handles+0;
+	stderr=all_open_files->file_descriptor_handles+1;
+	stdin =all_open_files->file_descriptor_handles+2;
+	
+	stdin_do_line_block=1;
 	{
 		uint16_t limit=getTerminalCursorLimit();
 		for (uint16_t i=0;i<limit;i++){
@@ -25,4 +31,3 @@ int main(){
 		_putchar_screen(ex_stdin_block_appropriate());
 	}
 }
-

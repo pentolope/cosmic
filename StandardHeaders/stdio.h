@@ -50,7 +50,7 @@ typedef struct {
 #ifdef __STD_REAL
 #ifdef __BUILDING_SIM_LOADER
 
-FILE __open_files[256]={[0].buffType=6,[1].buffType=6,[2].buffType=2};
+FILE __open_files[4]={[0].buffType=6,[1].buffType=6,[2].buffType=2};
 FILE* stdout=__open_files+0;
 FILE* stderr=__open_files+1;
 FILE* stdin =__open_files+2;
@@ -72,10 +72,8 @@ struct All_Open_Files {
 	bool fs_init_performed;
 	bool file_auto_buff_taken[MAX_AUTO_BUFF];
 	struct Auto_Buff file_auto_buff_content[MAX_AUTO_BUFF];
-} all_open_files = {0};
-FILE* stdout=all_open_files.file_descriptor_handles+0;
-FILE* stderr=all_open_files.file_descriptor_handles+1;
-FILE* stdin =all_open_files.file_descriptor_handles+2;
+}* all_open_files;
+FILE* stdout,stderr,stdin;
 
 #endif // #ifdef __BUILDING_SIM_LOADER
 

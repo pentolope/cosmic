@@ -76,7 +76,7 @@ FILE* fopen(const char* file,const char* mode){
 	FILE* fileObjPtr;
 	{
 		unsigned int i=2; // open slots start at 3 because 0,1,2 are taken by default
-		while (++i<256){
+		while (++i<4){
 			if (__open_files[i].buffType==0){
 				fileObjPtr=__open_files+i;
 				goto L0;

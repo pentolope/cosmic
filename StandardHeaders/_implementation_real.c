@@ -1504,7 +1504,7 @@ bool file_buff_flush(FILE* file){
 			return 0; // request is ignored. stdin being "flushed" doesn't make sense because those characters would still waiting to be read
 		} else {
 			// flushing input files is done by forgeting what was read from disk into the file buffer and move the file position by the size of the ungetc buffer and the file buffer.
-			struct Folder_File_Object* ffo=all_open_files.file_object_handles+(file->file_descriptor - 3);
+			struct Folder_File_Object* ffo=all_open_files->file_object_handles+(file->file_descriptor - 3);
 			if (file->ungetBuffPos<_MAX_UNGET){
 				ffo->target.walking_position -= _MAX_UNGET - file->ungetBuffPos; // I tried to figure out what posix wants the file position to be for ungetc for more then an hour, and I still can't figure it out so I'm just doing this.
 				ffo->target.walking_cluster = 0;
@@ -1539,7 +1539,7 @@ bool file_buff_flush(FILE* file){
 			file->ungetBuffPos=_MAX_UNGET;
 			uint32_t d=file->buffPos;
 			if (d!=0){
-				uint8_t res=fat_write_target_file(all_open_files.file_object_handles+(file->file_descriptor - 3),file->buffPtr,&file->buffPos);
+				uint8_t res=fat_write_target_file(all_open_files->file_object_handles+(file->file_descriptor - 3),file->buffPtr,&file->buffPos);
 				file->buffPos=d - file->buffPos;
 				if (res==0 & file->buffPos==0){
 					file->curIObuffMode=0;
@@ -1573,13 +1573,13 @@ bool file_buff_flush(FILE* file){
 }
 
 FILE* fopen(const char* pathname, const char* mode){
-	if (pathname==NULL | mode==NULL | !all_open_files.fs_init_performed) return NULL;
-	if (all_open_files.working_directory==NULL){
+	if (pathname==NULL | mode==NULL | !all_open_files->fs_init_performed) return NULL;
+	if (all_open_files->working_directory==NULL){
 		_isNextAllocFromKernel=1;
-		all_open_files.working_directory=malloc(2);
-		if (all_open_files.working_directory==NULL) return NULL;
-		all_open_files.working_directory[0]='/';
-		all_open_files.working_directory[1]=0;
+		all_open_files->working_directory=malloc(2);
+		if (all_open_files->working_directory==NULL) return NULL;
+		all_open_files->working_directory[0]='/';
+		all_open_files->working_directory[1]=0;
 	}
 	uint16_t mode_type;
 	if      (strcmp("r"  ,mode)==0) mode_type=0;
@@ -1601,16 +1601,16 @@ FILE* fopen(const char* pathname, const char* mode){
 		return NULL;
 	}
 	for (uint16_t fd=3;fd<MAX_FILE_DESCRIPTORS;fd++){
-		if (all_open_files.file_descriptor_handles[fd].file_descriptor==-1){
+		if (all_open_files->file_descriptor_handles[fd].file_descriptor==-1){
 			uint8_t* full_pathname;
 			{
 				const uint32_t l1=strlen(pathname);
 				if (pathname[0]!='/' & pathname[0]!='\\'){
-					const uint32_t l0=strlen((const char*)all_open_files.working_directory);
+					const uint32_t l0=strlen((const char*)all_open_files->working_directory);
 					_isNextAllocFromKernel=1;
 					full_pathname=malloc(l0+l1+2);
 					if (full_pathname==NULL) return NULL;
-					memcpy(full_pathname,all_open_files.working_directory,l0);
+					memcpy(full_pathname,all_open_files->working_directory,l0);
 					memcpy(full_pathname+(l0+1),pathname,l1);
 					full_pathname[l0]='/';
 					full_pathname[l0+l1+1]=0;
@@ -1622,7 +1622,7 @@ FILE* fopen(const char* pathname, const char* mode){
 					full_pathname[l1]=0;
 				}
 			}
-			struct Folder_File_Object* ffo=&(all_open_files.file_object_handles[fd -3]);
+			struct Folder_File_Object* ffo=&(all_open_files->file_object_handles[fd -3]);
 			switch (fat_find_path_target(full_pathname,ffo,0)){
 				case 0:
 				if (ffo->is_target_root) break; // I'm not giving the root to the caller
@@ -1649,18 +1649,18 @@ FILE* fopen(const char* pathname, const char* mode){
 						break;
 						// any other possibilities here are inconceivable
 					}
-					FILE* ret_file=&(all_open_files.file_descriptor_handles[fd]);
+					FILE* ret_file=&(all_open_files->file_descriptor_handles[fd]);
 					memset(ret_file,0,sizeof(FILE));
 					ret_file->file_descriptor=fd;
 					ret_file->buffType=IONBF;
 					ret_file->ungetBuffPos=_MAX_UNGET;
 					for (uint16_t i=0;i<MAX_AUTO_BUFF;i++){
-						if (!all_open_files.file_auto_buff_taken[i]){
-							all_open_files.file_auto_buff_taken[i]=1;
+						if (!all_open_files->file_auto_buff_taken[i]){
+							all_open_files->file_auto_buff_taken[i]=1;
 							ret_file->buffType=IOFBF;
 							ret_file->buffLen=AUTO_BUF_SIZE;
 							ret_file->buffPos=AUTO_BUF_SIZE;
-							ret_file->buffPtr=all_open_files.file_auto_buff_content[i].buff;
+							ret_file->buffPtr=all_open_files->file_auto_buff_content[i].buff;
 						}
 					}
 					return ret_file;
@@ -1718,8 +1718,8 @@ int16_t fflush(FILE* file){
 		// flush all file descriptors
 		bool f=0;
 		for (int16_t i=0;i<MAX_FILE_DESCRIPTORS;i++){
-			if (all_open_files.file_descriptor_handles[i].file_descriptor==i){
-				f |=file_buff_flush(all_open_files.file_descriptor_handles+i);
+			if (all_open_files->file_descriptor_handles[i].file_descriptor==i){
+				f |=file_buff_flush(all_open_files->file_descriptor_handles+i);
 			}
 		}
 		if (cache_flush_all()) return -1;
@@ -1738,14 +1738,14 @@ int16_t fclose(FILE* file){
 	if (fflush(file)) return -1;
 	if (file->buffPtr!=NULL){
 		for (uint16_t i=0;i<MAX_AUTO_BUFF;i++){
-			if ((void*)(file->buffPtr)==(void*)(all_open_files.file_auto_buff_content[i].buff)){
-				all_open_files.file_auto_buff_taken[i]=0;
+			if ((void*)(file->buffPtr)==(void*)(all_open_files->file_auto_buff_content[i].buff)){
+				all_open_files->file_auto_buff_taken[i]=0;
 				break;
 			}
 		}
 	}
-	if (fat_close_file(&(all_open_files.file_object_handles[file->file_descriptor - 3]))!=0) return -1;
-	all_open_files.file_descriptor_handles[file->file_descriptor].file_descriptor=-1;file->file_descriptor=-1;// it's probably the same pointer, but it should both be done to make sure
+	if (fat_close_file(&(all_open_files->file_object_handles[file->file_descriptor - 3]))!=0) return -1;
+	all_open_files->file_descriptor_handles[file->file_descriptor].file_descriptor=-1;file->file_descriptor=-1;// it's probably the same pointer, but it should both be done to make sure
 	return 0;
 }
 
@@ -1773,7 +1773,7 @@ uint32_t fread(void* buffer,uint32_t size,uint32_t count,FILE* file){
 	if (file->buffPtr!=NULL & (file->buffType==IOFBF | file->buffType==IOLBF) & file->buffLen!=0){
 		// fill the buffer if it is empty and the size of the read is less then the size of the buffer
 		if (file->buffPos == file->buffLen & total_left < file->buffLen){
-			fat_read_target_file(&(all_open_files.file_object_handles[file->file_descriptor - 3]),file->buffPtr,&file->buffPos); // for now, error value is ignored for buffer fill. length returned is expected to be correct.
+			fat_read_target_file(&(all_open_files->file_object_handles[file->file_descriptor - 3]),file->buffPtr,&file->buffPos); // for now, error value is ignored for buffer fill. length returned is expected to be correct.
 			uint32_t i=file->buffPos;
 			const uint32_t d=file->buffLen - i;
 			file->buffPos=d;
@@ -1809,7 +1809,7 @@ uint32_t fread(void* buffer,uint32_t size,uint32_t count,FILE* file){
 		uint8_t res;
 		{
 			uint32_t total_orig=total_left;
-			res=fat_read_target_file(&(all_open_files.file_object_handles[file->file_descriptor - 3]),bufferc,&total_left);
+			res=fat_read_target_file(&(all_open_files->file_object_handles[file->file_descriptor - 3]),bufferc,&total_left);
 			total_read+=total_left;
 			total_left=total_orig-total_left;
 		}
@@ -1909,7 +1909,7 @@ uint32_t fwrite(const void* buffer,uint32_t size,uint32_t count,FILE* file){
 		{
 			// direct write
 			uint32_t total_orig=total_left;
-			res=fat_write_target_file(&(all_open_files.file_object_handles[file->file_descriptor - 3]),bufferc,&total_left);
+			res=fat_write_target_file(&(all_open_files->file_object_handles[file->file_descriptor - 3]),bufferc,&total_left);
 			total_wrote+=total_left;
 			total_left=total_orig-total_left;
 		}
@@ -1947,7 +1947,7 @@ int16_t fseek(FILE* file,int32_t offset,int16_t whence){
 	if (file->file_descriptor>=MAX_FILE_DESCRIPTORS) return -1;
 	if (file->file_descriptor<3) return -1; // no fseek on stdio,stdout,stderr
 	if (file_buff_flush(file)) return -1;
-	if (fat_lazy_seek(&(all_open_files.file_object_handles[file->file_descriptor - 3]),offset,whence)) return -1;
+	if (fat_lazy_seek(&(all_open_files->file_object_handles[file->file_descriptor - 3]),offset,whence)) return -1;
 	file->errFlags=file->errFlags ^ (file->errFlags & 1);
 	return 0;
 }
@@ -1956,7 +1956,7 @@ int32_t ftell(FILE* file){
 	if (file==NULL) return -1;
 	if (file->file_descriptor>=MAX_FILE_DESCRIPTORS) return -1;
 	if (file->file_descriptor<3) return -1; // no ftell on stdio,stdout,stderr
-	uint32_t r=all_open_files.file_object_handles[file->file_descriptor - 3].target.walking_position;
+	uint32_t r=all_open_files->file_object_handles[file->file_descriptor - 3].target.walking_position;
 	if (file->curIObuffMode==1 & file->ungetBuffPos<_MAX_UNGET){
 		r -= _MAX_UNGET - file->ungetBuffPos; // I tried to figure out what posix wants the file position to be for ungetc for more then an hour, and I still can't figure it out so I'm just doing this.
 	}
@@ -1975,7 +1975,7 @@ int16_t fgetpos(FILE* file,fpos_t* pos){
 	if (file==NULL | pos==NULL) return -1;
 	if (file->file_descriptor>=MAX_FILE_DESCRIPTORS) return -1;
 	if (file->file_descriptor<3) return -1; // no fgetpos on stdio,stdout,stderr
-	uint32_t r=all_open_files.file_object_handles[file->file_descriptor - 3].target.walking_position;
+	uint32_t r=all_open_files->file_object_handles[file->file_descriptor - 3].target.walking_position;
 	if (file->curIObuffMode==1 & file->ungetBuffPos<_MAX_UNGET){
 		r -= _MAX_UNGET - file->ungetBuffPos; // I tried to figure out what posix wants the file position to be for ungetc for more then an hour, and I still can't figure it out so I'm just doing this.
 	}
@@ -1995,7 +1995,7 @@ int16_t fsetpos(FILE* file,fpos_t* pos){
 	if (file->file_descriptor>=MAX_FILE_DESCRIPTORS) return -1;
 	if (file->file_descriptor<3) return -1; // no fsetpos on stdio,stdout,stderr
 	if (file_buff_flush(file)) return -1;
-	struct Folder_File_Object* ffo=&(all_open_files.file_object_handles[file->file_descriptor - 3]);
+	struct Folder_File_Object* ffo=&(all_open_files->file_object_handles[file->file_descriptor - 3]);
 	if (ffo->target.file_size < pos->position) return -1;
 	if (ffo->target.walking_position==pos->position) return 0; // if it's the same position, then there is no need to set the position
 	ffo->target.walking_position=pos->position;
@@ -2113,26 +2113,26 @@ bool open_file_system(uint8_t partition_index){
 
 // returns 1 on failure, 0 on success. will overwrite the currently mounted file system, and all open files will be forced closed without flushing buffers
 bool perform_file_system_init(){
-	free(all_open_files.working_directory);
-	memset(&all_open_files,0,sizeof(struct All_Open_Files));
+	free(all_open_files->working_directory);
+	memset(all_open_files,0,sizeof(struct All_Open_Files));
 	for (uint16_t i=3;i<MAX_FILE_DESCRIPTORS;i++){
-		all_open_files.file_descriptor_handles[i].file_descriptor=-1;
+		all_open_files->file_descriptor_handles[i].file_descriptor=-1;
 	}
-	all_open_files.file_descriptor_handles[0].file_descriptor=0;
-	all_open_files.file_descriptor_handles[0].curIObuffMode=IONBF;
-	all_open_files.file_descriptor_handles[0].buffType=1;
-	all_open_files.file_descriptor_handles[0].ungetBuffPos=_MAX_UNGET;
-	all_open_files.file_descriptor_handles[1].file_descriptor=1;
-	all_open_files.file_descriptor_handles[1].curIObuffMode=IONBF;
-	all_open_files.file_descriptor_handles[1].buffType=2;
-	all_open_files.file_descriptor_handles[1].ungetBuffPos=_MAX_UNGET;
-	all_open_files.file_descriptor_handles[2].file_descriptor=2;
-	all_open_files.file_descriptor_handles[2].curIObuffMode=IONBF;
-	all_open_files.file_descriptor_handles[2].buffType=2;
-	all_open_files.file_descriptor_handles[2].ungetBuffPos=_MAX_UNGET;
+	all_open_files->file_descriptor_handles[0].file_descriptor=0;
+	all_open_files->file_descriptor_handles[0].curIObuffMode=IONBF;
+	all_open_files->file_descriptor_handles[0].buffType=1;
+	all_open_files->file_descriptor_handles[0].ungetBuffPos=_MAX_UNGET;
+	all_open_files->file_descriptor_handles[1].file_descriptor=1;
+	all_open_files->file_descriptor_handles[1].curIObuffMode=IONBF;
+	all_open_files->file_descriptor_handles[1].buffType=2;
+	all_open_files->file_descriptor_handles[1].ungetBuffPos=_MAX_UNGET;
+	all_open_files->file_descriptor_handles[2].file_descriptor=2;
+	all_open_files->file_descriptor_handles[2].curIObuffMode=IONBF;
+	all_open_files->file_descriptor_handles[2].buffType=2;
+	all_open_files->file_descriptor_handles[2].ungetBuffPos=_MAX_UNGET;
 	for (uint8_t partition_index=0;partition_index<4;partition_index++){
 		if (!open_file_system(partition_index)){
-			all_open_files.fs_init_performed=1;
+			all_open_files->fs_init_performed=1;
 			return 0;
 		}
 	}
