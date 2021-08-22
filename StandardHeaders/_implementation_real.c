@@ -2855,7 +2855,7 @@ int16_t ex_stdin_block_line(){
 			case 8:// backspace
 			if (position!=0){
 				_inc_cursor(-1);
-				memmove(ex_stdin_line_buffer+position,ex_stdin_line_buffer+(position+1u),length-position);
+				memmove(ex_stdin_line_buffer+(position-1u),ex_stdin_line_buffer+position,(length-position)+1u);
 				length--;
 				position--;
 			}
@@ -2885,7 +2885,7 @@ int16_t ex_stdin_block_line(){
 			position=length;
 			break;
 			default:
-			if (length<254 & c>=' ' & c<='~'){
+			if (length<253 & c>=' ' & c<='~'){
 				_inc_cursor(1);
 				memmove(ex_stdin_line_buffer+(position+1u),ex_stdin_line_buffer+position,(length-position)+1u);
 				ex_stdin_line_buffer[position]=c;
@@ -2894,13 +2894,15 @@ int16_t ex_stdin_block_line(){
 			}
 		}
 		for (uint16_t i=0;i<=length;i++){
-			int32_t target=(int32_t)_terminalCharacterState.cursor+((int32_t)position-(int32_t)i);
+			int32_t target=(int32_t)_terminalCharacterState.cursor+((int32_t)i-(int32_t)position);
 			if (target>=0 & target<cursorLimit){
 				_setchar_screen((uint16_t)target,(i==length)?' ':ex_stdin_line_buffer[i],_terminalCharacterState.current_foreground,_terminalCharacterState.current_background);
 			}
 		}
-		if (c=='\n' & length!=0){
+		if (c=='\n'){
 			_putchar_screen('\n');
+			ex_stdin_line_buffer[length++]='\n';
+			ex_stdin_line_buffer[length]=0;
 			ex_stdin_line_position=1;
 			return ex_stdin_line_buffer[0];
 		}

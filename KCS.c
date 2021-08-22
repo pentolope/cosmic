@@ -22,9 +22,7 @@ int main(){
 		}
 	}
 	while (1){
-		ex_stdin_block_appropriate();
-		_putchar_screen('|');
-		_putchar_screen('\n');
+		_putchar_screen(ex_stdin_block_appropriate());
 	}
 }
 
