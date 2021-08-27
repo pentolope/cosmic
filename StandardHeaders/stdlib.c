@@ -1,16 +1,17 @@
 #include <stdlib.h>
 
-// the arguments and return value are important, don't remove them
-int _exit_springboard(int argc_unused, char** argv_unused){
-	__FUNCTION_RET_INSTRUCTION_ADDRESS=_exit_ret_address;
+void _exit_springboard(){
+	__FUNCTION_CALLER_RET_STACK_ADDRESS=_exit_info.ret_stack_address;
+	__FUNCTION_CALLER_FRAME_STACK_ADDRESS=_exit_info.frame_stack_address;
+	__FUNCTION_RET_INSTRUCTION_ADDRESS=_exit_info.ret_address;
 }
 
 void exit(int status){
-	*((int*)_exit_ret_val_ptr)=status;
-	_exit_springboard(0,NULL);
+	*((int*)_exit_info.ret_val_ptr)=status;
+	_exit_springboard();
 }
 
 void abort(void){
-	*((int*)_exit_ret_val_ptr)=134;
-	_exit_springboard(0,NULL);
+	*((int*)_exit_info.ret_val_ptr)=134;
+	_exit_springboard();
 }

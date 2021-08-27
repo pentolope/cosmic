@@ -18,7 +18,7 @@ extern void exit(int);
 
 #endif // #ifdef __STD_REAL
 
-#include "alloc.h"
 #include "printf_.h"
+#include "alloc.h"
 
 #endif

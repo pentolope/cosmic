@@ -1,20 +1,3 @@
-/*
-#ifdef __COSMIC
-#define __STD_REAL
-#define __BUILDING_SIM_LOADER
-
-static unsigned long _exit_ret_address=0xFFFFFFF0;
-static unsigned int _exit_ret_val_ptr;
-#include <stdbool.h>
-#include <stdint.h>
-#include <assert.h>
-
-#include <stdlib.c>
-#include <string.c>
-#include <_implementation_sim.c>
-#endif
-*/
-
 
 #include "StatementWalk.c"
 #include "FinalizersAndFileIO.c"

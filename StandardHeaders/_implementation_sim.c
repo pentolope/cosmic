@@ -1,10 +1,8 @@
 
 
-#include <stdio.h>
-#include <alloc.h>
-#include <printf_.h>
-#include <stdlib.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 struct _print_target{
 	_Bool isStr;

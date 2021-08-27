@@ -34,7 +34,7 @@ typedef struct {
 	
 	int file_descriptor; /* value represents: 
 	: -1 : not taken slot for a file stream
-	: 0,1,2 : the true form of stdout,stderr,stdin respectively
+	: 0,1,2 : the true form of stdin,stdout,stderr respectively
 	: all_open_files.file_object_handles[{value} - 3] : an open file stream
 	: otherwise, it is invalid */
 	unsigned char* buffPtr;
@@ -50,10 +50,10 @@ typedef struct {
 #ifdef __STD_REAL
 #ifdef __BUILDING_SIM_LOADER
 
-FILE __open_files[4]={[0].buffType=6,[1].buffType=6,[2].buffType=2};
-FILE* stdout=__open_files+0;
-FILE* stderr=__open_files+1;
-FILE* stdin =__open_files+2;
+FILE __open_files[4]={[0].buffType=2,[1].buffType=6,[2].buffType=6};
+FILE* stdin =__open_files+0;
+FILE* stdout=__open_files+1;
+FILE* stderr=__open_files+2;
 
 #else // #ifdef __BUILDING_SIM_LOADER
 
@@ -73,7 +73,7 @@ struct All_Open_Files {
 	bool file_auto_buff_taken[MAX_AUTO_BUFF];
 	struct Auto_Buff file_auto_buff_content[MAX_AUTO_BUFF];
 }* all_open_files;
-FILE* stdout,stderr,stdin;
+FILE* stdin,stdout,stderr;
 
 #endif // #ifdef __BUILDING_SIM_LOADER
 

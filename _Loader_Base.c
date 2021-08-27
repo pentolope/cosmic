@@ -723,21 +723,78 @@ static void _exec_springboard1(){
 
 static int _exec_springboard0(int argc, char** argv){
 	*((int*)__FUNCTION_RET_VALUE_PTR)=0;
-	_exit_ret_address=__FUNCTION_RET_INSTRUCTION_ADDRESS;
-	_exit_ret_val_ptr=__FUNCTION_RET_VALUE_PTR;
 	_exec_springboard1();
 }
 
 
 
+static void catch_exit_sub1(){
+	_exit_info.ret_stack_address=__FUNCTION_CALLER_RET_STACK_ADDRESS;
+	_exit_info.frame_stack_address=__FUNCTION_CALLER_FRAME_STACK_ADDRESS;
+	_exit_info.ret_address=__FUNCTION_RET_INSTRUCTION_ADDRESS;
+}
+
+static int catch_exit_sub0(){
+	static struct {
+		unsigned long r0;
+		unsigned int r1;
+		unsigned int r2;
+		unsigned int r3;
+		unsigned int r4;
+	} restore; // must be static !
+	
+	restore.r0=__FUNCTION_RET_INSTRUCTION_ADDRESS;
+	restore.r1=__FUNCTION_CALLER_RET_STACK_ADDRESS;
+	restore.r2=__FUNCTION_CALLER_FRAME_STACK_ADDRESS;
+	restore.r3=__FUNCTION_ARG_SIZE;
+	restore.r4=__FUNCTION_RET_VALUE_PTR;
+	_exit_info.ret_val_ptr=__FUNCTION_RET_VALUE_PTR;
+	catch_exit_sub1();
+	__FUNCTION_RET_INSTRUCTION_ADDRESS=restore.r0;
+	__FUNCTION_CALLER_RET_STACK_ADDRESS=restore.r1;
+	__FUNCTION_CALLER_FRAME_STACK_ADDRESS=restore.r2;
+	__FUNCTION_ARG_SIZE=restore.r3;
+	__FUNCTION_RET_VALUE_PTR=restore.r4;
+}
+
+static int caught_exit_value;
+
+static bool catch_exit(){
+	static struct {
+		unsigned long r0;
+		unsigned int r1;
+		unsigned int r2;
+		unsigned int r3;
+		unsigned int r4;
+		bool will_catch_exit;
+		bool did_catch_exit;
+	} restore; // must be static !
+	
+	restore.r0=__FUNCTION_RET_INSTRUCTION_ADDRESS;
+	restore.r1=__FUNCTION_CALLER_RET_STACK_ADDRESS;
+	restore.r2=__FUNCTION_CALLER_FRAME_STACK_ADDRESS;
+	restore.r3=__FUNCTION_ARG_SIZE;
+	restore.r4=__FUNCTION_RET_VALUE_PTR;
+
+	restore.will_catch_exit=0;
+	caught_exit_value=catch_exit_sub0();
+	__FUNCTION_RET_INSTRUCTION_ADDRESS=restore.r0;
+	__FUNCTION_CALLER_RET_STACK_ADDRESS=restore.r1;
+	__FUNCTION_CALLER_FRAME_STACK_ADDRESS=restore.r2;
+	__FUNCTION_ARG_SIZE=restore.r3;
+	__FUNCTION_RET_VALUE_PTR=restore.r4;
+	restore.did_catch_exit=restore.will_catch_exit;
+	restore.will_catch_exit=1;
+	return restore.did_catch_exit;
+}
+
 int run_binary(int argc, char** argv){
 	_isKernelExecuting=0;
-	*((int*)__FUNCTION_RET_VALUE_PTR)=0;
-	_exit_ret_address=__FUNCTION_RET_INSTRUCTION_ADDRESS;
-	_exit_ret_val_ptr=__FUNCTION_RET_VALUE_PTR;
+	if (catch_exit()) return caught_exit_value;
 	if (argc==0) return 0xFFFF;
 	loadFileContentsAsByteCode(argv[0]);
 	int ret = _exec_springboard0(argc,argv);
+	if (catch_exit()) return caught_exit_value;
 	free(binaryLocation);
 	return ret;
 }
