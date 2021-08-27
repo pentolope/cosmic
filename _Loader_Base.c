@@ -363,127 +363,154 @@ int binSearchStdObjNames(char* name){
 	return -1;
 }
 
-
+uint32_t binaryFile_noEOF_fget_32(){
+	uint32_t v;
+	v =(uint32_t)binaryFile_noEOF_fgetc();
+	v|=(uint32_t)binaryFile_noEOF_fgetc()<<8;
+	v|=(uint32_t)binaryFile_noEOF_fgetc()<<16;
+	v|=(uint32_t)binaryFile_noEOF_fgetc()<<24;
+	return v;
+}
 
 void loadFileContentsAsByteCode(const char* filePath){
-	printf("0/7\r");
 	for (uint16_t i1=0;i1<NUM_STD_SYMBOLS;i1++){stdObjects[i1].label=0;} // this for loop isn't really needed for sim loader but it will be needed for kernel's loader.
+	labelAddressPair=NULL;binaryFileLoadState.corruptionErrorMessage=NULL;binaryFileLoadState.binaryFile=NULL; // setting these to NULL is not really needed
+	
+	const uint8_t icc_to_delta[] = {[0]=0,[1]=1,[2]=2,[3]=2,[4]=2,[5]=3,[6]=3,[7]=3,[8]=4,[9]=5,[10]=6,[11]=8,[12]=3,[13]=4,[14]=4,[15]=5};
+	uint16_t id_temp;
+	uint8_t workingByteCode[10];
+	uint32_t initialLabelCount=NUM_STD_SYMBOLS;
+	uint32_t initialRawSize=0;
+	uint32_t dataWalkIndex=0;
+	while ((id_temp=_intrinsic_c_functions[dataWalkIndex++])!=0){
+		workingByteCode[0]=id_temp;
+		initialLabelCount+=id_temp==I_LABL | id_temp==I_FCST | id_temp==I_JJMP;
+		const uint8_t icc = instructionContentCatagory(id_temp);
+		const uint8_t deltaByteCode=icc_to_delta[icc];
+		for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
+			workingByteCode[iDelta]=_intrinsic_c_functions[dataWalkIndex++];
+		}
+		initialRawSize+=backendInstructionSizeFromByteCode(workingByteCode);
+	}
+	initialRawSize+=initialRawSize & 1;
+	// the loop above could be reduced to a calculation at compile time... but I'm not going to do that right now.
 	
 	binaryFileLoadState.binaryFile=fopen(filePath,"rb");
-	if (binaryFileLoadState.binaryFile==NULL){
-		err_10_1_(strMerge3("Error: Could not load file \"",filePath,"\""));
+	if (binaryFileLoadState.binaryFile==NULL){err_10_1_(strMerge3("Error: Could not load file \"",filePath,"\""));}
+	uint32_t totalFunctionAndStaticDataBackendSize,totalFunctionAndStaticDataBackendSizeAligned,totalFunctionAndStaticDataLength,len_symbols;
+	uint8_t* fileContentAfterSymbols;
+	binaryFileLoadState.corruptionErrorMessage=strMerge3("Error: Input file \"",filePath,"\" is corrupted");
+	totalFunctionAndStaticDataBackendSize=binaryFile_noEOF_fget_32();
+	totalFunctionAndStaticDataLength=binaryFile_noEOF_fget_32();
+	numberOfLabels=binaryFile_noEOF_fget_32();
+	len_symbols=binaryFile_noEOF_fget_32();
+	totalFunctionAndStaticDataBackendSize+=initialRawSize;
+	numberOfLabels+=initialLabelCount;
+	totalFunctionAndStaticDataBackendSizeAligned=totalFunctionAndStaticDataBackendSize + (totalFunctionAndStaticDataBackendSize & 1);
+	free((char*)binaryFileLoadState.corruptionErrorMessage);// free is temporary, it will be remade. it is freed because then it's more likely that the binary can be placed better by malloc
+	binaryFileLoadState.corruptionErrorMessage=NULL;
+	binaryLocation=malloc(totalFunctionAndStaticDataBackendSizeAligned);
+	fileContentAfterSymbols=malloc(totalFunctionAndStaticDataLength);
+	labelAddressPair=calloc(numberOfLabels,sizeof(struct LabelNumberAddressPair));
+	if (binaryLocation==NULL | fileContentAfterSymbols==NULL | labelAddressPair==NULL){
+		fprintf(stderr,"Could not allocate sufficient space for binary\n");
+		exit(1);
 	}
 	binaryFileLoadState.corruptionErrorMessage=strMerge3("Error: Input file \"",filePath,"\" is corrupted");
-	{
-		mainLabel=0;
-		uint32_t len_symbols;
-		len_symbols =(uint32_t)binaryFile_noEOF_fgetc();
-		len_symbols|=(uint32_t)binaryFile_noEOF_fgetc()<<8;
-		len_symbols|=(uint32_t)binaryFile_noEOF_fgetc()<<16;
-		len_symbols|=(uint32_t)binaryFile_noEOF_fgetc()<<24;
-		
-		for (uint32_t i0=0;i0<len_symbols;i0++){
-			uint32_t label;
-			label =(uint32_t)binaryFile_noEOF_fgetc();
-			label|=(uint32_t)binaryFile_noEOF_fgetc()<<8;
-			label|=(uint32_t)binaryFile_noEOF_fgetc()<<16;
-			label|=(uint32_t)binaryFile_noEOF_fgetc()<<24;
-			char c;
-			char name[64]; // identifiers over 60 characters long won't match any standard identifier anyway
-			name[0]=0;
-			uint8_t name_i=0;
-			while (6<=(c=binaryFile_noEOF_fgetc())){
-				if (name_i!=62){
-					name[name_i++]=c;
-					name[name_i]=0;
-				}
-			}
-			uint8_t type=c;
-			if (type==4){
-				if (strcmp("main",name)==0){
-					mainLabel=label;
-				}
-			} else if (type==5 | type==1){
-				int match=binSearchStdObjNames(name);
-				if (match!=-1 && stdObjects[match].expectedType==type){
-					stdObjects[match].label=label;
-				}
+	for (uint32_t i=0;i<len_symbols;i++){
+		uint32_t label;
+		char name[64]; // identifiers over 60 characters long won't match any standard identifier anyway
+		name[0]=0;
+		uint8_t name_i=0;
+		char c;
+		label=binaryFile_noEOF_fget_32();
+		while (6<=(c=binaryFile_noEOF_fgetc())){
+			if (name_i!=62){
+				name[name_i++]=c;
+				name[name_i]=0;
 			}
 		}
-		if (mainLabel==0){
-			fprintf(stderr,"Could not find \'main\' symbol\n");
-			exit(1);
+		uint8_t type=c;
+		if (type==4){
+			if (strcmp("main",name)==0){
+				mainLabel=label;
+			}
+		} else if (type==5 | type==1){
+			int match=binSearchStdObjNames(name);
+			if (match!=-1 && stdObjects[match].expectedType==type){
+				stdObjects[match].label=label;
+			}
 		}
 	}
-	printf("1/7\r");
-	{
-		fpos_t fileBufferStartPosition;
-		if (fgetpos(binaryFileLoadState.binaryFile,&fileBufferStartPosition)){
-			err_10_1_(binaryFileLoadState.corruptionErrorMessage);
+	if (mainLabel==0){
+		fprintf(stderr,"Could not find \'main\' symbol\n");
+		exit(1);
+	}
+	if (fread(fileContentAfterSymbols,1,totalFunctionAndStaticDataLength,binaryFileLoadState.binaryFile)!=totalFunctionAndStaticDataLength){
+		GiveCorruptedMessage:;
+		fprintf(stderr,"%s\n",binaryFileLoadState.corruptionErrorMessage);
+		exit(1);
+	}
+	binaryFile_isEOF_fgetc();
+	if (feof(binaryFileLoadState.binaryFile)==0){
+		goto GiveCorruptedMessage;
+	}
+	if (fclose(binaryFileLoadState.binaryFile)!=0){
+		fprintf(stderr,"Error when closing \"%s\"\n",filePath);
+		exit(1);
+	}
+	bool doubleLoopSwitch;
+	uint32_t rawWalkPosition=(uint32_t)binaryLocation;
+	for (uint16_t i=0;i<NUM_STD_SYMBOLS;i++){
+		labelAddressPair[i].number=stdObjects[i].label;
+		labelAddressPair[i].address=(uint32_t)stdObjects[i].address;
+	}
+	uint32_t labelWalkCount=NUM_STD_SYMBOLS;
+	dataWalkIndex=0;
+	while ((id_temp=_intrinsic_c_functions[dataWalkIndex++])!=0){
+		workingByteCode[0]=id_temp;
+		const uint8_t icc = instructionContentCatagory(id_temp);
+		const uint8_t deltaByteCode=icc_to_delta[icc];
+		for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
+			workingByteCode[iDelta]=_intrinsic_c_functions[dataWalkIndex++];
 		}
-		numberOfLabels=NUM_STD_SYMBOLS;
-		uint32_t rawSize=0;
-		uint16_t id_temp;
-		const uint8_t icc_to_delta[] = {[0]=0,[1]=1,[2]=2,[3]=2,[4]=2,[5]=3,[6]=3,[7]=3,[8]=4,[9]=5,[10]=6,[11]=8,[12]=3,[13]=4,[14]=4,[15]=5};
-		uint8_t workingByteCode[10];
-		uint32_t intrinsicWalk=0;
-		while ((id_temp=_intrinsic_c_functions[intrinsicWalk++])!=0){
-			workingByteCode[0]=id_temp;
-			numberOfLabels+=id_temp==I_LABL | id_temp==I_FCST | id_temp==I_JJMP;
-			const uint8_t icc = instructionContentCatagory(id_temp);
-			const uint8_t deltaByteCode=icc_to_delta[icc];
-			for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
-				workingByteCode[iDelta]=_intrinsic_c_functions[intrinsicWalk++];
+		rawWalkPosition+=backendInstructionSizeFromByteCode(workingByteCode);
+		if (id_temp==I_LABL | id_temp==I_FCST | id_temp==I_JJMP){
+			if (labelWalkCount>=numberOfLabels){
+				goto GiveCorruptedMessage;
 			}
-			rawSize+=backendInstructionSizeFromByteCode(workingByteCode);
-		}
-		intrinsicWalk=0;
-		bool doubleLoopSwitch=false;
-		do {
-			while ((id_temp=binaryFile_noEOF_fgetc())!=0){
-				workingByteCode[0]=id_temp;
-				numberOfLabels+=id_temp==I_LABL | id_temp==I_FCST | id_temp==I_JJMP;
-				const uint8_t icc = instructionContentCatagory(id_temp);
-				const uint8_t deltaByteCode=icc_to_delta[icc];
-				for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
-					workingByteCode[iDelta]=binaryFile_noEOF_fgetc();
-				}
-				rawSize+=backendInstructionSizeFromByteCode(workingByteCode);
+			InstructionSingle IS;
+			decompressInstruction(workingByteCode,&IS);
+			labelAddressPair[labelWalkCount].address=rawWalkPosition;
+			if (id_temp==I_LABL){
+				labelAddressPair[labelWalkCount++].number=IS.arg.D.a_0;
+			} else if (id_temp==I_FCST){
+				labelAddressPair[labelWalkCount++].number=IS.arg.BWD.a_2;
+			} else {
+				labelAddressPair[labelWalkCount++].number=IS.arg.BBD.a_2;
 			}
-			if (doubleLoopSwitch) break;
-			doubleLoopSwitch=true;
-		} while (true);
-		doubleLoopSwitch=false;
-		uint32_t rawSizeBeforeAlign=rawSize;
-		rawSize+=rawSize&1;
-		// size and number of labels is now determined
-		binaryFile_isEOF_fgetc();
-		printf("2/7\r");
-		if (fsetpos(binaryFileLoadState.binaryFile,&fileBufferStartPosition)){
-			err_10_1_(binaryFileLoadState.corruptionErrorMessage);
 		}
-		binaryLocation   =malloc(rawSize);
-		labelAddressPair =calloc(numberOfLabels,sizeof(struct LabelNumberAddressPair)); // calloc might not be needed, but I'm going to use it anyway to ensure that unresolved labels are always detected
-		if (binaryLocation==NULL | labelAddressPair==NULL){
-			fprintf(stderr,"Could not allocate sufficient space for binary\n");
-			exit(1);
-		}
-		uint32_t rawWalkPosition=(uint32_t)binaryLocation;
-		for (uint16_t i1=0;i1<NUM_STD_SYMBOLS;i1++){
-			labelAddressPair[i1].number=stdObjects[i1].label;
-			labelAddressPair[i1].address=(uint32_t)stdObjects[i1].address;
-		}
-		uint32_t labelWalkCount=NUM_STD_SYMBOLS;
-		printf("3/7\r");
-		while ((id_temp=_intrinsic_c_functions[intrinsicWalk++])!=0){
+	}
+	rawWalkPosition+=rawWalkPosition & 1;
+	doubleLoopSwitch=false;
+	dataWalkIndex=0;
+	do {
+		while ((id_temp=fileContentAfterSymbols[dataWalkIndex++])!=0){
 			workingByteCode[0]=id_temp;
 			const uint8_t icc = instructionContentCatagory(id_temp);
 			const uint8_t deltaByteCode=icc_to_delta[icc];
 			for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
-				workingByteCode[iDelta]=_intrinsic_c_functions[intrinsicWalk++];
+				workingByteCode[iDelta]=fileContentAfterSymbols[dataWalkIndex++];
+			}
+			// dataWalkIndex may walk a little too far (and thus outside of it's allocation) but it probably won't be too bad since it is just reading data...
+			if (dataWalkIndex>totalFunctionAndStaticDataLength){
+				goto GiveCorruptedMessage;
 			}
 			rawWalkPosition+=backendInstructionSizeFromByteCode(workingByteCode);
 			if (id_temp==I_LABL | id_temp==I_FCST | id_temp==I_JJMP){
+				if (labelWalkCount>=numberOfLabels){
+					goto GiveCorruptedMessage;
+				}
 				InstructionSingle IS;
 				decompressInstruction(workingByteCode,&IS);
 				labelAddressPair[labelWalkCount].address=rawWalkPosition;
@@ -496,224 +523,193 @@ void loadFileContentsAsByteCode(const char* filePath){
 				}
 			}
 		}
-		intrinsicWalk=0;
-		
-		doubleLoopSwitch=false;
-		do {
-			while ((id_temp=binaryFile_noEOF_fgetc())!=0){
-				workingByteCode[0]=id_temp;
-				const uint8_t icc = instructionContentCatagory(id_temp);
-				const uint8_t deltaByteCode=icc_to_delta[icc];
-				for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
-					workingByteCode[iDelta]=binaryFile_noEOF_fgetc();
-				}
-				rawWalkPosition+=backendInstructionSizeFromByteCode(workingByteCode);
-				if (id_temp==I_LABL | id_temp==I_FCST | id_temp==I_JJMP){
-					InstructionSingle IS;
-					decompressInstruction(workingByteCode,&IS);
-					labelAddressPair[labelWalkCount].address=rawWalkPosition;
-					if (id_temp==I_LABL){
-						labelAddressPair[labelWalkCount++].number=IS.arg.D.a_0;
-					} else if (id_temp==I_FCST){
-						labelAddressPair[labelWalkCount++].number=IS.arg.BWD.a_2;
-					} else {
-						labelAddressPair[labelWalkCount++].number=IS.arg.BBD.a_2;
-					}
-				}
-			}
-			if (doubleLoopSwitch) break;
-			doubleLoopSwitch=true;
-		} while (true);
-		doubleLoopSwitch=false;
-		// label addresses now determined
-		printf("4/7\r");
-		sortLabels();
-		if (fsetpos(binaryFileLoadState.binaryFile,&fileBufferStartPosition)){
-			err_10_1_(binaryFileLoadState.corruptionErrorMessage);
-		}
-		mainAddress=getLabelAddress(mainLabel);
-		
-		uint8_t* binaryLocationWalk=binaryLocation;
-		uint16_t func_stack_size;
-		uint8_t func_stack_initial;
-		while ((id_temp=_intrinsic_c_functions[intrinsicWalk++])!=0){
-			workingByteCode[0]=id_temp;
-			uint8_t icc = instructionContentCatagory(id_temp);
-			uint8_t deltaByteCode=icc_to_delta[icc];
-			for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
-				workingByteCode[iDelta]=_intrinsic_c_functions[intrinsicWalk++];
-			}
-			InstructionSingle IS;
-			decompressInstruction(workingByteCode,&IS);
-			
-			uint16_t intrinsicID=getIntrinsicID(IS.id);
-			uint32_t symVal;
-			if (intrinsicID!=0){
-				symVal=getLabelAddress(intrinsicID);
-			} else {
-				uint8_t symbolSizeBytes=0;
-				uint8_t symbolSizeWords=0;
-				switch (IS.id){
-					case I_FCST:
-					func_stack_initial=IS.arg.BWD.a_0;
-					func_stack_size=IS.arg.BWD.a_1;
-					break;
-					case I_JTEN:
-					symVal=getLabelAddress(IS.arg.D.a_0);
-					break;
-					case I_SYRD:
-					case I_SYDD:
-					symbolSizeBytes=4;
-					symbolSizeWords=2;
-					break;
-					case I_SYDB:
-					case I_SYRB:
-					symbolSizeBytes=1;
-					symbolSizeWords=1;
-					break;
-					case I_SYRW:
-					case I_SYDW:
-					symbolSizeBytes=2;
-					symbolSizeWords=1;
-					break;
-					case I_SYRQ:
-					case I_SYDQ:
-					symbolSizeBytes=8;
-					symbolSizeWords=4;
-					break;
-					default:;
-				}
-				if (symbolSizeWords!=0){
-					symbolicStack.vsl=100;
-					InstructionSingle IS_temp;
-					do {
-						workingByteCode[0]=_intrinsic_c_functions[intrinsicWalk++];
-						if (workingByteCode[0]==0){
-							printf("ByteCode corrupted, end inside symbolic\n");
-							exit(1);
-						}
-						icc = instructionContentCatagory(workingByteCode[0]);
-						deltaByteCode=icc_to_delta[icc];
-						for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
-							workingByteCode[iDelta]=_intrinsic_c_functions[intrinsicWalk++];
-						}
-						symbolicResolutionSingle(workingByteCode,&IS_temp);
-					} while (IS_temp.id!=I_SYRE & IS_temp.id!=I_SYDE);
-					if (100-symbolicStack.vsl!=symbolSizeWords){
-						printf("ByteCode corrupted, symbolic result size mismatch\n");
-						exit(1);
-					}
-					switch (symbolSizeBytes){
-						case 1:symVal=(uint32_t)(symbolicStack.vs[99]&255);break;
-						case 2:symVal=(uint32_t)symbolicStack.vs[99];break;
-						case 4:symVal=((uint32_t)symbolicStack.vs[99]<<16)|symbolicStack.vs[98];break;
-						//case 8:break;
-						default:assert(false);
-					}
-				}
-			}
-			backendInstructionWrite(&binaryLocationWalk,symVal,func_stack_size,func_stack_initial,IS);
-		}
-		intrinsicWalk=0;
-		
-		printf("5/7\r");
-		doubleLoopSwitch=false;
-		do {
-			while ((id_temp=binaryFile_noEOF_fgetc())!=0){
-			workingByteCode[0]=id_temp;
-			uint8_t icc = instructionContentCatagory(id_temp);
-			uint8_t deltaByteCode=icc_to_delta[icc];
-			for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
-				workingByteCode[iDelta]=binaryFile_noEOF_fgetc();
-			}
-			InstructionSingle IS;
-			decompressInstruction(workingByteCode,&IS);
-			
-			uint16_t intrinsicID=getIntrinsicID(IS.id);
-			uint32_t symVal;
-			if (intrinsicID!=0){
-				symVal=getLabelAddress(intrinsicID);
-			} else {
-				uint8_t symbolSizeBytes=0;
-				uint8_t symbolSizeWords=0;
-				switch (IS.id){
-					case I_FCST:
-					func_stack_initial=IS.arg.BWD.a_0;
-					func_stack_size=IS.arg.BWD.a_1;
-					break;
-					case I_JTEN:
-					symVal=getLabelAddress(IS.arg.D.a_0);
-					break;
-					case I_SYRD:
-					case I_SYDD:
-					symbolSizeBytes=4;
-					symbolSizeWords=2;
-					break;
-					case I_SYDB:
-					case I_SYRB:
-					symbolSizeBytes=1;
-					symbolSizeWords=1;
-					break;
-					case I_SYRW:
-					case I_SYDW:
-					symbolSizeBytes=2;
-					symbolSizeWords=1;
-					break;
-					case I_SYRQ:
-					case I_SYDQ:
-					symbolSizeBytes=8;
-					symbolSizeWords=4;
-					break;
-					default:;
-				}
-				if (symbolSizeWords!=0){
-					symbolicStack.vsl=100;
-					InstructionSingle IS_temp;
-					do {
-						workingByteCode[0]=binaryFile_noEOF_fgetc();
-						if (workingByteCode[0]==0){
-							printf("ByteCode corrupted, end inside symbolic\n");
-							exit(1);
-						}
-						icc = instructionContentCatagory(workingByteCode[0]);
-						deltaByteCode=icc_to_delta[icc];
-						for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
-							workingByteCode[iDelta]=binaryFile_noEOF_fgetc();
-						}
-						symbolicResolutionSingle(workingByteCode,&IS_temp);
-					} while (IS_temp.id!=I_SYRE & IS_temp.id!=I_SYDE);
-					if (100-symbolicStack.vsl!=symbolSizeWords){
-						printf("ByteCode corrupted, symbolic result size mismatch\n");
-						exit(1);
-					}
-					switch (symbolSizeBytes){
-						case 1:symVal=(uint32_t)(symbolicStack.vs[99]&255);break;
-						case 2:symVal=(uint32_t)symbolicStack.vs[99];break;
-						case 4:symVal=((uint32_t)symbolicStack.vs[99]<<16)|symbolicStack.vs[98];break;
-						//case 8:break;
-						default:assert(false);
-					}
-				}
-			}
-			backendInstructionWrite(&binaryLocationWalk,symVal,func_stack_size,func_stack_initial,IS);
-			}
-			if (doubleLoopSwitch) break;
-			doubleLoopSwitch=true;
-			printf("6/7\r");
-		} while (true);
-		doubleLoopSwitch=false;
-		assert(binaryLocationWalk==(uint8_t*)binaryLocation+rawSizeBeforeAlign); // otherwise, the size that was initially calculated was wrong
-		free(labelAddressPair);
-		labelAddressPair=NULL;
+		if (doubleLoopSwitch) break;
+		doubleLoopSwitch=true;
+	} while (true);
+	rawWalkPosition+=rawWalkPosition & 1;
+	// dataWalkIndex may walk a little too far (and thus outside of it's allocation) but it probably won't be too bad since it is just reading data...
+	if (dataWalkIndex!=totalFunctionAndStaticDataLength | labelWalkCount!=numberOfLabels | rawWalkPosition!=(uint32_t)binaryLocation+totalFunctionAndStaticDataBackendSizeAligned){
+		goto GiveCorruptedMessage;
 	}
+	// label addresses now determined
+	sortLabels();
+	mainAddress=getLabelAddress(mainLabel);
+	
+	uint8_t* binaryLocationWalk=binaryLocation;
+	uint16_t func_stack_size;
+	uint8_t func_stack_initial;
+	dataWalkIndex=0;
+	while ((id_temp=_intrinsic_c_functions[dataWalkIndex++])!=0){
+		workingByteCode[0]=id_temp;
+		uint8_t icc = instructionContentCatagory(id_temp);
+		uint8_t deltaByteCode=icc_to_delta[icc];
+		for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
+			workingByteCode[iDelta]=_intrinsic_c_functions[dataWalkIndex++];
+		}
+		InstructionSingle IS;
+		decompressInstruction(workingByteCode,&IS);
+		
+		uint16_t intrinsicID=getIntrinsicID(IS.id);
+		uint32_t symVal;
+		if (intrinsicID!=0){
+			symVal=getLabelAddress(intrinsicID);
+		} else {
+			uint8_t symbolSizeBytes=0;
+			uint8_t symbolSizeWords=0;
+			switch (IS.id){
+				case I_FCST:
+				func_stack_initial=IS.arg.BWD.a_0;
+				func_stack_size=IS.arg.BWD.a_1;
+				break;
+				case I_JTEN:
+				symVal=getLabelAddress(IS.arg.D.a_0);
+				break;
+				case I_SYRD:
+				case I_SYDD:
+				symbolSizeBytes=4;
+				symbolSizeWords=2;
+				break;
+				case I_SYDB:
+				case I_SYRB:
+				symbolSizeBytes=1;
+				symbolSizeWords=1;
+				break;
+				case I_SYRW:
+				case I_SYDW:
+				symbolSizeBytes=2;
+				symbolSizeWords=1;
+				break;
+				case I_SYRQ:
+				case I_SYDQ:
+				symbolSizeBytes=8;
+				symbolSizeWords=4;
+				break;
+				default:;
+			}
+			if (symbolSizeWords!=0){
+				symbolicStack.vsl=100;
+				InstructionSingle IS_temp;
+				do {
+					workingByteCode[0]=_intrinsic_c_functions[dataWalkIndex++];
+					if (workingByteCode[0]==0){
+						// end inside symbolic
+						goto GiveCorruptedMessage;
+					}
+					icc = instructionContentCatagory(workingByteCode[0]);
+					deltaByteCode=icc_to_delta[icc];
+					for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
+						workingByteCode[iDelta]=_intrinsic_c_functions[dataWalkIndex++];
+					}
+					symbolicResolutionSingle(workingByteCode,&IS_temp);
+				} while (IS_temp.id!=I_SYRE & IS_temp.id!=I_SYDE);
+				if (100-symbolicStack.vsl!=symbolSizeWords){
+					// symbolic result size mismatch
+					goto GiveCorruptedMessage;
+				}
+				switch (symbolSizeBytes){
+					case 1:symVal=(uint32_t)(symbolicStack.vs[99]&255);break;
+					case 2:symVal=(uint32_t)symbolicStack.vs[99];break;
+					case 4:symVal=((uint32_t)symbolicStack.vs[99]<<16)|symbolicStack.vs[98];break;
+					//case 8:break;
+					default:assert(false);
+				}
+			}
+		}
+		backendInstructionWrite(&binaryLocationWalk,symVal,func_stack_size,func_stack_initial,IS);
+	}
+	dataWalkIndex=0;
+	doubleLoopSwitch=false;
+	do {
+		while ((id_temp=fileContentAfterSymbols[dataWalkIndex++])!=0){
+		workingByteCode[0]=id_temp;
+		uint8_t icc = instructionContentCatagory(id_temp);
+		uint8_t deltaByteCode=icc_to_delta[icc];
+		for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
+			workingByteCode[iDelta]=fileContentAfterSymbols[dataWalkIndex++];
+		}
+		InstructionSingle IS;
+		decompressInstruction(workingByteCode,&IS);
+		
+		uint16_t intrinsicID=getIntrinsicID(IS.id);
+		uint32_t symVal;
+		if (intrinsicID!=0){
+			symVal=getLabelAddress(intrinsicID);
+		} else {
+			uint8_t symbolSizeBytes=0;
+			uint8_t symbolSizeWords=0;
+			switch (IS.id){
+				case I_FCST:
+				func_stack_initial=IS.arg.BWD.a_0;
+				func_stack_size=IS.arg.BWD.a_1;
+				break;
+				case I_JTEN:
+				symVal=getLabelAddress(IS.arg.D.a_0);
+				break;
+				case I_SYRD:
+				case I_SYDD:
+				symbolSizeBytes=4;
+				symbolSizeWords=2;
+				break;
+				case I_SYDB:
+				case I_SYRB:
+				symbolSizeBytes=1;
+				symbolSizeWords=1;
+				break;
+				case I_SYRW:
+				case I_SYDW:
+				symbolSizeBytes=2;
+				symbolSizeWords=1;
+				break;
+				case I_SYRQ:
+				case I_SYDQ:
+				symbolSizeBytes=8;
+				symbolSizeWords=4;
+				break;
+				default:;
+			}
+			if (symbolSizeWords!=0){
+				symbolicStack.vsl=100;
+				InstructionSingle IS_temp;
+				do {
+					workingByteCode[0]=fileContentAfterSymbols[dataWalkIndex++];
+					if (workingByteCode[0]==0){
+						// end inside symbolic
+						goto GiveCorruptedMessage;
+					}
+					icc = instructionContentCatagory(workingByteCode[0]);
+					deltaByteCode=icc_to_delta[icc];
+					for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
+						workingByteCode[iDelta]=fileContentAfterSymbols[dataWalkIndex++];
+					}
+					symbolicResolutionSingle(workingByteCode,&IS_temp);
+				} while (IS_temp.id!=I_SYRE & IS_temp.id!=I_SYDE);
+				if (100-symbolicStack.vsl!=symbolSizeWords){
+					// symbolic result size mismatch
+					goto GiveCorruptedMessage;
+				}
+				switch (symbolSizeBytes){
+					case 1:symVal=(uint32_t)(symbolicStack.vs[99]&255);break;
+					case 2:symVal=(uint32_t)symbolicStack.vs[99];break;
+					case 4:symVal=((uint32_t)symbolicStack.vs[99]<<16)|symbolicStack.vs[98];break;
+					//case 8:break;
+					default:assert(false);
+				}
+			}
+		}
+		backendInstructionWrite(&binaryLocationWalk,symVal,func_stack_size,func_stack_initial,IS);
+		}
+		if (doubleLoopSwitch) break;
+		doubleLoopSwitch=true;
+	} while (true);
+	if (dataWalkIndex!=totalFunctionAndStaticDataLength){
+		// should not be possible, but anyway...
+		goto GiveCorruptedMessage;
+	}
+	// all data is now placed
 	free((char*)binaryFileLoadState.corruptionErrorMessage);
-	fclose(binaryFileLoadState.binaryFile);
-	binaryFileLoadState.corruptionErrorMessage=NULL;
-	binaryFileLoadState.binaryFile=NULL;
-	printf("Load Successful\n");
+	free(fileContentAfterSymbols);
+	free(labelAddressPair);
 }
-
-
 
 static void _exec_springboard1(){
 	// this is a very neat trick.

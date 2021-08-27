@@ -31,7 +31,17 @@ struct BinContainer{
 	InstructionBuffer staticData;
 };
 
+struct FileContentSegment{
+	struct FileContentSegment* next;
+	uint16_t position;
+	char buffer[8192];
+};
 
+struct FileContentStruct {
+	struct FileContentSegment* startSegment;
+	struct FileContentSegment* walkSegment;
+	uint32_t length;
+};
 
 // also prepends and appends a newline
 char* loadFileContentsAsSourceCode(const char* filePath){
@@ -39,38 +49,67 @@ char* loadFileContentsAsSourceCode(const char* filePath){
 	if (inputFile==NULL){
 		err_10_1_(strMerge3("Could not load file \"",filePath,"\""));
 	}
-	fpos_t startingPositionOfFile;
-	fgetpos(inputFile,&startingPositionOfFile);
-	int32_t lengthOfFile = 0;
-	while (fgetc(inputFile)!=EOF){
-		lengthOfFile++;
-		if (lengthOfFile>268435456L){ // 2**28
+	struct FileContentStruct fcs={0};
+	fcs.walkSegment=fcs.startSegment=cosmic_malloc(sizeof(struct FileContentSegment));
+	goto mid;
+	while (1){
+		fcs.walkSegment->next=cosmic_malloc(sizeof(struct FileContentSegment));
+		fcs.walkSegment=fcs.walkSegment->next;
+		mid:;
+		fcs.walkSegment->next=NULL;
+		fcs.walkSegment->position=0;
+		uint32_t r;
+		r=fread(fcs.walkSegment->buffer,1,8192,inputFile);
+		fcs.walkSegment->position=r;
+		fcs.length+=r;
+		if (r!=8192){
+			if (feof(inputFile)!=0){
+				break;
+			} else {
+				fclose(inputFile);
+				err_10_1_(strMerge3("An unknown error occured when reading input file \"",filePath,"\""));
+			}
+		}
+		if (fcs.length>268435456lu){ // 2**28
 			fclose(inputFile);
 			err_10_1_(strMerge3("Input file \"",filePath,"\" is too large"));
 		}
 	}
-	fsetpos(inputFile,&startingPositionOfFile);
-	char *characterArrayOfFile = cosmic_malloc((lengthOfFile+3)*sizeof(char));
-	characterArrayOfFile[0] = '\n';
-	characterArrayOfFile[lengthOfFile+1] = '\n';
-	characterArrayOfFile[lengthOfFile+2] = 0;
-	bool hasGivenStrangeCharacterWarning=false;
-	for (int32_t i=1;i<lengthOfFile+1;i++){
-		int currentCharacter = fgetc(inputFile);
-		assert(currentCharacter!=EOF); // length should have already been determined
-		if ((currentCharacter<32 & currentCharacter!='\r' & currentCharacter!='\n' & currentCharacter!='\t') | currentCharacter>126){
-			if (!hasGivenStrangeCharacterWarning){
-				err_00__0("Strange character found when opening source file. Is it really a C source code file?");
-				hasGivenStrangeCharacterWarning=true;
-			}
-			currentCharacter=' ';
-		}
-		characterArrayOfFile[i]=currentCharacter;
+	if (fclose(inputFile)!=0){
+		err_10_1_(strMerge3("fclose on input file \"",filePath,"\" failed"));
 	}
-	fclose(inputFile);
-	return characterArrayOfFile;
+	fcs.walkSegment=fcs.startSegment;
+	char* result=cosmic_malloc(fcs.length+3u);
+	result[0]='\n';
+	uint32_t position=1;
+	do {
+		memcpy(result+position,fcs.walkSegment->buffer,fcs.walkSegment->position);
+		position+=fcs.walkSegment->position;
+		fcs.walkSegment=fcs.walkSegment->next;
+	} while (fcs.walkSegment!=NULL);
+	result[position++]='\n';
+	result[position++]=0;
+	assert(position==fcs.length+3u);
+	position--;
+	fcs.walkSegment=fcs.startSegment;
+	do {
+		struct FileContentSegment* next=fcs.walkSegment->next;
+		cosmic_free(fcs.walkSegment);
+		fcs.walkSegment=next;
+	} while (fcs.walkSegment!=NULL);
+	bool hasGivenStrangeCharacterWarning=false;
+	for (uint32_t i=0;i<position;i++){
+		char currentCharacter=result[i];
+		if ((currentCharacter<32 & currentCharacter!='\r' & currentCharacter!='\n' & currentCharacter!='\t') | currentCharacter>126){
+			result[i]=' ';
+			if (!hasGivenStrangeCharacterWarning){
+				hasGivenStrangeCharacterWarning=true;
+				err_00__1(strMerge3("Strange character(s) found in \"",filePath,"\". Is it really a C source code file?"));
+			}
+		}
+	}
+	return result;
 }
-
 
 
 FILE* safe_fputc_file;
@@ -80,38 +119,76 @@ void safe_fputc(int value){
 	if (fputc(value,safe_fputc_file)!=value) err_10_1_(strMerge3("Error in writing \'",safe_fputc_file_path,"\'"));
 }
 
+void safe_fput_32(uint32_t value){
+	safe_fputc((uint8_t)(value>> 0));
+	safe_fputc((uint8_t)(value>> 8));
+	safe_fputc((uint8_t)(value>>16));
+	safe_fputc((uint8_t)(value>>24));
+}
+
+void safe_fwrite(const void* array, uint32_t length){
+	if (fwrite(array,1,length,safe_fputc_file)!=length) err_10_1_(strMerge3("Error in writing \'",safe_fputc_file_path,"\'"));
+}
 
 // destroys global_static_data
 void finalOutputFromCompile(const char* filePath){
 	if (filePath!=NULL){
+		uint32_t totalFunctionAndStaticDataBackendSize=0;
+		uint32_t totalFunctionAndStaticDataLength=1;
+		uint32_t labelCount=0;
+		{
+			uint8_t* byteCode;
+			enum InstructionTypeID id;
+			for (uint32_t i=0;i<globalInstructionBuffersOfFunctions.numberOfSlotsTaken;i++){
+				totalFunctionAndStaticDataLength+=globalInstructionBuffersOfFunctions.slots[i].allocLen-1u;
+				byteCode=globalInstructionBuffersOfFunctions.slots[i].byteCode;
+				while ((id=*byteCode)!=0){
+					totalFunctionAndStaticDataBackendSize+=backendInstructionSizeFromByteCode(byteCode);
+					labelCount+=(id==I_LABL | id==I_JJMP | id==I_FCST);
+					byteCode+=getStorageDeltaForInstruction(id);
+				}
+			}
+		}
+		{
+			InstructionSingle* buffer=global_static_data.buffer;
+			uint32_t numberOfSlotsTaken=global_static_data.numberOfSlotsTaken;
+			for (uint32_t i=0;i<numberOfSlotsTaken;i++){
+				totalFunctionAndStaticDataBackendSize+=backendInstructionSize(buffer+i);
+				labelCount+=(buffer[i].id==I_LABL);
+			}
+		}
 		CompressedInstructionBuffer cis_global_static_data=compressInstructionBuffer(&global_static_data);
+		totalFunctionAndStaticDataLength+=cis_global_static_data.allocLen;
 		destroyInstructionBuffer(&global_static_data);
 		uint32_t symbolEntryLength=0;
-		for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots;i++){
-			struct GlobalVariableEntry gve=blockFrameArray.globalBlockFrame.globalVariableEntries[i];
-			if (!gve.usedStatic) symbolEntryLength++;
+		{
+			struct GlobalVariableEntry* gve;
+			for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots;i++){
+				gve=blockFrameArray.globalBlockFrame.globalVariableEntries+i;
+				symbolEntryLength+=(bool)(!gve->usedStatic);
+			}
 		}
-		for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalFunctionEntrySlots;i++){
-			struct GlobalFunctionEntry gfe=blockFrameArray.globalBlockFrame.globalFunctionEntries[i];
-			if (!gfe.usedStatic^gfe.usedInline) symbolEntryLength++;
+		{
+			struct GlobalFunctionEntry* gfe;
+			for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalFunctionEntrySlots;i++){
+				gfe=blockFrameArray.globalBlockFrame.globalFunctionEntries+i;
+				symbolEntryLength+=(bool)(!gfe->usedStatic^gfe->usedInline);
+			}
 		}
 		safe_fputc_file_path=filePath;
 		safe_fputc_file = fopen(safe_fputc_file_path,"wb");
 		if (safe_fputc_file==NULL) err_10_1_(strMerge3("Could not open \'",safe_fputc_file_path,"\' for output"));
-		safe_fputc((uint8_t)(symbolEntryLength));
-		safe_fputc((uint8_t)(symbolEntryLength>>8));
-		safe_fputc((uint8_t)(symbolEntryLength>>16));
-		safe_fputc((uint8_t)(symbolEntryLength>>24));
+		safe_fput_32(totalFunctionAndStaticDataBackendSize);
+		safe_fput_32(totalFunctionAndStaticDataLength);
+		safe_fput_32(labelCount);
+		safe_fput_32(symbolEntryLength);
 		for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalVariableEntrySlots;i++){
 			struct GlobalVariableEntry gve=blockFrameArray.globalBlockFrame.globalVariableEntries[i];
 			if (!gve.usedStatic){
-				safe_fputc((uint8_t)(gve.labelID));
-				safe_fputc((uint8_t)(gve.labelID>>8));
-				safe_fputc((uint8_t)(gve.labelID>>16));
-				safe_fputc((uint8_t)(gve.labelID>>24));
-				char* t=applyToTypeStringGetIdentifierToNew(gve.typeString);
-				for (uint32_t i2=0;t[i2];i2++) safe_fputc(t[i2]);
-				cosmic_free(t);
+				safe_fput_32(gve.labelID);
+				const char* firstSpace=strchr(gve.typeString,' ');
+				assert(firstSpace!=NULL);
+				safe_fwrite(gve.typeString,firstSpace - gve.typeString);
 				safe_fputc(gve.usedExtern+gve.hadInitializer*2);
 				/*
 				0- no extern, no initializer
@@ -124,13 +201,10 @@ void finalOutputFromCompile(const char* filePath){
 		for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalFunctionEntrySlots;i++){
 			struct GlobalFunctionEntry gfe=blockFrameArray.globalBlockFrame.globalFunctionEntries[i];
 			if (!gfe.usedStatic^gfe.usedInline){
-				safe_fputc((uint8_t)(gfe.labelID));
-				safe_fputc((uint8_t)(gfe.labelID>>8));
-				safe_fputc((uint8_t)(gfe.labelID>>16));
-				safe_fputc((uint8_t)(gfe.labelID>>24));
-				char* t=applyToTypeStringGetIdentifierToNew(gfe.typeString);
-				for (uint32_t i2=0;t[i2];i2++) safe_fputc(t[i2]);
-				cosmic_free(t);
+				safe_fput_32(gfe.labelID);
+				const char* firstSpace=strchr(gfe.typeString,' ');
+				assert(firstSpace!=NULL);
+				safe_fwrite(gfe.typeString,firstSpace - gfe.typeString);
 				safe_fputc(gfe.usedExtern+4);
 				/*
 				4- no extern (and therefore   defined)
@@ -140,16 +214,11 @@ void finalOutputFromCompile(const char* filePath){
 		}
 		for (uint32_t i=0;i<globalInstructionBuffersOfFunctions.numberOfSlotsTaken;i++){
 			CompressedInstructionBuffer cib=globalInstructionBuffersOfFunctions.slots[i];
-			uint32_t lenWithoutTerminate=cib.allocLen-1;
-			for (uint32_t i2=0;i2<lenWithoutTerminate;i2++){
-				safe_fputc(cib.byteCode[i2]);
-			}
+			safe_fwrite(cib.byteCode,cib.allocLen-1u);
 		}
 		safe_fputc(0);
-		for (uint32_t i=0;i<cis_global_static_data.allocLen;i++){
-			safe_fputc(cis_global_static_data.byteCode[i]);
-		}
-		// null terminator for static data is already placed by the loop above
+		safe_fwrite(cis_global_static_data.byteCode,cis_global_static_data.allocLen);
+		// null terminator for static data is already placed from the safe_fwrite above
 		if (fclose(safe_fputc_file)!=0) err_10_1_(strMerge3("Could not close \'",safe_fputc_file_path,"\' after writing"));
 		safe_fputc_file=NULL;
 		safe_fputc_file_path=NULL;
@@ -554,6 +623,9 @@ struct BinContainer loadFileContentsAsBinContainer(const char* filePath){
 		err_10_1_(strMerge3("Could not load file \"",filePath,"\""));
 	}
 	binaryFileLoadState.corruptionErrorMessage=strMerge3("Input file \"",filePath,"\" is corrupted");
+	for (uint16_t i=0;i<12;i++){
+		binaryFile_noEOF_fgetc();// for now, I am just going to ignore this new data. it is redundant, anyway.
+	}
 	struct BinContainer binContainerOut;
 	{
 		struct StringBuilder* stringBuilder=stringBuilderCreate();

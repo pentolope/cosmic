@@ -251,7 +251,6 @@ typedef struct InstructionBuffer{
 
 
 
-#ifdef INCLUDE_BACKEND
 uint32_t backendInstructionSize(const InstructionSingle* IS){
 	switch (IS->id){
 		case I_SYDB:
@@ -353,6 +352,7 @@ uint32_t backendInstructionSize(const InstructionSingle* IS){
 	}
 	return 0;
 }
+
 
 uint8_t decompressInstruction(const uint8_t* byteCode,InstructionSingle* IS_parent);
 
@@ -463,6 +463,7 @@ uint32_t backendInstructionSizeFromByteCode(const uint8_t* byteCode){
 	return 0;
 }
 
+#ifdef INCLUDE_BACKEND
 
 // symVal includes symbolic calculations,JTEN, and location of related label for things like D32U
 void backendInstructionWrite(uint8_t** byte,uint32_t symVal,uint16_t func_stack_size,uint8_t func_stack_initial,const InstructionSingle IS){
@@ -1299,7 +1300,7 @@ void applyLabelRenamesInInstructionBuffer(InstructionBuffer* ib,const uint32_t* 
 		uint32_t* lablPtr;
 		if (id==I_LABL | id==I_SYCL | id==I_JTEN | id==I_FCST){
 			lablPtr=&buffer[i].arg.D.a_0;
-			Search:
+			Search:;
 			lablVal=*lablPtr;
 			for (uint32_t i1=0;i1<arrLen;i1++){
 				if (lablVal==fromArr[i1]){*lablPtr=toArr[i1];break;}
@@ -1324,7 +1325,7 @@ void doLabelMarkoffInAllCompressedInstructionBuffers(uint32_t* labelMarkoff,cons
 			if (id==I_SYCL | id==I_JTEN){
 				delta=decompressInstruction(byteCode,&IS);
 				lablVal=IS.arg.D.a_0;
-				Search:
+				Search:;
 				for (uint32_t i1=0;i1<arrLen;i1++){
 					if (lablVal==labelMarkoff[i1]){labelMarkoff[i1]=0;break;}
 				}
@@ -1350,7 +1351,7 @@ void doLabelMarkoffInInstructionBuffer(const InstructionBuffer* ib,uint32_t* lab
 		uint32_t lablVal;
 		if (id==I_SYCL | id==I_JTEN){
 			lablVal=buffer[i].arg.D.a_0;
-			Search:
+			Search:;
 			for (uint32_t i1=0;i1<arrLen;i1++){
 				if (lablVal==labelMarkoff[i1]){labelMarkoff[i1]=0;break;}
 			}

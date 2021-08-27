@@ -34,19 +34,11 @@ void intrinsicBuild(){
 	safe_fputc_file_path="IntrinsicBuiltFiles/_intrinsics_symbols.bin";
 	safe_fputc_file = fopen("IntrinsicBuiltFiles/_intrinsics_symbols.bin","wb");
 	if (safe_fputc_file==NULL) err_10_1_("Could not open required file for output");
-	safe_fputc((uint8_t)(bc.len_symbols));
-	safe_fputc((uint8_t)(bc.len_symbols>>8));
-	safe_fputc((uint8_t)(bc.len_symbols>>16));
-	safe_fputc((uint8_t)(bc.len_symbols>>24));
+	safe_fput_32(bc.len_symbols);
 	for (uint32_t i0=0;i0<bc.len_symbols;i0++){
 		struct SymbolEntry se=bc.symbols[i0];
-		safe_fputc((uint8_t)(se.label));
-		safe_fputc((uint8_t)(se.label>>8));
-		safe_fputc((uint8_t)(se.label>>16));
-		safe_fputc((uint8_t)(se.label>>24));
-		for (uint32_t i1=0;se.name[i1];i1++){
-			safe_fputc(se.name[i1]);
-		}
+		safe_fput_32(se.label);
+		safe_fwrite(se.name,strlen(se.name));
 		safe_fputc(se.type);
 		cosmic_free(se.name);
 	}
@@ -55,17 +47,13 @@ void intrinsicBuild(){
 	safe_fputc_file_path="IntrinsicBuiltFiles/_intrinsics_functions.bin";
 	safe_fputc_file = fopen("IntrinsicBuiltFiles/_intrinsics_functions.bin","wb");
 	if (safe_fputc_file==NULL) err_10_1_("Could not open required file for output");
-	for (uint32_t i=0;i<cib0.allocLen;i++){
-		safe_fputc(cib0.byteCode[i]);
-	}
+	safe_fwrite(cib0.byteCode,cib0.allocLen);
 	if (fclose(safe_fputc_file)!=0) err_10_1_("Could not close required file after writing");
 	
 	safe_fputc_file_path="IntrinsicBuiltFiles/_intrinsics_static.bin";
 	safe_fputc_file = fopen("IntrinsicBuiltFiles/_intrinsics_static.bin","wb");
 	if (safe_fputc_file==NULL) err_10_1_("Could not open required file for output");
-	for (uint32_t i=0;i<cib1.allocLen;i++){
-		safe_fputc(cib1.byteCode[i]);
-	}
+	safe_fwrite(cib1.byteCode,cib1.allocLen);
 	if (fclose(safe_fputc_file)!=0) err_10_1_("Could not close required file after writing");
 	
 	safe_fputc_file=NULL;

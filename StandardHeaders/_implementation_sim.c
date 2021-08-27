@@ -435,10 +435,10 @@ unsigned long fread(void* buffer,unsigned long size,unsigned long count,FILE* fi
 	for (unsigned long i=0;i<e;i++){
 		int v;
 		v=fgetc(file);
-		if (v==EOF) return i;
+		if (v==EOF) return size<=1u?i:i/size;
 		((char*)buffer)[i]=v;
 	}
-	return e;
+	return count;
 }
 
 unsigned long fwrite(const void* buffer,unsigned long size,unsigned long count,FILE* file){
@@ -446,9 +446,9 @@ unsigned long fwrite(const void* buffer,unsigned long size,unsigned long count,F
 	for (unsigned long i=0;i<e;i++){
 		int v;
 		v=fputc(((char*)buffer)[i],file);
-		if (v==EOF) return i;
+		if (v==EOF) return size<=1u?i:i/size;
 	}
-	return e;
+	return count;
 }
 
 int feof(FILE* file){
