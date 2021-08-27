@@ -603,17 +603,17 @@ void backendInstructionWrite(uint8_t** byte,uint32_t symVal,uint16_t func_stack_
 		*((*byte)++)=1;*((*byte)++)=0xFF;
 		return;
 		case I_RL2_:
-		*((*byte)++)=(((unsigned)IS.arg.BBD.a_2&0xFu)<<4)|((unsigned)IS.arg.BBD.a_0&0xFu);*((*byte)++)=(((unsigned)IS.arg.BBD.a_2>>4)&0xFu);
-		*((*byte)++)=(((unsigned)IS.arg.BBD.a_2>>4)&0xF0u)|((unsigned)IS.arg.BBD.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)IS.arg.BBD.a_2>>12)&0xFu);
 		w=IS.arg.BBD.a_2>>16;
+		*((*byte)++)=(((unsigned)IS.arg.BBD.a_2&0xFu)<<4)|((unsigned)IS.arg.BBD.a_0&0xFu);*((*byte)++)=(((unsigned)IS.arg.BBD.a_2>>4)&0xFu);
 		*((*byte)++)=(((unsigned)w&0xFu)<<4)|((unsigned)IS.arg.BBD.a_1&0xFu);*((*byte)++)=(((unsigned)w>>4)&0xFu);
+		*((*byte)++)=(((unsigned)IS.arg.BBD.a_2>>4)&0xF0u)|((unsigned)IS.arg.BBD.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)IS.arg.BBD.a_2>>12)&0xFu);
 		*((*byte)++)=(((unsigned)w>>4)&0xF0u)|((unsigned)IS.arg.BBD.a_1&0xFu);*((*byte)++)=0x10u|(((unsigned)w>>12)&0xFu);
 		return;
 		case I_SYRD:
-		*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|((unsigned)IS.arg.B2.a_0&0xFu);*((*byte)++)=(((unsigned)symVal>>4)&0xFu);
-		*((*byte)++)=(((unsigned)symVal>>4)&0xF0u)|((unsigned)IS.arg.B2.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)symVal>>12)&0xFu);
 		w=symVal>>16;
+		*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|((unsigned)IS.arg.B2.a_0&0xFu);*((*byte)++)=(((unsigned)symVal>>4)&0xFu);
 		*((*byte)++)=(((unsigned)w&0xFu)<<4)|((unsigned)IS.arg.B2.a_1&0xFu);*((*byte)++)=(((unsigned)w>>4)&0xFu);
+		*((*byte)++)=(((unsigned)symVal>>4)&0xF0u)|((unsigned)IS.arg.B2.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)symVal>>12)&0xFu);
 		*((*byte)++)=(((unsigned)w>>4)&0xF0u)|((unsigned)IS.arg.B2.a_1&0xFu);*((*byte)++)=0x10u|(((unsigned)w>>12)&0xFu);
 		return;
 		case I_D32U:
