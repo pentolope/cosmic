@@ -55,6 +55,7 @@ int fputc(int c, FILE* stream){
 int fgetc(FILE* stream){
 	if (stream->buffType==0 | (stream->buffType>=3 & stream->buffType<=6)) return EOF;
 	if (*((volatile unsigned long*)0x04020006)<=stream->buffPos){
+		stream->errFlags=1;
 		return EOF;
 	}
 	return *((volatile char*)(0x05000000+stream->buffPos++));
@@ -67,6 +68,7 @@ int fgetpos(FILE* stream,fpos_t* pos){
 
 int fsetpos(FILE* stream,fpos_t* pos){
 	stream->buffPos=pos->position;
+	stream->errFlags=0;
 	return 0;
 }
 
@@ -428,17 +430,37 @@ int snprintf(char* dest, unsigned long size, const char* format, ...){
 	return print_target.writeCount;
 }
 
+unsigned long fread(void* buffer,unsigned long size,unsigned long count,FILE* file){
+	unsigned long e=size*count;
+	for (unsigned long i=0;i<e;i++){
+		int v;
+		v=fgetc(file);
+		if (v==EOF) return i;
+		((char*)buffer)[i]=v;
+	}
+	return e;
+}
+
+unsigned long fwrite(const void* buffer,unsigned long size,unsigned long count,FILE* file){
+	unsigned long e=size*count;
+	for (unsigned long i=0;i<e;i++){
+		int v;
+		v=fputc(((char*)buffer)[i],file);
+		if (v==EOF) return i;
+	}
+	return e;
+}
+
+int feof(FILE* file){
+	if (file->errFlags & 1) return -1;
+	return 0;
+}
+
 void _give_not_implemented_message(const char* f_name){
 	fprintf(stderr," The function `%s` is not implemented in the simulator definitions. The simulator will now exit.",f_name);
 	exit(1);
 }
 
-unsigned long fread(void* buffer,unsigned long size,unsigned long count,FILE* file){
-	_give_not_implemented_message("fread");
-}
-unsigned long fwrite(const void* buffer,unsigned long size,unsigned long count,FILE* file){
-	_give_not_implemented_message("fwrite");
-}
 int fseek(FILE* file,long offset,int whence){
 	_give_not_implemented_message("fseek");
 }
@@ -453,9 +475,6 @@ int rewind(FILE* file){
 }
 void clearerr(FILE* file){
 	_give_not_implemented_message("clearerr");
-}
-int feof(FILE* file){
-	_give_not_implemented_message("feof");
 }
 int ferror(FILE* file){
 	_give_not_implemented_message("ferror");

@@ -29,6 +29,7 @@ typedef struct {
 	The simulator's definitions (ab)use this struct as well, but those definitions use the values for other purposes.
 	`buffPos` is used as a position marker
 	`buffType` is used to store the mode_id
+	`errFlags` has it's bit 0 used like normal (bit 0 is eof)
 	all other values are unused by the simulator. the simulator's definitions are less compliant to the standard.
 	*/
 	
@@ -84,17 +85,17 @@ int fgetc(FILE* stream);
 int fflush(FILE* stream);
 int fgetpos(FILE* inputFile,fpos_t* pos);
 int fsetpos(FILE* inputFile,fpos_t* pos);
+unsigned long fread(void* buffer,unsigned long size,unsigned long count,FILE* file);
+unsigned long fwrite(const void* buffer,unsigned long size,unsigned long count,FILE* file);
+int feof(FILE* file);
 
 // the functions below are not implemented in the simulator. attempting to use them there will result in a runtime error
 
-unsigned long fread(void* buffer,unsigned long size,unsigned long count,FILE* file);
-unsigned long fwrite(const void* buffer,unsigned long size,unsigned long count,FILE* file);
 int fseek(FILE* file,long offset,int whence);
 long ftell(FILE* file);
 int ungetc(int ch, FILE* file);
 int rewind(FILE* file);
 void clearerr(FILE* file);
-int feof(FILE* file);
 int ferror(FILE* file);
 
 #else // #ifdef __STD_REAL
@@ -110,17 +111,17 @@ extern int fgetc(FILE* stream);
 extern int fflush(FILE* stream);
 extern int fgetpos(FILE* inputFile,fpos_t* pos);
 extern int fsetpos(FILE* inputFile,fpos_t* pos);
+extern unsigned long fread(void* buffer,unsigned long size,unsigned long count,FILE* file);
+extern unsigned long fwrite(const void* buffer,unsigned long size,unsigned long count,FILE* file);
+extern int feof(FILE* file);
 
 // the functions below are not implemented in the simulator. attempting to use them there will result in a runtime error
 
-extern unsigned long fread(void* buffer,unsigned long size,unsigned long count,FILE* file);
-extern unsigned long fwrite(const void* buffer,unsigned long size,unsigned long count,FILE* file);
 extern int fseek(FILE* file,long offset,int whence);
 extern long ftell(FILE* file);
 extern int ungetc(int ch, FILE* file);
 extern int rewind(FILE* file);
 extern void clearerr(FILE* file);
-extern int feof(FILE* file);
 extern int ferror(FILE* file);
 
 
