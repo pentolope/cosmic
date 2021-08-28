@@ -4,6 +4,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define COLOR_GRAY_OR_BLACK '0' // gray when on text, black when on background
+#define COLOR_RED           '1'
+#define COLOR_GREEN         '2'
+#define COLOR_YELLOW        '3'
+#define COLOR_BLUE          '4'
+#define COLOR_MAGENTA       '5'
+#define COLOR_CYAN          '6'
+#define COLOR_WHITE         '7'
+
+#define COLOR_TO_TEXT        '9'
+#define COLOR_TO_BACKGROUND  '4'
+
+
 struct _print_target{
 	_Bool isStr;
 	_Bool strMaxHit;
@@ -145,7 +158,7 @@ struct {
 	uint8_t current_background;
 	uint16_t cursor;
 } _terminalCharacterState={
-	.current_foreground=255,
+	.current_foreground=182,
 	.current_background=0
 };
 

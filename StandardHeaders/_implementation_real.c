@@ -25,6 +25,18 @@
 #define FAT_ATTRIB_DIR      (1 << 4)
 #define FAT_ATTRIB_ARCHIVE  (1 << 5)
 
+#define COLOR_GRAY_OR_BLACK '0' // gray when on text, black when on background
+#define COLOR_RED           '1'
+#define COLOR_GREEN         '2'
+#define COLOR_YELLOW        '3'
+#define COLOR_BLUE          '4'
+#define COLOR_MAGENTA       '5'
+#define COLOR_CYAN          '6'
+#define COLOR_WHITE         '7'
+
+#define COLOR_TO_TEXT        '9'
+#define COLOR_TO_BACKGROUND  '4'
+
 
 uint16_t read2(const uint8_t* p){
 	return ((uint16_t)p[0] << 0) | ((uint16_t)p[1] << 8);
@@ -86,6 +98,7 @@ struct Cache {
 	uint8_t sector_count;
 	uint8_t sector_walk;
 	bool dirty[CACHE_SIZE];
+	bool invalid[CACHE_SIZE];
 	uint32_t sector_addresses[CACHE_SIZE];
 } cache={0};
 
@@ -132,15 +145,17 @@ bool cache_flush_single(uint8_t index){
 }
 
 bool cache_flush_all(){
+	bool f=0;
 	for (uint8_t i=0;i<cache.sector_count;i++){
-		if (cache_flush_single(i)) return 1;
+		f |= cache_flush_single(i);
 	}
-	return 0;
+	return f;
 }
 
 bool card_to_cache(uint8_t index){
 	uint8_t c=255;
 	uint8_t s=0;
+	cache.invalid[index]=1;
 	*((volatile uint8_t*)(0x80000000lu|0x02lu))=1;
 	if (*((volatile uint8_t*)(0x80000000lu|0x1000000lu|0x04lu))!=4) goto Fail;
 	s=1;
@@ -163,6 +178,7 @@ bool card_to_cache(uint8_t index){
 	s=3;
 	if (*((volatile uint16_t*)(0x80000000lu|0x1000000lu|0x06lu))!=0) goto Fail;
 	*((volatile uint8_t*)(0x80000000lu|0x02lu))=0;
+	cache.invalid[index]=0;
 	return 0;
 	Fail:;
 	printf("[card_to_cache FAIL {%d,%d}]\n",c,s);
@@ -176,6 +192,9 @@ bool cache_load(uint32_t sector){
 	uint8_t index;
 	for (index=0;index<cache.sector_count;index++){
 		if (cache.sector_addresses[index]==sector){
+			if (cache.invalid[index]){
+				return card_to_cache(index);
+			}
 			return 0;
 		}
 	}
@@ -491,6 +510,7 @@ uint8_t* normalize_path(const uint8_t* path){
 	uint32_t length=strlen((const char*)path);
 	_isNextAllocFromKernel=1;
 	uint8_t* normalized_path=malloc(length+1);
+	if (normalized_path==NULL) exit(1);
 	uint32_t i;
 	for (i=0;i<=length;i++){
 		if (path[i]=='\\') normalized_path[i]='/';
@@ -2163,7 +2183,7 @@ struct {
 	uint8_t current_background;
 	uint16_t cursor;
 } _terminalCharacterState={
-	.current_foreground=255,
+	.current_foreground=182,
 	.current_background=0
 };
 
@@ -2980,7 +3000,50 @@ void _setchar_screen(uint16_t position, uint8_t character, uint8_t foreground, u
 }
 
 void _putchar_screen(char c){
-	if (c>=' ' & c<='~'){
+	if (_terminalCharacterState.isAnsiEscapeOccuring){
+		uint16_t l=strlen(_terminalCharacterState.ansiBuffer);
+		if (c=='m'){
+			_terminalCharacterState.isAnsiEscapeOccuring=0;
+			if (_terminalCharacterState.ansiBuffer[0]=='['){
+				uint8_t p=0;
+				uint8_t v=0;
+				switch (_terminalCharacterState.ansiBuffer[1]){
+					case '0':if (l==2){
+						_terminalCharacterState.current_foreground=182;
+						_terminalCharacterState.current_background=0;
+					}break;
+					case COLOR_TO_BACKGROUND:p=1;break;
+					case COLOR_TO_TEXT:p=2;break;
+				}
+				if (p!=0 & l==3){
+					switch (_terminalCharacterState.ansiBuffer[2]){
+						case COLOR_GRAY_OR_BLACK:v=p==1?0:182;break;
+						case COLOR_RED:v=224;break;
+						case COLOR_GREEN:v=28;break;
+						case COLOR_YELLOW:v=252;break;
+						case COLOR_BLUE:v=3;break;
+						case COLOR_MAGENTA:v=227;break;
+						case COLOR_CYAN:v=31;break;
+						case COLOR_WHITE:v=255;break;
+						default:p=0;break;
+					}
+					if (p==1){
+						_terminalCharacterState.current_background=v;
+					} else if (p==2){
+						_terminalCharacterState.current_foreground=v;
+					}
+				}
+			}
+		} else if (l==7){
+			// too long, abort it. It's not going to handle this well and I kinda don't care
+			_terminalCharacterState.isAnsiEscapeOccuring=0;
+		} else {
+			_terminalCharacterState.ansiBuffer[l++]=c;
+		}
+	} else if (c==27){
+		_terminalCharacterState.isAnsiEscapeOccuring=1;
+		memset(_terminalCharacterState.ansiBuffer,0,8);
+	} else if (c>=' ' & c<='~'){
 		const uint32_t a=0x80800000lu+_terminalCharacterState.cursor*3lu;
 		*(volatile uint8_t*)(a+0)=c;
 		*(volatile uint8_t*)(a+1)=_terminalCharacterState.current_foreground;

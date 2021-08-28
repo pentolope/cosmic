@@ -33,9 +33,8 @@ bool _freeNonKernel(){
 		if (currentBlockSize==0u | (currentBlockSize&3u)!=0u | (currentBlockAddr&3u)!=0u) return 1;
 		
 		nextBlockAddr=currentBlockSize+currentBlockAddr;
-		if (nextBlockAddr>=_MemorySize) return 1;
-		
 		if (nextBlockAddr==_MemorySize) break;
+		if (nextBlockAddr> _MemorySize) return 1;
 		nextBlockSize=_MemoryRead32(nextBlockAddr);
 		if ((nextBlockSize&0x80000001lu)==1lu){
 			_MemoryWrite32(nextBlockAddr,_MemoryRead32(nextBlockAddr)&0x7FFFFFFElu);

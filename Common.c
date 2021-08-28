@@ -153,8 +153,8 @@ struct {
 
 void makeColor(char type, char color){
 	if (compileSettings.noColor) return;
-    printf("%c%c%c%c%c",        // printf() doesn't always work as intended when these are printed with %s format
-        27,'[',type,color,'m');
+	printf("%c%c%c%c%c",        // printf() doesn't always work as intended when these are printed with %s format
+		27,'[',type,color,'m');
 }
 
 void resetColor(){
