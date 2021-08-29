@@ -20,7 +20,6 @@ void makeColor(char type, char color){
 
 void resetColor(){
 	printf("\033[0m");
-	//printf("%c[0m",27);
 }
 
 
@@ -197,8 +196,6 @@ int run_command(char** arg){
 					makeColor(COLOR_TO_TEXT,COLOR_GREEN);
 				}
 				if ((ffo->target.attributes & FAT_ATTRIB_HIDDEN)!=0 | (ffo->target.attributes & FAT_ATTRIB_SYSTEM)!=0){
-					makeColor(COLOR_TO_BACKGROUND,COLOR_RED);
-				} else {
 					makeColor(COLOR_TO_BACKGROUND,COLOR_YELLOW);
 				}
 				printf("%s\n",ffo_target_name);

@@ -153,8 +153,7 @@ struct {
 } symbolicStack;
 
 
-void symbolicResolutionSingle(const uint8_t* workingByteCode,InstructionSingle* IS_temp){
-	decompressInstruction(workingByteCode,IS_temp);
+void symbolicResolutionSingle(InstructionSingle* IS_temp){
 	if (symbolicStack.vsl<10){
 		fprintf(stderr,"ByteCode corrupted, symbolic stack overflow\n");
 		exit(1);
@@ -376,21 +375,15 @@ void loadFileContentsAsByteCode(const char* filePath){
 	for (uint16_t i1=0;i1<NUM_STD_SYMBOLS;i1++){stdObjects[i1].label=0;} // this for loop isn't really needed for sim loader but it will be needed for kernel's loader.
 	labelAddressPair=NULL;binaryFileLoadState.corruptionErrorMessage=NULL;binaryFileLoadState.binaryFile=NULL; // setting these to NULL is not really needed
 	
-	const uint8_t icc_to_delta[] = {[0]=0,[1]=1,[2]=2,[3]=2,[4]=2,[5]=3,[6]=3,[7]=3,[8]=4,[9]=5,[10]=6,[11]=8,[12]=3,[13]=4,[14]=4,[15]=5};
+	static const uint8_t icc_to_delta[] = {[0]=0,[1]=1,[2]=2,[3]=2,[4]=2,[5]=3,[6]=3,[7]=3,[8]=4,[9]=5,[10]=6,[11]=8,[12]=3,[13]=4,[14]=4,[15]=5};
 	uint16_t id_temp;
-	uint8_t workingByteCode[10];
 	uint32_t initialLabelCount=NUM_STD_SYMBOLS;
 	uint32_t initialRawSize=0;
 	uint32_t dataWalkIndex=0;
-	while ((id_temp=_intrinsic_c_functions[dataWalkIndex++])!=0){
-		workingByteCode[0]=id_temp;
+	while ((id_temp=_intrinsic_c_functions[dataWalkIndex])!=0){
 		initialLabelCount+=id_temp==I_LABL | id_temp==I_FCST | id_temp==I_JJMP;
-		const uint8_t icc = instructionContentCatagory(id_temp);
-		const uint8_t deltaByteCode=icc_to_delta[icc];
-		for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
-			workingByteCode[iDelta]=_intrinsic_c_functions[dataWalkIndex++];
-		}
-		initialRawSize+=backendInstructionSizeFromByteCode(workingByteCode);
+		initialRawSize+=backendInstructionSizeFromByteCode((uint8_t*)_intrinsic_c_functions+dataWalkIndex);
+		dataWalkIndex+=icc_to_delta[instructionContentCatagory(id_temp)];
 	}
 	initialRawSize+=initialRawSize & 1;
 	// the loop above could be reduced to a calculation at compile time... but I'm not going to do that right now.
@@ -467,20 +460,11 @@ void loadFileContentsAsByteCode(const char* filePath){
 	}
 	uint32_t labelWalkCount=NUM_STD_SYMBOLS;
 	dataWalkIndex=0;
-	while ((id_temp=_intrinsic_c_functions[dataWalkIndex++])!=0){
-		workingByteCode[0]=id_temp;
-		const uint8_t icc = instructionContentCatagory(id_temp);
-		const uint8_t deltaByteCode=icc_to_delta[icc];
-		for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
-			workingByteCode[iDelta]=_intrinsic_c_functions[dataWalkIndex++];
-		}
-		rawWalkPosition+=backendInstructionSizeFromByteCode(workingByteCode);
+	while ((id_temp=_intrinsic_c_functions[dataWalkIndex])!=0){
+		rawWalkPosition+=backendInstructionSizeFromByteCode((uint8_t*)_intrinsic_c_functions+dataWalkIndex);
 		if (id_temp==I_LABL | id_temp==I_FCST | id_temp==I_JJMP){
-			if (labelWalkCount>=numberOfLabels){
-				goto GiveCorruptedMessage;
-			}
 			InstructionSingle IS;
-			decompressInstruction(workingByteCode,&IS);
+			decompressInstruction((uint8_t*)_intrinsic_c_functions+dataWalkIndex,&IS);
 			labelAddressPair[labelWalkCount].address=rawWalkPosition;
 			if (id_temp==I_LABL){
 				labelAddressPair[labelWalkCount++].number=IS.arg.D.a_0;
@@ -490,29 +474,21 @@ void loadFileContentsAsByteCode(const char* filePath){
 				labelAddressPair[labelWalkCount++].number=IS.arg.BBD.a_2;
 			}
 		}
+		dataWalkIndex+=icc_to_delta[instructionContentCatagory(id_temp)];
 	}
 	rawWalkPosition+=rawWalkPosition & 1;
 	doubleLoopSwitch=false;
 	dataWalkIndex=0;
 	do {
-		while ((id_temp=fileContentAfterSymbols[dataWalkIndex++])!=0){
-			workingByteCode[0]=id_temp;
-			const uint8_t icc = instructionContentCatagory(id_temp);
-			const uint8_t deltaByteCode=icc_to_delta[icc];
-			for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
-				workingByteCode[iDelta]=fileContentAfterSymbols[dataWalkIndex++];
-			}
+		while ((id_temp=fileContentAfterSymbols[dataWalkIndex])!=0){
 			// dataWalkIndex may walk a little too far (and thus outside of it's allocation) but it probably won't be too bad since it is just reading data...
-			if (dataWalkIndex>totalFunctionAndStaticDataLength){
-				goto GiveCorruptedMessage;
-			}
-			rawWalkPosition+=backendInstructionSizeFromByteCode(workingByteCode);
+			rawWalkPosition+=backendInstructionSizeFromByteCode(fileContentAfterSymbols+dataWalkIndex);
 			if (id_temp==I_LABL | id_temp==I_FCST | id_temp==I_JJMP){
 				if (labelWalkCount>=numberOfLabels){
 					goto GiveCorruptedMessage;
 				}
 				InstructionSingle IS;
-				decompressInstruction(workingByteCode,&IS);
+				decompressInstruction(fileContentAfterSymbols+dataWalkIndex,&IS);
 				labelAddressPair[labelWalkCount].address=rawWalkPosition;
 				if (id_temp==I_LABL){
 					labelAddressPair[labelWalkCount++].number=IS.arg.D.a_0;
@@ -522,7 +498,12 @@ void loadFileContentsAsByteCode(const char* filePath){
 					labelAddressPair[labelWalkCount++].number=IS.arg.BBD.a_2;
 				}
 			}
+			dataWalkIndex+=icc_to_delta[instructionContentCatagory(id_temp)];
+			if (dataWalkIndex>totalFunctionAndStaticDataLength){
+				goto GiveCorruptedMessage;
+			}
 		}
+		dataWalkIndex++;
 		if (doubleLoopSwitch) break;
 		doubleLoopSwitch=true;
 	} while (true);
@@ -538,19 +519,16 @@ void loadFileContentsAsByteCode(const char* filePath){
 	uint8_t* binaryLocationWalk=binaryLocation;
 	uint16_t func_stack_size;
 	uint8_t func_stack_initial;
+	uint16_t intrinsicID;
+	uint32_t symVal;
 	dataWalkIndex=0;
-	while ((id_temp=_intrinsic_c_functions[dataWalkIndex++])!=0){
-		workingByteCode[0]=id_temp;
-		uint8_t icc = instructionContentCatagory(id_temp);
-		uint8_t deltaByteCode=icc_to_delta[icc];
-		for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
-			workingByteCode[iDelta]=_intrinsic_c_functions[dataWalkIndex++];
-		}
+	while ((id_temp=_intrinsic_c_functions[dataWalkIndex])!=0){
 		InstructionSingle IS;
-		decompressInstruction(workingByteCode,&IS);
+		decompressInstruction((uint8_t*)_intrinsic_c_functions+dataWalkIndex,&IS);
+		rawWalkPosition+=backendInstructionSize(&IS);
+		dataWalkIndex+=icc_to_delta[instructionContentCatagory(id_temp)];
 		
-		uint16_t intrinsicID=getIntrinsicID(IS.id);
-		uint32_t symVal;
+		intrinsicID=getIntrinsicID(IS.id);
 		if (intrinsicID!=0){
 			symVal=getLabelAddress(intrinsicID);
 		} else {
@@ -590,17 +568,13 @@ void loadFileContentsAsByteCode(const char* filePath){
 				symbolicStack.vsl=100;
 				InstructionSingle IS_temp;
 				do {
-					workingByteCode[0]=_intrinsic_c_functions[dataWalkIndex++];
-					if (workingByteCode[0]==0){
+					if ((id_temp=_intrinsic_c_functions[dataWalkIndex])==0){
 						// end inside symbolic
 						goto GiveCorruptedMessage;
 					}
-					icc = instructionContentCatagory(workingByteCode[0]);
-					deltaByteCode=icc_to_delta[icc];
-					for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
-						workingByteCode[iDelta]=_intrinsic_c_functions[dataWalkIndex++];
-					}
-					symbolicResolutionSingle(workingByteCode,&IS_temp);
+					decompressInstruction((uint8_t*)_intrinsic_c_functions+dataWalkIndex,&IS_temp);
+					symbolicResolutionSingle(&IS_temp);
+					dataWalkIndex+=icc_to_delta[instructionContentCatagory(id_temp)];
 				} while (IS_temp.id!=I_SYRE & IS_temp.id!=I_SYDE);
 				if (100-symbolicStack.vsl!=symbolSizeWords){
 					// symbolic result size mismatch
@@ -620,18 +594,13 @@ void loadFileContentsAsByteCode(const char* filePath){
 	dataWalkIndex=0;
 	doubleLoopSwitch=false;
 	do {
-		while ((id_temp=fileContentAfterSymbols[dataWalkIndex++])!=0){
-		workingByteCode[0]=id_temp;
-		uint8_t icc = instructionContentCatagory(id_temp);
-		uint8_t deltaByteCode=icc_to_delta[icc];
-		for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
-			workingByteCode[iDelta]=fileContentAfterSymbols[dataWalkIndex++];
-		}
+		while ((id_temp=fileContentAfterSymbols[dataWalkIndex])!=0){
 		InstructionSingle IS;
-		decompressInstruction(workingByteCode,&IS);
+		decompressInstruction(fileContentAfterSymbols+dataWalkIndex,&IS);
+		rawWalkPosition+=backendInstructionSize(&IS);
+		dataWalkIndex+=icc_to_delta[instructionContentCatagory(id_temp)];
 		
-		uint16_t intrinsicID=getIntrinsicID(IS.id);
-		uint32_t symVal;
+		intrinsicID=getIntrinsicID(IS.id);
 		if (intrinsicID!=0){
 			symVal=getLabelAddress(intrinsicID);
 		} else {
@@ -671,17 +640,13 @@ void loadFileContentsAsByteCode(const char* filePath){
 				symbolicStack.vsl=100;
 				InstructionSingle IS_temp;
 				do {
-					workingByteCode[0]=fileContentAfterSymbols[dataWalkIndex++];
-					if (workingByteCode[0]==0){
+					if ((id_temp=fileContentAfterSymbols[dataWalkIndex])==0){
 						// end inside symbolic
 						goto GiveCorruptedMessage;
 					}
-					icc = instructionContentCatagory(workingByteCode[0]);
-					deltaByteCode=icc_to_delta[icc];
-					for (uint8_t iDelta=1;iDelta<deltaByteCode;iDelta++){
-						workingByteCode[iDelta]=fileContentAfterSymbols[dataWalkIndex++];
-					}
-					symbolicResolutionSingle(workingByteCode,&IS_temp);
+					decompressInstruction(fileContentAfterSymbols+dataWalkIndex,&IS_temp);
+					symbolicResolutionSingle(&IS_temp);
+					dataWalkIndex+=icc_to_delta[instructionContentCatagory(id_temp)];
 				} while (IS_temp.id!=I_SYRE & IS_temp.id!=I_SYDE);
 				if (100-symbolicStack.vsl!=symbolSizeWords){
 					// symbolic result size mismatch
@@ -698,6 +663,7 @@ void loadFileContentsAsByteCode(const char* filePath){
 		}
 		backendInstructionWrite(&binaryLocationWalk,symVal,func_stack_size,func_stack_initial,IS);
 		}
+		dataWalkIndex++;
 		if (doubleLoopSwitch) break;
 		doubleLoopSwitch=true;
 	} while (true);
@@ -709,6 +675,7 @@ void loadFileContentsAsByteCode(const char* filePath){
 	free((char*)binaryFileLoadState.corruptionErrorMessage);
 	free(fileContentAfterSymbols);
 	free(labelAddressPair);
+	labelAddressPair=NULL;binaryFileLoadState.corruptionErrorMessage=NULL;binaryFileLoadState.binaryFile=NULL; // setting these to NULL is not really needed
 }
 
 static void _exec_springboard1(){
