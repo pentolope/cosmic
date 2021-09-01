@@ -194,9 +194,51 @@ void _putchar_ensure_cursor_normal(){
 	}
 }
 
-
 void _putchar_screen(char c){
-	if (c>=' ' & c<='~'){
+	if (_terminalCharacterState.isAnsiEscapeOccuring){
+		uint16_t l=strlen(_terminalCharacterState.ansiBuffer);
+		if (c=='m'){
+			_terminalCharacterState.isAnsiEscapeOccuring=0;
+			if (_terminalCharacterState.ansiBuffer[0]=='['){
+				uint8_t p=0;
+				uint8_t v=0;
+				switch (_terminalCharacterState.ansiBuffer[1]){
+					case '0':if (l==2){
+						_terminalCharacterState.current_foreground=182;
+						_terminalCharacterState.current_background=0;
+					}break;
+					case COLOR_TO_BACKGROUND:p=1;break;
+					case COLOR_TO_TEXT:p=2;break;
+				}
+				if (p!=0 & l==3){
+					switch (_terminalCharacterState.ansiBuffer[2]){
+						case COLOR_GRAY_OR_BLACK:v=p==1?0:182;break;
+						case COLOR_RED:v=224;break;
+						case COLOR_GREEN:v=28;break;
+						case COLOR_YELLOW:v=252;break;
+						case COLOR_BLUE:v=3;break;
+						case COLOR_MAGENTA:v=227;break;
+						case COLOR_CYAN:v=31;break;
+						case COLOR_WHITE:v=255;break;
+						default:p=0;break;
+					}
+					if (p==1){
+						_terminalCharacterState.current_background=v;
+					} else if (p==2){
+						_terminalCharacterState.current_foreground=v;
+					}
+				}
+			}
+		} else if (l==7){
+			// too long, abort it. It's not going to handle this well and I kinda don't care
+			_terminalCharacterState.isAnsiEscapeOccuring=0;
+		} else {
+			_terminalCharacterState.ansiBuffer[l++]=c;
+		}
+	} else if (c==27){
+		_terminalCharacterState.isAnsiEscapeOccuring=1;
+		memset(_terminalCharacterState.ansiBuffer,0,8);
+	} else if (c>=' ' & c<='~'){
 		const uint32_t a=0x80800000lu+_terminalCharacterState.cursor*3lu;
 		*(volatile uint8_t*)(a+0)=c;
 		*(volatile uint8_t*)(a+1)=_terminalCharacterState.current_foreground;
@@ -213,6 +255,7 @@ void _putchar_screen(char c){
 		_putchar_ensure_cursor_normal();
 	}
 }
+
 
 void _putstr(struct _print_target* print_target,const char* str){
 	if (str==NULL) str="(null)";
