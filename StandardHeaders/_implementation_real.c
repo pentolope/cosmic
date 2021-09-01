@@ -677,6 +677,7 @@ bool fat_lazy_seek(struct Folder_File_Object* ffo, int32_t offset, uint8_t whenc
 		} else {
 			// then offset must equal 0
 			ffo->target.walking_cluster = ffo->target.entrance_cluster;
+			ffo->target.walking_position = 0;
 			return 0;
 		}
 		case SEEK_CUR:;
@@ -1415,7 +1416,7 @@ uint8_t fat_create_object(struct Folder_File_Object* ffo, const uint8_t* file_na
 			buffer[ 8]=' ';
 			buffer[ 9]=' ';
 			buffer[10]=' ';
-			buffer[11]=' ';
+			buffer[11]=FAT_ATTRIB_DIR;
 			buffer[12]=0x10;
 			buffer[26]=(entrance_cluster >> 0);
 			buffer[27]=(entrance_cluster >> 8);
@@ -2443,7 +2444,6 @@ void ps2_command(uint8_t id){
 	4 = echo responce
 	*/
 	static uint8_t controller_state=0;
-	*((volatile uint8_t*)(0x80000000lu|0x01lu))=1;
 	switch (id){
 		case 0:{
 			if (controller_state!=0){
@@ -2475,9 +2475,10 @@ void ps2_command(uint8_t id){
 			*((volatile uint8_t*)(0x80000000lu|0x1800000lu|0x01lu))=0xF3;
 		}break;
 		case 3:{
-			*((volatile uint8_t*)(0x80000000lu|0x1800000lu|0x01lu))=0x60;
+			*((volatile uint8_t*)(0x80000000lu|0x1800000lu|0x01lu))=0x00;
 		}break;
 		case 4:{
+			*((volatile uint8_t*)(0x80000000lu|0x01lu))=1; // set led 1 to on to signal that the keyboard was initialized
 			return;
 		}break;
 		case 5:{
