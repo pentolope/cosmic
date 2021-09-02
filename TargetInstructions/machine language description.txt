@@ -2,7 +2,7 @@ Machine Language Description
 
 Notes:
   Memory is little-endian and byte accessed (except for stack instructions, which are word accessed and word alligned)
-  Instruction decoder only needs 5 bits of input from the instruction: the 4 important ones and one bit to say if the first 4 bits were 1111
+  Instruction decoder only needs 5 bits of input from the instruction: the 4 important ones and 1 bit to say if the first 4 bits were 1111
   When memory addresses are referred to, the form r1,r2 is often used. r1 is the less significant word, r2 is the more significant word
   When registers are referred to using assembly notation (like this: %F ) then literally that register is being referred to, it is not an argument for that instruction
 
@@ -62,7 +62,7 @@ When CALL is executed:
   Then,  it pushes %1 to the stack
   Then,  it pushes the double word of the address the Instruction Pointer should return to on function return. (The upper word is pushed first.)
   Then,  the Stack_Pointer (which is pointing to the lower word of the return address) is put into %0
-  Then,  the Instrution Pointer is set to the value in the argument registers
+  Then,  the Instruction Pointer is set to the value in the argument registers
 
 When RET_ is executed:
   First, it sets Stack_Pointer to %0
