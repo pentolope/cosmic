@@ -31,13 +31,13 @@ Instructions:
 1 - 0,1,0,1, - r1  or  r2 -> r0
 1 - 0,1,1,0, - r1  xor r2 -> r0
 1 - 0,1,1,1, - r0 + r1 +~r2 -> r1, with carry stored to ones bit of r0, if carry would be larger then 1, r0 would still hold 1.
-1 - 1,0,0,0, - memory read a  word into r0 at r1,r2  (must be aligned to word boundry)
-1 - 1,0,0,1, - memory write the word in r0 at r1,r2  (must be aligned to word boundry)
+1 - 1,0,0,0, - memory read a  word into r0 at r1,r2  (must be aligned to word boundary)
+1 - 1,0,0,1, - memory write the word in r0 at r1,r2  (must be aligned to word boundary)
 1 - 1,0,1,0, - r1 + r2 -> r0
 1 - 1,0,1,1, - r1 + r2 + %F -> r0, with carry stored to ones bit of %F, if carry would be larger then 1, r0 would still hold 1.
 1 - 1,1,0,0, - r1 - r2 -> r0
 1 - 1,1,0,1, - r1 - r2 (carry)-> r0
-1 - 1,1,1,0, - conditional jump if(r2 == 0) to r0,r1 (must be aligned to word boundry)
+1 - 1,1,1,0, - conditional jump if(r2 == 0) to r0,r1 (must be aligned to word boundary)
 
 2 - 0,0,0,0, - push r0 to stack
 2 - 0,0,0,1, - push r0 then r1 to stack
@@ -49,11 +49,11 @@ Instructions:
 2 - 0,1,1,1, - r0 * r1 -> r0 (word multiply, the upper word is not generated)
 2 - 1,0,0,0, - %D,%E * r0,r1 -> %D,%E  (32 bit multiplication, lower 32 bits are stored. %E is the upper word.)
 2 - 1,0,0,1, - r0 / r1 -> r0 , r0 % r1 -> r1   (% is the remainder of the division)
-2 - 1,0,1,0, - call to address at r0,r1 (must be aligned to word boundry)
+2 - 1,0,1,0, - call to address at r0,r1 (must be aligned to word boundary)
 2 - 1,0,1,1, - ret
 2 - 1,1,0,0, - memory read byte into lower byte of r0 at %D,r1  (upper byte of r0 is set to 0)
 2 - 1,1,0,1, - memory write byte in  lower byte of r0 at %D,r1  (upper byte of r0 is effectively ignored, however it should be 0)
-2 - 1,1,1,0, - jump to r0,r1 (must be aligned to word boundry)
+2 - 1,1,1,0, - jump to r0,r1 (must be aligned to word boundary)
 2 - 1,1,1,1, - SP - r0 -> r0 , then r0 -> SP
 
 
