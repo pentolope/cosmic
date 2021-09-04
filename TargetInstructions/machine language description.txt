@@ -1,7 +1,7 @@
 Machine Language Description
 
 Notes:
-  Memory is little-endian and byte accessed (except for stack instructions, which are word accessed and word alligned)
+  Memory is little-endian and byte addressed (stack instructions operate on words and require word alignment. Each word is 16 bits)
   Instruction decoder only needs 5 bits of input from the instruction: the 4 important ones and 1 bit to say if the first 4 bits were 1111
   When memory addresses are referred to, the form r1,r2 is often used. r1 is the less significant word, r2 is the more significant word
   When registers are referred to using assembly notation (like this: %F ) then literally that register is being referred to, it is not an argument for that instruction
