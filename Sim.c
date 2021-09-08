@@ -1698,8 +1698,10 @@ int main(int argc, char** argv){
 		fprintf(fpga_boot_asm_file,"%s","LDLO %C $00\n");
 		fprintf(fpga_boot_asm_file,"%s","MWRW %A %C %C\n");
 		fprintf(fpga_boot_asm_file,"%s","MWRW %B %D %C\n"); // write storage size to place that malloc and related functions will find it
-		fprintf(fpga_boot_asm_file,"%s%04X\n","LDFU %A #",(unsigned int)(0xFFFF & mainAddress));
-		fprintf(fpga_boot_asm_file,"%s%04X\n","LDFU %B #",(unsigned int)(0xFFFF & (mainAddress >> 16))); // set up main address
+		fprintf(fpga_boot_asm_file,"%s%02X\n","LDLO %A $",(unsigned int)(0xFF & (mainAddress >>  0)));
+		fprintf(fpga_boot_asm_file,"%s%02X\n","LDLO %B $",(unsigned int)(0xFF & (mainAddress >> 16)));
+		fprintf(fpga_boot_asm_file,"%s%02X\n","LDUP %A $",(unsigned int)(0xFF & (mainAddress >>  8)));
+		fprintf(fpga_boot_asm_file,"%s%02X\n","LDUP %B $",(unsigned int)(0xFF & (mainAddress >> 24))); // set up main address
 		fprintf(fpga_boot_asm_file,"%s","CALL %A %B\n"); // call main
 		fprintf(fpga_boot_asm_file,"%s","LDLA %A %B @00000000\n");
 		fprintf(fpga_boot_asm_file,"%s","AJMP %A %B\n"); // jump back to where boot starts (this is a fail safe, in general this main function shouldn't return anyway)
