@@ -1249,7 +1249,7 @@ void applyAutoTypeConversion_Typical(ExpressionTreeNode* tn){
 					printInformativeMessageForExpression(true,"cannot subtract differing pointer to pointer",tn);
 					exit(1);
 				}
-				*thisTSP=copyStringToHeapString("unsigned long");
+				*thisTSP=copyStringToHeapString("long");
 				tp->extraVal=etc_03(&r);
 				tp->operatorTypeID=4;
 			} else if (l.isPtr){
