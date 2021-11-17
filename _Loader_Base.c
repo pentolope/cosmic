@@ -93,6 +93,12 @@ void sortLabels(){
 			}
 		}
 	}
+	for (uint32_t i=1;i<numberOfLabels;i++){
+		if (labelAddressPair[i-1u].number==labelAddressPair[i].number & labelAddressPair[i].number!=0u){
+			fprintf(stderr,"Label number conflict detected\n");
+			exit(1);
+		}
+	}
 }
 
 uint32_t getLabelAddress(uint32_t labelToSearch){

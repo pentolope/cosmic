@@ -377,7 +377,7 @@ void triggerFileLoad(){
 		return;
 	}
 	//printf("VALID\n");
-	if ((fileAccessInfo.isRead=!doStringsMatch(fileMode,"wb"))){
+	if ((fileAccessInfo.isRead=!doStringsMatch(fileMode,"wb") && !doStringsMatch(fileMode,"w"))){
 		fpos_t startingPositionOfFile;
 		fgetpos(inputFile,&startingPositionOfFile);
 		while (fgetc(inputFile)!=EOF){
@@ -431,8 +431,8 @@ void ps2ProcessCommands();
 
 void ps2AddBytes(const uint8_t* b){ // this function is for bytes coming in from the "keyboard"
 	while (*b!=0) {
-		ps2_state.buff_in[(++ps2_state.pos_in_write)&255] = *(b++);
-		ps2_state.had_overflow |= ps2_state.pos_in_write == ps2_state.pos_in_read;
+		ps2_state.buff_in[ps2_state.pos_in_write++] = *(b++);
+		ps2_state.had_overflow |= ps2_state.pos_in_write == ps2_state.pos_in_read; // might trigger overflow when it just barely becomes full, but I don't really care
 	}
 }
 
@@ -449,7 +449,7 @@ void ps2PopTopByte(){
 }
 
 void ps2PushByte(uint8_t b){
-	ps2_state.buff_in[(++ps2_state.pos_out_write)&255] = b;
+	ps2_state.buff_in[ps2_state.pos_out_write++] = b;
 	ps2ProcessCommands();
 }
 
@@ -541,8 +541,8 @@ uint8_t readByte(uint32_t a){
 		if (a>=0x81800000 && a<=0x818FFFFF){
 			switch (a&7){
 				case 0:return ps2ReadTopByte();
-				case 2:return ((unsigned)ps2_state.pos_out_read - (unsigned)ps2_state.pos_out_write)&255;
-				case 3:return ((unsigned)ps2_state.pos_in_read - (unsigned)ps2_state.pos_in_write)&255;// would be surprised if this was not 0 because this is a simulator...
+				case 2:return ((unsigned)ps2_state.pos_in_read - (unsigned)ps2_state.pos_in_write)!=0;
+				case 3:return ((unsigned)ps2_state.pos_out_read - (unsigned)ps2_state.pos_out_write)!=0;
 				case 6:return ps2_state.had_overflow;
 			}
 		}
@@ -922,7 +922,6 @@ void singleExecute(){
 		
 	}
 	machineState->pc+=2;
-	uint16_t stupid=machineState->sp;
 	switch (type){
 		case 0x00:machineState->reg[r0]=imm;break;
 		case 0x01:machineState->reg[r0]|=((unsigned)imm<<8)&0xFF00u;break;
@@ -1020,7 +1019,7 @@ void fullExecute(){
 					printf("Premature Exit Initiated...\n");
 					bye();
 				}
-				if ((globalSDL_Information.event.type==SDL_KEYDOWN || globalSDL_Information.event.type==SDL_KEYUP) && globalSDL_Information.event.key.repeat==0){
+				if ((globalSDL_Information.event.type==SDL_KEYDOWN || globalSDL_Information.event.type==SDL_KEYUP)){
 					if (globalSDL_Information.event.type==SDL_KEYDOWN){
 						switch (globalSDL_Information.event.key.keysym.scancode){
 							case SDL_SCANCODE_0:ps2AddBytes((const uint8_t[]){0x45,0});break;
@@ -1099,6 +1098,7 @@ void fullExecute(){
 							case SDL_SCANCODE_LEFT:ps2AddBytes((const uint8_t[]){0xE0,0x6B,0});break;
 							case SDL_SCANCODE_DOWN:ps2AddBytes((const uint8_t[]){0xE0,0x72,0});break;
 							case SDL_SCANCODE_RIGHT:ps2AddBytes((const uint8_t[]){0xE0,0x74,0});break;
+							case SDL_SCANCODE_SPACE:ps2AddBytes((const uint8_t[]){0x29,0});break;
 							// don't care about other keys
 						}
 					} else {
@@ -1179,6 +1179,7 @@ void fullExecute(){
 							case SDL_SCANCODE_LEFT:ps2AddBytes((const uint8_t[]){0xE0,0xF0,0x6B,0});break;
 							case SDL_SCANCODE_DOWN:ps2AddBytes((const uint8_t[]){0xE0,0xF0,0x72,0});break;
 							case SDL_SCANCODE_RIGHT:ps2AddBytes((const uint8_t[]){0xE0,0xF0,0x74,0});break;
+							case SDL_SCANCODE_SPACE:ps2AddBytes((const uint8_t[]){0xF0,0x29,0});break;
 							// don't care about other keys
 						}
 					}
@@ -1769,8 +1770,10 @@ int main(int argc, char** argv){
 		
 		machineState->pc=mainAddress;// set pc to main address
 		printf("Starting SDL...\n");
+		fflush(stdout);
 		initializeSDL();
 		printf("Running...\n");
+		fflush(stdout);
 		if (!printEachInstruction){
 			printf("Call Stack:\n|\n%5d:main()\n",0);
 		}

@@ -104,17 +104,17 @@ void err_00__0(const char* message){printInformativeMessageAtSourceContainerInde
 void err_00__1(      char* message){err_00__0(message);cosmic_free(message);}
 void err_10_00(const char* message){printInformativeMessageAtSourceContainerIndex(true,message,-1,0);}
 void err_10_01(      char* message){err_10_00(message);cosmic_free(message);}
-void err_10_1_(const char* message){err_10_00(message);exit(1);}
+void err_10_1_(const char* message){err_10_00(message); exit(1); assert(false);}
 void err_010_0(const char* message,int32_t s){printInformativeMessageAtSourceContainerIndex(false,message,s,0);}
 void err_010_1(      char* message,int32_t s){err_010_0(message,s);cosmic_free(message);}
 void err_011_0(const char* message,int32_t s,int32_t e){printInformativeMessageAtSourceContainerIndex(false,message,s,e);}
 void err_011_1(      char* message,int32_t s,int32_t e){printInformativeMessageAtSourceContainerIndex(false,message,s,e);cosmic_free(message);}
 void err_11000(const char* message,int32_t s){printInformativeMessageAtSourceContainerIndex(true,message,s,0);}
 void err_11001(      char* message,int32_t s){err_11000(message,s);cosmic_free(message);}
-void err_1101_(const char* message,int32_t s){err_11000(message,s);exit(1);}
+void err_1101_(const char* message,int32_t s){err_11000(message,s); exit(1); assert(false);}
 void err_11100(const char* message,int32_t s,int32_t e){printInformativeMessageAtSourceContainerIndex(true,message,s,e);}
 void err_11101(      char* message,int32_t s,int32_t e){printInformativeMessageAtSourceContainerIndex(true,message,s,e);cosmic_free(message);}
-void err_1111_(const char* message,int32_t s,int32_t e){printInformativeMessageAtSourceContainerIndex(true,message,s,e);exit(1);}
+void err_1111_(const char* message,int32_t s,int32_t e){printInformativeMessageAtSourceContainerIndex(true,message,s,e); exit(1); assert(false);}
 
 
 

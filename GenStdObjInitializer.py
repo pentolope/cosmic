@@ -36,6 +36,7 @@ fopen
 fclose
 fputc
 fgetc
+fgets
 fflush
 fgetpos
 fsetpos

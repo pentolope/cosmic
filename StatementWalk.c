@@ -875,6 +875,9 @@ printInstructionBufferWithMessageAndNumber(&instructionBufferForFunction,typeStr
 						} else {
 							err_1101_("It seems that a variable was being declared at file scope,\n  but something went wrong when trying to figure out if it had an initalizer",gotoFailIndex);
 						}
+						if (hasExtern & isInitializationBeingGiven){
+							err_1101_("Variables marked as extern cannot be initialized",gotoFailIndex);
+						}
 						int32_t indexOfSemicolon = endIndexForDeclaration;
 						uint32_t labelID=++globalLabelID;
 						if (isInitializationBeingGiven & typeStringIndex==typeStringIndexLast){
@@ -903,7 +906,7 @@ printInstructionBufferWithMessageAndNumber(&instructionBufferForFunction,typeStr
 							default:assert(false);
 							case 0:;
 						}
-						if (!isInitializationBeingGiven | typeStringIndex!=typeStringIndexLast){
+						if ((!isInitializationBeingGiven | typeStringIndex!=typeStringIndexLast) & !hasExtern){
 							addBlankStaticVariable(typeString);
 						}
 					}

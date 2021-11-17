@@ -2071,6 +2071,30 @@ int16_t ferror(FILE* file){
 	return 0;
 }
 
+char* fgets(char* str,int num, FILE* stream){
+	if (num<=0) return NULL; // what is it supposed to do?
+	int i=0;
+	int c;
+	while (1){
+		if (i==num -1){
+			str[i]=0;
+			return str;
+		}
+		c=fgetc(stream);
+		if (c==EOF){
+			if (i!=0){
+				str[i]=0;
+			}
+			return NULL;
+		}
+		str[i++]=c;
+		if (c=='\n'){
+			str[i]=0;
+			return str;
+		}
+	}
+}
+
 /*
 todo:
 
@@ -2191,197 +2215,482 @@ struct {
 void _print_target_char(struct _print_target* print_target,char c){
 	if (print_target->isStr){
 		if (!print_target->strMaxHit){
-			print_target->str[print_target->writeCount++]=c;
-			print_target->strMaxHit=print_target->writeCount>print_target->strMax;
+			print_target->str[print_target->writeCount]=c;
+			print_target->strMaxHit=(print_target->writeCount+1u)>print_target->strMax;
+		}
+	} else {
+		fputc(c,print_target->stream);
+	}
+	print_target->writeCount++;
+}
+
+
+#define PRINTF_FLAG_NEG       (1U<< 0)
+#define PRINTF_FLAG_PLUS      (1U<< 1)
+#define PRINTF_FLAG_PADZERO   (1U<< 2)
+#define PRINTF_FLAG_SPACE     (1U<< 3)
+#define PRINTF_HAS_WIDTH      (1U<< 4)
+#define PRINTF_HAS_PRECISION  (1U<< 5)
+#define PRINTF_SIG_UPPERCASE  (1U<< 6)
+#define PRINTF_VAL_CHAR       (1U<< 7)
+#define PRINTF_VAL_SHORT      (1U<< 8)
+#define PRINTF_VAL_LONG       (1U<< 9)
+#define PRINTF_VAL_SIGNED     (1U<<10)
+
+#define PRINTF_REINTERP_TO_SIGNED_INT(v) (*(int*)(&(v)))
+#define PRINTF_REINTERP_TO_UNSIGN_INT(v) (*(unsigned int*)(&(v)))
+#define PRINTF_REINTERP_TO_SIGNED_LONG(v) (*(long*)(&(v)))
+#define PRINTF_REINTERP_TO_UNSIGN_LONG(v) (*(unsigned long*)(&(v)))
+
+
+// prints padding and sign for integer-like specifiers
+void _print_sub1(struct _print_target* print_target, unsigned int len_value, unsigned int sign_type, unsigned int mode, unsigned int format_signals, unsigned int width, unsigned int precision){
+	/*
+	mode 0: right justified before value printed
+	mode 1: left justified before value printed
+	mode 2: left justified after value printed
+	*/
+	/*
+	sign_type 0: no sign
+	sign_type 1: neg sign
+	sign_type 2: pos sign
+	sign_type 3: space
+	*/
+	unsigned precision_to_print=0;
+	unsigned width_to_print=0;
+	if (((format_signals & PRINTF_HAS_PRECISION)!=0) & (precision > (len_value - (sign_type!=0u)))){
+		precision_to_print = precision - (len_value - (sign_type!=0u));
+		len_value += precision_to_print;
+	}
+	if (((format_signals & PRINTF_HAS_WIDTH)!=0) & (width > len_value)){
+		width_to_print = width - len_value;
+		//len_value += width_to_print;//no need to update len_value
+	}
+	switch (mode){
+		case 0:
+		if (format_signals & PRINTF_FLAG_PADZERO){
+			unsigned c=0u;
+			switch (sign_type){
+				case 1:c='-';break;
+				case 2:c='+';break;
+				case 3:c=' ';break;
+			}
+			if (c!=0u) _print_target_char(print_target,c);
+		}
+		case 2:
+		if (format_signals & PRINTF_FLAG_PADZERO){
+			for (unsigned i=0;i<width_to_print;i++){
+				_print_target_char(print_target,'0');
+			}
+			return;
 		} else {
-			print_target->writeCount++;
+			for (unsigned i=0;i<width_to_print;i++){
+				_print_target_char(print_target,' ');
+			}
+		}
+		if (mode==2) return;
+		case 1:
+		{
+			unsigned c=0u;
+			switch (sign_type){
+				case 1:c='-';break;
+				case 2:c='+';break;
+				case 3:c=' ';break;
+			}
+			if (c!=0u) _print_target_char(print_target,c);
+		}
+		for (unsigned i=0;i<precision_to_print;i++){
+			_print_target_char(print_target,'0');
+		}
+	}
+}
+
+#if 0
+// prints padding for floating point specifiers (which is why this is disabled)
+void _print_sub2(struct _print_target* print_target, unsigned int len_value, unsigned int format_signals, unsigned int width){
+}
+#endif
+
+// prints a string
+void _print_sub3(struct _print_target* print_target, const char* s, unsigned int format_signals, unsigned int width, unsigned int precision){
+	if (s==NULL){
+		// lets be nice to that poor soul who called printf with NULL for a string
+		s="(null)";
+	}
+	unsigned long len0=strlen(s);
+	unsigned int len1=len0;
+	if (len0!=len1) len1=0xFFFFu;
+	if ((format_signals & PRINTF_HAS_PRECISION)!=0 & precision<len1){
+		len1=precision;
+	}
+	unsigned int len2=0;
+	if ((format_signals & PRINTF_HAS_WIDTH)!=0 & width>len1){
+		len2=width - len1;
+	}
+	if (format_signals & PRINTF_FLAG_NEG){
+		for (unsigned int i=0;i<len1;i++) _print_target_char(print_target,s[i]);
+		for (unsigned int i=0;i<len2;i++) _print_target_char(print_target,' ');
+	} else {
+		for (unsigned int i=0;i<len2;i++) _print_target_char(print_target,' ');
+		for (unsigned int i=0;i<len1;i++) _print_target_char(print_target,s[i]);
+	}
+}
+
+// prints a (un)signed integer in decimal format
+void _print_sub4(struct _print_target* print_target, unsigned int value, unsigned int format_signals, unsigned int width, unsigned int precision){
+	if (format_signals & PRINTF_HAS_PRECISION){
+		format_signals &= ~PRINTF_FLAG_PADZERO; // it seems like having a precision specified will override zero pad
+	}
+	unsigned int uvalue;
+	int is_neg;
+	if (format_signals & PRINTF_VAL_SIGNED){
+		is_neg=PRINTF_REINTERP_TO_SIGNED_INT(value)<0;
+		uvalue=is_neg? - PRINTF_REINTERP_TO_SIGNED_INT(value) : PRINTF_REINTERP_TO_SIGNED_INT(value);
+	} else {
+		is_neg=0;
+		uvalue=value;
+	}
+	unsigned int sign_type=is_neg;
+	unsigned int buf[5];
+	buf[4]=((uvalue        )%10u)+'0';
+	buf[3]=((uvalue /   10u)%10u)+'0';
+	buf[2]=((uvalue /  100u)%10u)+'0';
+	buf[1]=((uvalue / 1000u)%10u)+'0';
+	buf[0]=((uvalue /10000u)%10u)+'0';
+	unsigned int skip=(((format_signals & PRINTF_HAS_PRECISION)!=0 & (precision==0u & value==0u))!=0);
+	for (unsigned int i=0;i<4;i++){
+		if (buf[i]=='0') skip++;
+		else break;
+	}
+	unsigned int len=5u -skip;
+	if (is_neg | (format_signals & PRINTF_FLAG_SPACE) | (format_signals & PRINTF_FLAG_PLUS)){
+		len++;
+		if ((format_signals & PRINTF_FLAG_PLUS)!=0 & !is_neg) sign_type=2u;
+		else if ((format_signals & PRINTF_FLAG_SPACE)!=0 & sign_type==0u) sign_type=3u;
+	}
+	unsigned int has_width_or_precision=((format_signals & PRINTF_HAS_PRECISION) | (format_signals & PRINTF_HAS_WIDTH))!=0;
+	if (has_width_or_precision){
+		_print_sub1(print_target,len,sign_type,(format_signals & PRINTF_FLAG_NEG)!=0,format_signals,width,precision);
+	} else {
+		unsigned c=0u;
+		switch (sign_type){
+			case 1:c='-';break;
+			case 2:c='+';break;
+			case 3:c=' ';break;
+		}
+		if (c!=0u) _print_target_char(print_target,c);
+	}
+	for (unsigned int i=skip;i<5;i++){
+		_print_target_char(print_target,buf[i]);
+	}
+	if (has_width_or_precision & ((format_signals & PRINTF_FLAG_NEG)!=0)){
+		_print_sub1(print_target,len,sign_type,2,format_signals,width,precision);
+	}
+}
+
+// prints a (un)signed long in decimal format
+void _print_sub5(struct _print_target* print_target, unsigned long value, unsigned int format_signals, unsigned int width, unsigned int precision){
+	if (format_signals & PRINTF_VAL_SIGNED){
+		if ((int)(PRINTF_REINTERP_TO_SIGNED_LONG(value))==(PRINTF_REINTERP_TO_SIGNED_LONG(value))){
+			// you know what a fully correct and faster option is for this value and sign? the one that prints an integer instead of a long, because this value can fit in an integer
+			_print_sub4(print_target,(int)value,format_signals,width,precision);
+			return;
 		}
 	} else {
-		if (fputc(c,print_target->stream)==-1){
-			_putchar_screen('#');
+		if ((unsigned int)value==value){
+			// you know what a fully correct and faster option is for this value and sign? the one that prints an unsigned integer instead of an unsigned long, because this value can fit in an unsigned integer
+			_print_sub4(print_target,(unsigned)value,format_signals,width,precision);
+			return;
 		}
 	}
-}
-
-void _putstr(struct _print_target* print_target,const char* str){
-	if (str==NULL) str="(null)";
-	while (*str!=0){
-		_print_target_char(print_target,*(str++));
+	if (format_signals & PRINTF_HAS_PRECISION){
+		format_signals &= ~PRINTF_FLAG_PADZERO; // it seems like having a precision specified will override zero pad
 	}
-}
-
-void _put_udeci(struct _print_target* print_target,unsigned long uv){
-	bool t=false;
-	const uint8_t iStart=(uv&0xFFFF0000)!=0?9:4;
-	uint8_t i=iStart;
-	uint8_t o[10];
-	if (iStart==9){
-		do {
-			o[i]=uv%10;
-			uv=uv/10;
-		} while (i--!=0);
+	unsigned long uvalue0,uvalue1;
+	unsigned int uvalue2;
+	int is_neg;
+	if (format_signals & PRINTF_VAL_SIGNED){
+		is_neg=PRINTF_REINTERP_TO_SIGNED_LONG(value)<0;
+		uvalue0=is_neg ? - PRINTF_REINTERP_TO_SIGNED_LONG(value) : PRINTF_REINTERP_TO_SIGNED_LONG(value);
 	} else {
-		uint16_t uvs=uv;
-		do {
-			o[i]=uvs%10;
-			uvs=uvs/10;
-		} while (i--!=0);
+		is_neg=0;
+		uvalue0=value;
 	}
-	i=iStart;
-	do {
-		char c=o[iStart-i];
-		t|=c!=0;
-		if (t) _print_target_char(print_target,c+'0');
-	} while (i--!=0);
-	if (!t) _print_target_char(print_target,'0');
+	unsigned int sign_type=is_neg;
+	unsigned int buf[10];
+	uvalue1=uvalue0 /10LU;
+	buf[9]=(uvalue0 - (uvalue1 *10LU))+'0';
+	uvalue0=uvalue1;uvalue1=uvalue0 /10LU;
+	buf[8]=(uvalue0 - (uvalue1 *10LU))+'0';
+	uvalue0=uvalue1;uvalue1=uvalue0 /10LU;
+	buf[7]=(uvalue0 - (uvalue1 *10LU))+'0';
+	uvalue0=uvalue1;uvalue1=uvalue0 /10LU;
+	buf[6]=(uvalue0 - (uvalue1 *10LU))+'0';
+	uvalue0=uvalue1;uvalue1=uvalue0 /10LU;
+	buf[5]=(uvalue0 - (uvalue1 *10LU))+'0';
+	uvalue0=uvalue1;uvalue1=uvalue0 /10LU;
+	buf[4]=(uvalue0 - (uvalue1 *10LU))+'0';
+	uvalue2=uvalue1; // 6 digits have been generated, value is now garenteed to be in range to use 16 bit operations
+	buf[3]=((uvalue2       )%10u)+'0';
+	buf[2]=((uvalue2 /  10u)%10u)+'0';
+	buf[1]=((uvalue2 / 100u)%10u)+'0';
+	buf[0]=((uvalue2 /1000u)%10u)+'0';
+	unsigned int skip=((((format_signals & PRINTF_HAS_PRECISION)!=0 & (precision==0u & value==0)))!=0);
+	for (unsigned int i=0;i<9;i++){
+		if (buf[i]=='0') skip++;
+		else break;
+	}
+	unsigned int len=10u -skip;
+	if (is_neg | (format_signals & PRINTF_FLAG_SPACE) | (format_signals & PRINTF_FLAG_PLUS)){
+		len++;
+		if ((format_signals & PRINTF_FLAG_PLUS)!=0 & !is_neg) sign_type=2u;
+		else if ((format_signals & PRINTF_FLAG_SPACE)!=0 & sign_type==0u) sign_type=3u;
+	}
+	unsigned int has_width_or_precision=((format_signals & PRINTF_HAS_PRECISION) | (format_signals & PRINTF_HAS_WIDTH))!=0;
+	if (has_width_or_precision){
+		_print_sub1(print_target,len,sign_type,(format_signals & PRINTF_FLAG_NEG)!=0,format_signals,width,precision);
+	} else {
+		unsigned c=0u;
+		switch (sign_type){
+			case 1:c='-';break;
+			case 2:c='+';break;
+			case 3:c=' ';break;
+		}
+		if (c!=0u) _print_target_char(print_target,c);
+	}
+	for (unsigned int i=skip;i<10;i++){
+		_print_target_char(print_target,buf[i]);
+	}
+	if (has_width_or_precision & ((format_signals & PRINTF_FLAG_NEG)!=0)){
+		_print_sub1(print_target,len,sign_type,2,format_signals,width,precision);
+	}
 }
 
-void _put_sdeci(struct _print_target* print_target,long sv){
-	unsigned long uv=sv;
-	bool s = (sv&0x80000000)!=0;
-	unsigned long uvc=(uv^(s*0xFFFFFFFF))+s;
-	if (s) _print_target_char(print_target,'-');
-	_put_udeci(print_target,uvc);
-}
-
-void _putinthex(struct _print_target* print_target,unsigned int v){
-	for (unsigned int i=0;i<2u;i++){
-		unsigned int byte0=((char*)&v)[1u-i];
-		unsigned int digit0=(byte0>>4)&0xFu;
-		unsigned int digit1=(byte0>>0)&0xFu;
-		digit0=digit0+(digit0>=10u)*7u+48u;
-		digit1=digit1+(digit1>=10u)*7u+48u;
-		_print_target_char(print_target,digit0);
-		_print_target_char(print_target,digit1);
+// prints an unsigned integer in hexadecimal format
+void _print_sub6(struct _print_target* print_target, unsigned int value, unsigned int format_signals, unsigned int width, unsigned int precision){
+	if (format_signals & PRINTF_HAS_PRECISION){
+		format_signals &= ~PRINTF_FLAG_PADZERO; // it seems like having a precision specified will override zero pad
+	}
+	unsigned int buf[4];
+	buf[3]=((value >> 0u)&0xFu)+'0';
+	buf[2]=((value >> 4u)&0xFu)+'0';
+	buf[1]=((value >> 8u)&0xFu)+'0';
+	buf[0]=((value >>12u)&0xFu)+'0';
+	if (format_signals & PRINTF_SIG_UPPERCASE){
+		buf[3]+=('A' - ('9' + 1))*(buf[3]>(unsigned)(9 + '0'));
+		buf[2]+=('A' - ('9' + 1))*(buf[2]>(unsigned)(9 + '0'));
+		buf[1]+=('A' - ('9' + 1))*(buf[1]>(unsigned)(9 + '0'));
+		buf[0]+=('A' - ('9' + 1))*(buf[0]>(unsigned)(9 + '0'));
+	} else {
+		buf[3]+=('a' - ('9' + 1))*(buf[3]>(unsigned)(9 + '0'));
+		buf[2]+=('a' - ('9' + 1))*(buf[2]>(unsigned)(9 + '0'));
+		buf[1]+=('a' - ('9' + 1))*(buf[1]>(unsigned)(9 + '0'));
+		buf[0]+=('a' - ('9' + 1))*(buf[0]>(unsigned)(9 + '0'));
+	}
+	unsigned int skip=((((format_signals & PRINTF_HAS_PRECISION)!=0 & (precision==0u & value==0u)))!=0);
+	for (unsigned int i=0;i<3;i++){
+		if (buf[i]=='0') skip++;
+		else break;
+	}
+	unsigned int len=4u -skip;
+	unsigned int has_width_or_precision=((format_signals & PRINTF_HAS_PRECISION) | (format_signals & PRINTF_HAS_WIDTH))!=0;
+	if (has_width_or_precision){
+		_print_sub1(print_target,len,0,(format_signals & PRINTF_FLAG_NEG)!=0,format_signals,width,precision);
+	}
+	for (unsigned int i=skip;i<4;i++){
+		_print_target_char(print_target,buf[i]);
+	}
+	if (has_width_or_precision & ((format_signals & PRINTF_FLAG_NEG)!=0)){
+		_print_sub1(print_target,len,0,2,format_signals,width,precision);
 	}
 }
 
 
 void _print(struct _print_target* print_target,const char* format,va_list args){
-	while (1){
-		char c;
-		bool formatFinished;
-		bool formatTerminateByAnother;
-		bool formatTerminateByNull;
-		bool formatTerminateByExcess;
-		uint16_t formatState0=0;
-		uint16_t formatState1;
-		uint32_t val;
-		switch ((c=*(format++))){
-			case 0:
-			return;
-			case '%':
-			FormatStart:;
-			formatFinished=false;
-			formatState0=1;
-			formatState1=0;
-			formatTerminateByAnother=0;
-			formatTerminateByNull=0;
-			formatTerminateByExcess=0;
-			do {
-				switch ((c=*(format++))){
-					case 0:
-					formatFinished=1;
-					formatTerminateByNull=1;
-					break;
-					case '0':
-					case '1':
-					case '2':
-					case '3':
-					case '4':
-					case '5':
-					case '6':
-					case '7':
-					case '8':
-					case '9':
-					break;
-					case 'c':
-					formatState0=10;
-					formatFinished=1;
-					break;
-					case 'l':
-					formatState0+=2;
-					break;
-					case 'd':
-					formatFinished=1;
-					break;
-					case 'u':
-					formatState0+=1;
-					formatFinished=1;
-					break;
-					case 'x':
-					case 'X':
-					formatState0=7;
-					break;
-					case '%':
-					formatFinished=1;
-					if (formatState0==1){
-						formatState0=8;
-					} else {
-						formatTerminateByAnother=1;
-					}
-					break;
-					case 's':
-					formatFinished=1;
-					if (formatState0==1){
-						formatState0=9;
-					}
-					break;
-					default:
-					formatFinished=1;
-					formatTerminateByExcess=1;
-					break;
+	unsigned int c0;
+	while ((c0=*(format++))!=0){
+		if (c0!='%'){
+			_print_target_char(print_target,c0);
+		} else {
+			// %[flags][width][.precision][length]specifier
+			unsigned int format_signals=0;
+			unsigned int width=0;
+			unsigned int precision=0;
+			// flags
+			while (1){
+				switch ((c0=*(format++))){
+					case '-':format_signals |=PRINTF_FLAG_NEG;     break;
+					case '+':format_signals |=PRINTF_FLAG_PLUS;    break;
+					case '0':format_signals |=PRINTF_FLAG_PADZERO; break;
+					case ' ':format_signals |=PRINTF_FLAG_SPACE;   break;
+					// hash not supported
+					default:goto FlagsDone;
 				}
-			} while (!formatFinished);
-			switch (formatState0){
-				case 1:
-				case 2:
-				case 7:
-				case 10:
-				val=va_arg(args,unsigned int);
-				break;
-				case 3:
-				case 4:
-				case 9:
-				val=va_arg(args,unsigned long);
-				break;
 			}
-			switch (formatState0){
-				case 1:
-				val=(long)((int)val); // sign extend
-				case 3:
-				_put_sdeci(print_target,val);
+			FlagsDone:;
+			if (c0==0) return;
+			// width
+			if (c0=='*'){
+				int temp_width=0;
+				format_signals |=PRINTF_HAS_WIDTH;
+				temp_width=va_arg(args,int);
+				width=temp_width;
+				if (temp_width<0){
+					format_signals |=PRINTF_FLAG_NEG;// is the application of this flag correct?
+					width=-temp_width;
+				}
+				if ((c0=*(format++))==0) return;
+			} else {
+				while (c0>='0' & c0<='9'){
+					format_signals |=PRINTF_HAS_WIDTH;
+					width=width *10+(c0 -'0');
+					if ((c0=*(format++))==0) return;
+				}
+			}
+			// precision
+			if (c0=='.'){
+				format_signals |=PRINTF_HAS_PRECISION;
+				if ((c0=*(format++))==0) return;
+				if (c0=='*'){
+					int temp_precision=0;
+					temp_precision=va_arg(args,int);
+					precision=temp_precision;
+					if (temp_precision<0){
+						precision=-temp_precision;
+					}
+					if ((c0=*(format++))==0) return;
+				} else {
+					while (c0>='0' & c0<='9'){
+						precision=precision *10+(c0 -'0');
+						if ((c0=*(format++))==0) return;
+					}
+				}
+			}
+			unsigned int c1;
+			c1=*format;
+			// length
+			format_signals |=PRINTF_VAL_SIGNED; // default assignment. needed for `n` specifier
+			switch (c0){
+				case 'l':
+				if (c1=='l'){
+					// this should be long long, but that isn't supported right now
+					format_signals |=PRINTF_VAL_LONG;
+					if ((*(format++))==0) return;
+				} else {
+					format_signals |=PRINTF_VAL_LONG;
+				}
+				if ((c0=*(format++))==0) return;
 				break;
-				case 2:
-				case 4:
-				_put_udeci(print_target,val);
+				case 'h':
+				if (c1=='h'){
+					format_signals |=PRINTF_VAL_CHAR;
+					if ((*(format++))==0) return;
+				} else {
+					format_signals |=PRINTF_VAL_SHORT;
+				}
+				if ((c0=*(format++))==0) return;
 				break;
-				case 7:
-				_putinthex(print_target,val);
+				case 'z':
+				format_signals &= ~ PRINTF_VAL_SIGNED;
+				case 'j':
+				case 't':
+				format_signals |=PRINTF_VAL_LONG;
+				if ((c0=*(format++))==0) return;
 				break;
-				case 8:
+				//case 'L':break;//not supported
+				default:break;
+			}
+			if ((format_signals & PRINTF_FLAG_NEG) && (format_signals & PRINTF_FLAG_PADZERO)){
+				format_signals &= ~ PRINTF_FLAG_PADZERO; // left justify overrides zero padding if both are used
+			}
+			// specifier
+			switch (c0){
+				case '%':
 				_print_target_char(print_target,'%');
 				break;
-				case 9:
-				_putstr(print_target,(char*)val);
+				case 'd':
+				case 'i':
+				{
+				format_signals |=PRINTF_VAL_SIGNED;
+				if (format_signals & PRINTF_VAL_LONG){
+					long v=va_arg(args,long);
+					_print_sub5(print_target,PRINTF_REINTERP_TO_UNSIGN_LONG(v),format_signals,width,precision);
+				} else {
+					int v=va_arg(args,int);
+					_print_sub4(print_target,PRINTF_REINTERP_TO_UNSIGN_INT(v),format_signals,width,precision);
+				}
+				}
 				break;
-				case 10:
-				_print_target_char(print_target,val&255);
+				case 'u':
+				{
+				format_signals &= ~ PRINTF_VAL_SIGNED;
+				if (format_signals & PRINTF_VAL_LONG){
+					unsigned long v=va_arg(args,unsigned long);
+					_print_sub5(print_target,v,format_signals,width,precision);
+				} else {
+					unsigned int v=va_arg(args,unsigned int);
+					_print_sub4(print_target,v,format_signals,width,precision);
+				}
+				}
 				break;
+				case 'X':
+				format_signals |=PRINTF_SIG_UPPERCASE;
+				case 'x':
+				{
+				format_signals &= ~ PRINTF_VAL_SIGNED;
+				unsigned int v=va_arg(args,unsigned int);
+				_print_sub6(print_target,v,format_signals,width,precision);
+				}
+				break;
+				case 'c':
+				{
+				char v=va_arg(args,int);
+				_print_target_char(print_target,v);
+				}
+				break;
+				case 's':
+				{
+				const char* v=va_arg(args,const char*);
+				_print_sub3(print_target,v,format_signals,width,precision);
+				}
+				break;
+				case 'n':
+				{
+				void* v0=va_arg(args,void*);
+				if (format_signals & PRINTF_VAL_CHAR){
+					if (format_signals & PRINTF_VAL_SIGNED){
+						*((signed char*)v0)=print_target->writeCount;
+					} else {
+						*((unsigned char*)v0)=print_target->writeCount;
+					}
+				} else if (format_signals & PRINTF_VAL_SHORT){
+					if (format_signals & PRINTF_VAL_SIGNED){
+						*((signed short*)v0)=print_target->writeCount;
+					} else {
+						*((unsigned short*)v0)=print_target->writeCount;
+					}
+				} else if (format_signals & PRINTF_VAL_LONG){
+					if (format_signals & PRINTF_VAL_SIGNED){
+						*((signed long*)v0)=print_target->writeCount;
+					} else {
+						*((unsigned long*)v0)=print_target->writeCount;
+					}
+				} else {
+					if (format_signals & PRINTF_VAL_SIGNED){
+						*((signed int*)v0)=print_target->writeCount;
+					} else {
+						*((unsigned int*)v0)=print_target->writeCount;
+					}
+				}
+				}
+				break;
+				default:break;// either not supported or invalid
 			}
-			if (formatTerminateByNull) {
-				return;
-			}
-			if (formatTerminateByAnother) goto FormatStart;
-			if (formatTerminateByExcess) _print_target_char(print_target,c);
-			
-			break;
-			default:
-			_print_target_char(print_target,c);
-			break;
 		}
 	}
 }
+
+
 
 
 int vsprintf(char *dest, const char *format, va_list args){
@@ -2961,6 +3270,7 @@ uint16_t getTerminalCursorLimit(){
 		return n0*71u;
 	}
 }
+
 void _putchar_ensure_cursor_normal(){
 	uint8_t mode_info=*(volatile uint8_t*)(0x80804ffflu);
 	uint8_t font_height=(mode_info &15)+3;
@@ -3040,6 +3350,11 @@ void _putchar_screen(char c){
 			_terminalCharacterState.isAnsiEscapeOccuring=0;
 		} else {
 			_terminalCharacterState.ansiBuffer[l++]=c;
+			if (_terminalCharacterState.ansiBuffer[0]=='[' & _terminalCharacterState.ansiBuffer[1]=='1' & _terminalCharacterState.ansiBuffer[2]=='A'){
+				_terminalCharacterState.isAnsiEscapeOccuring=0;
+				unsigned n=(((*(volatile uint8_t*)(0x80804ffflu)&(1<<4))!=0)?80u:71u);
+				if (_terminalCharacterState.cursor>=n) _terminalCharacterState.cursor -=n;
+			}
 		}
 	} else if (c==27){
 		_terminalCharacterState.isAnsiEscapeOccuring=1;

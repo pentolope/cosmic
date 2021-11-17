@@ -26,11 +26,12 @@ typedef struct {
 
 typedef struct {
 	/*
-	The simulator's definitions (ab)use this struct as well, but those definitions use the values for other purposes.
+	The simulator's definitions (ab)use this struct as well, but those definitions may use the values for other purposes.
 	`buffPos` is used as a position marker
 	`buffType` is used to store the mode_id
 	`errFlags` has it's bit 0 used like normal (bit 0 is eof)
-	all other values are unused by the simulator. the simulator's definitions are less compliant to the standard.
+	`file_descriptor` if 0,1,2 then it is the true form of stdin,stdout,stderr respectively
+	all other values are unused by the simulator. the simulator's definitions are less compliant to the C and POSIX standards.
 	*/
 	
 	int file_descriptor; /* value represents: 
@@ -51,7 +52,12 @@ typedef struct {
 #ifdef __STD_REAL
 #ifdef __BUILDING_SIM_LOADER
 
-FILE __open_files[4]={[0].buffType=2,[1].buffType=6,[2].buffType=6};
+FILE __open_files[4]={
+	[0].buffType=2,[0].file_descriptor=0,
+	[1].buffType=6,[1].file_descriptor=1,
+	[2].buffType=6,[2].file_descriptor=2,
+	[3].file_descriptor=3
+};
 FILE* stdin =__open_files+0;
 FILE* stdout=__open_files+1;
 FILE* stderr=__open_files+2;
@@ -88,6 +94,7 @@ int fsetpos(FILE* inputFile,fpos_t* pos);
 unsigned long fread(void* buffer,unsigned long size,unsigned long count,FILE* file);
 unsigned long fwrite(const void* buffer,unsigned long size,unsigned long count,FILE* file);
 int feof(FILE* file);
+char* fgets(char* str,int num,FILE* file);
 
 // the functions below are not implemented in the simulator. attempting to use them there will result in a runtime error
 
@@ -114,6 +121,7 @@ extern int fsetpos(FILE* inputFile,fpos_t* pos);
 extern unsigned long fread(void* buffer,unsigned long size,unsigned long count,FILE* file);
 extern unsigned long fwrite(const void* buffer,unsigned long size,unsigned long count,FILE* file);
 extern int feof(FILE* file);
+extern char* fgets(char* str,int num,FILE* file);
 
 // the functions below are not implemented in the simulator. attempting to use them there will result in a runtime error
 
