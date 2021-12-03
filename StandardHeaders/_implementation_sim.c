@@ -181,15 +181,8 @@ void _putchar_ensure_cursor_normal(){
 	n1*=n2;
 	while (_terminalCharacterState.cursor>=n0){
 		_terminalCharacterState.cursor-=n2;
-		uint16_t i;
-		for (i=0;i<n1;i++){
-			const uint32_t a0=0x80800000lu+(i+ 0)*3lu;
-			const uint32_t a1=0x80800000lu+(i+n2)*3lu;
-			*(volatile uint8_t*)(a0+0)=*(volatile uint8_t*)(a1+0);
-			*(volatile uint8_t*)(a0+1)=*(volatile uint8_t*)(a1+1);
-			*(volatile uint8_t*)(a0+2)=*(volatile uint8_t*)(a1+2);
-		}
-		for (;i<n0;i++){
+		memmove((void*)(0x80800000lu),(void*)(0x80800000lu+n2 *3lu),n1 *3lu);
+		for (uint16_t i=n1;i<n0;i++){
 			const uint32_t a=0x80800000lu+i*3lu;
 			*(volatile uint8_t*)(a+0)=' ';
 			*(volatile uint8_t*)(a+1)=255;
