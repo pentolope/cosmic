@@ -250,107 +250,102 @@ typedef struct InstructionBuffer{
 } InstructionBuffer;
 
 
+// The following instructions cannot be calculated using this lookup table: I_ALCR,I_STOF,I_ZNXB
+static uint8_t instruction_id_to_backend_size[]={
+	[I_SYDB]=1,
+	[I_BYTE]=1,
+	[I_RET_]=2,
+	[I_PU1_]=2,
+	[I_PU2_]=2,
+	[I_PUA1]=2,
+	[I_PUA2]=2,
+	[I_POP1]=2,
+	[I_POP2]=2,
+	[I_CALL]=2,
+	[I_MULS]=2,
+	[I_MULL]=2,
+	[I_DIVM]=2,
+	[I_SHFT]=2,
+	[I_BSWP]=2,
+	[I_MOV_]=2,
+	[I_AND_]=2,
+	[I_OR__]=2,
+	[I_XOR_]=2,
+	[I_ADDN]=2,
+	[I_SSUB]=2,
+	[I_SUBN]=2,
+	[I_SUBC]=2,
+	[I_MWBN]=2,
+	[I_MRBN]=2,
+	[I_MWBV]=2,
+	[I_MRBV]=2,
+	[I_MWWN]=2,
+	[I_MRWN]=2,
+	[I_MWWV]=2,
+	[I_MRWV]=2,
+	[I_STWN]=2,
+	[I_STRN]=2,
+	[I_STWV]=2,
+	[I_STRV]=2,
+	[I_CJMP]=2,
+	[I_JJMP]=2,
+	[I_AJMP]=2,
+	[I_SYRB]=2,
+	[I_BL1_]=2,
+	[I_SYDW]=2,
+	[I_WORD]=2,
+	[I_SYRW]=4,
+	[I_RL1_]=4,
+	[I_STPS]=4,
+	[I_JTEN]=4,
+	[I_SYDD]=4,
+	[I_DWRD]=4,
+	[I_STPA]=6,
+	[I_ALOC]=6,
+	[I_LAD0]=6,
+	[I_LAD1]=6,
+	[I_LAD2]=6,
+	[I_LSU0]=6,
+	[I_RL2_]=8,
+	[I_SYRD]=8,
+	[I_SYDQ]=8,
+	[I_LAD3]=10,
+	[I_D32U]=14,
+	[I_R32U]=14,
+	[I_D32S]=14,
+	[I_R32S]=14,
+	[I_D64U]=14,
+	[I_D64S]=14,
+	[I_R64U]=14,
+	[I_R64S]=14,
+	[I_LAD4]=14,
+	[I_LAD5]=14,
+	[I_LSU4]=14,
+	[I_LSU5]=14,
+	[I_LMU4]=14,
+	[I_LMU5]=14,
+	[I_LDI4]=14,
+	[I_LDI5]=14,
+	[I_LLS6]=14,
+	[I_LLS7]=14,
+	[I_LRS6]=14,
+	[I_LRS7]=14,
+	[I_SYRQ]=16,
+	
+	[I_SYDE]=0 // to ensure length of array is sufficient
+};
 
 uint32_t backendInstructionSize(const InstructionSingle* IS){
-	switch (IS->id){
-		case I_SYDB:
-		case I_BYTE:
-		return 1;
-		case I_RET_:
-		case I_PU1_:
-		case I_PU2_:
-		case I_PUA1:
-		case I_PUA2:
-		case I_POP1:
-		case I_POP2:
-		case I_CALL:
-		case I_MULS:
-		case I_MULL:
-		case I_DIVM:
-		case I_SHFT:
-		case I_BSWP:
-		case I_MOV_:
-		case I_AND_:
-		case I_OR__:
-		case I_XOR_:
-		case I_ADDN:
-		case I_SSUB:
-		case I_SUBN:
-		case I_SUBC:
-		case I_MWBN:
-		case I_MRBN:
-		case I_MWBV:
-		case I_MRBV:
-		case I_MWWN:
-		case I_MRWN:
-		case I_MWWV:
-		case I_MRWV:
-		case I_STWN:
-		case I_STRN:
-		case I_STWV:
-		case I_STRV:
-		case I_CJMP:
-		case I_JJMP:
-		case I_AJMP:
-		case I_SYRB:
-		case I_BL1_:
-		case I_SYDW:
-		case I_WORD:
-		return 2;
-		case I_SYRW:
-		case I_RL1_:
-		case I_STPS:
-		case I_JTEN:
-		case I_SYDD:
-		case I_DWRD:
-		return 4;
-		case I_STPA:
-		case I_ALOC:
-		case I_LAD0:
-		case I_LAD1:
-		case I_LAD2:
-		case I_LSU0:
-		return 6;
-		case I_RL2_:
-		case I_SYRD:
-		case I_SYDQ:
-		return 8;
-		case I_LAD3:
-		return 10;
-		case I_D32U:
-		case I_R32U:
-		case I_D32S:
-		case I_R32S:
-		case I_D64U:
-		case I_D64S:
-		case I_R64U:
-		case I_R64S:
-		case I_LAD4:
-		case I_LAD5:
-		case I_LSU4:
-		case I_LSU5:
-		case I_LMU4:
-		case I_LMU5:
-		case I_LDI4:
-		case I_LDI5:
-		case I_LLS6:
-		case I_LLS7:
-		case I_LRS6:
-		case I_LRS7:
-		return 14;
-		case I_SYRQ:
-		return 16;
-		
-		case I_ALCR:return 4u+(((unsigned)IS->arg.BW.a_1&0xFF00u)!=0u)*2u;
-		case I_STOF:return 8u+(((unsigned)IS->arg.BW.a_1&0xFF00u)!=0u)*2u;
-		case I_ZNXB:return IS->arg.D.a_0;
-		
-		case I_LSU3:
-		case I_LMU3:
-		assert(false);// backend not ready for those instructions yet
-		default:;
+	if (IS->id==I_ALCR | IS->id==I_STOF | IS->id==I_ZNXB){
+		switch (IS->id){
+			case I_ALCR:return 4u+(((unsigned)IS->arg.BW.a_1&0xFF00u)!=0u)*2u;
+			case I_STOF:return 8u+(((unsigned)IS->arg.BW.a_1&0xFF00u)!=0u)*2u;
+			case I_ZNXB:return IS->arg.D.a_0;
+			
+			default:;// impossible to hit default
+		}
 	}
-	return 0;
+	return instruction_id_to_backend_size[IS->id];
 }
 
 
@@ -361,117 +356,24 @@ uint32_t backendInstructionSizeFromByteCode(const uint8_t* byteCode){
 	IS.id=byteCode[0];
 	if (IS.id==I_ALCR | IS.id==I_STOF | IS.id==I_ZNXB){
 		decompressInstruction(byteCode,&IS);
+		switch (IS.id){
+			case I_ALCR:return 4u+(((unsigned)IS.arg.BW.a_1&0xFF00u)!=0u)*2u;
+			case I_STOF:return 8u+(((unsigned)IS.arg.BW.a_1&0xFF00u)!=0u)*2u;
+			case I_ZNXB:return IS.arg.D.a_0;
+			
+			default:;// impossible to hit default
+		}
 	}
-	switch (IS.id){
-		case I_SYDB:
-		case I_BYTE:
-		return 1;
-		case I_RET_:
-		case I_PU1_:
-		case I_PU2_:
-		case I_PUA1:
-		case I_PUA2:
-		case I_POP1:
-		case I_POP2:
-		case I_CALL:
-		case I_MULS:
-		case I_MULL:
-		case I_DIVM:
-		case I_SHFT:
-		case I_BSWP:
-		case I_MOV_:
-		case I_AND_:
-		case I_OR__:
-		case I_XOR_:
-		case I_ADDN:
-		case I_SSUB:
-		case I_SUBN:
-		case I_SUBC:
-		case I_MWBN:
-		case I_MRBN:
-		case I_MWBV:
-		case I_MRBV:
-		case I_MWWN:
-		case I_MRWN:
-		case I_MWWV:
-		case I_MRWV:
-		case I_STWN:
-		case I_STRN:
-		case I_STWV:
-		case I_STRV:
-		case I_CJMP:
-		case I_JJMP:
-		case I_AJMP:
-		case I_SYRB:
-		case I_BL1_:
-		case I_SYDW:
-		case I_WORD:
-		return 2;
-		case I_SYRW:
-		case I_RL1_:
-		case I_STPS:
-		case I_JTEN:
-		case I_SYDD:
-		case I_DWRD:
-		return 4;
-		case I_STPA:
-		case I_ALOC:
-		case I_LAD0:
-		case I_LAD1:
-		case I_LAD2:
-		case I_LSU0:
-		return 6;
-		case I_RL2_:
-		case I_SYRD:
-		case I_SYDQ:
-		return 8;
-		case I_LAD3:
-		return 10;
-		case I_D32U:
-		case I_R32U:
-		case I_D32S:
-		case I_R32S:
-		case I_D64U:
-		case I_D64S:
-		case I_R64U:
-		case I_R64S:
-		case I_LAD4:
-		case I_LAD5:
-		case I_LSU4:
-		case I_LSU5:
-		case I_LMU4:
-		case I_LMU5:
-		case I_LDI4:
-		case I_LDI5:
-		case I_LLS6:
-		case I_LLS7:
-		case I_LRS6:
-		case I_LRS7:
-		return 14;
-		case I_SYRQ:
-		return 16;
-		
-		case I_ALCR:return 4u+(((unsigned)IS.arg.BW.a_1&0xFF00u)!=0u)*2u;
-		case I_STOF:return 8u+(((unsigned)IS.arg.BW.a_1&0xFF00u)!=0u)*2u;
-		case I_ZNXB:return IS.arg.D.a_0;
-		
-		case I_LSU3:
-		case I_LMU3:
-		assert(false);// backend not ready for those instructions yet
-		default:;
-	}
-	return 0;
+	return instruction_id_to_backend_size[IS.id];
 }
 
 #ifdef INCLUDE_BACKEND
 
 // symVal includes symbolic calculations,JTEN, and location of related label for things like D32U
 void backendInstructionWrite(uint8_t** byte,uint32_t symVal,uint16_t func_stack_size,uint8_t func_stack_initial,const InstructionSingle IS){
-	uint8_t b0=((unsigned)IS.arg.B2.a_0&0xFu)|(((unsigned)IS.arg.B2.a_1&0xFu)<<4);
-	uint8_t b1=((unsigned)IS.arg.B3.a_0&0xFu)|(((unsigned)IS.arg.B3.a_1&0xFu)<<4);
-	uint8_t b2=(unsigned)IS.arg.B3.a_2&0xFu;
 	uint16_t w;
-	InstructionSingle bh;// backend helper (to compose instructions from here)
+	uint16_t word[7];
+	uint16_t size=1;
 	switch (IS.id){
 		case I_NOP_:
 		case I_JEND:
@@ -538,98 +440,109 @@ void backendInstructionWrite(uint8_t** byte,uint32_t symVal,uint16_t func_stack_
 		case I_SYDB:*((*byte)++)=symVal;return;
 		case I_BYTE:*((*byte)++)=IS.arg.B1.a_0;return;
 		
-		case I_PU1_:case I_PUA1:*((*byte)++)=(unsigned)IS.arg.B1.a_0&0xFu;*((*byte)++)=0xF0;return;
-		case I_POP1:*((*byte)++)=IS.arg.B1.a_0&0xFu;*((*byte)++)=0xF2;return;
-		case I_PU2_:case I_PUA2:*((*byte)++)=b0;*((*byte)++)=0xF1;return;
-		case I_POP2:*((*byte)++)=b0;*((*byte)++)=0xF3;return;
-		case I_MOV_:*((*byte)++)=b0;*((*byte)++)=0xF4;return;
-		case I_BSWP:*((*byte)++)=b0;*((*byte)++)=0xF5;return;
-		case I_SHFT:*((*byte)++)=b0;*((*byte)++)=0xF6;return;
-		case I_MULS:*((*byte)++)=b0;*((*byte)++)=0xF7;return;
-		case I_MULL:*((*byte)++)=b0;*((*byte)++)=0xF8;return;
-		case I_DIVM:*((*byte)++)=b0;*((*byte)++)=0xF9;return;
-		case I_CALL:*((*byte)++)=b0;*((*byte)++)=0xFA;return;
-		case I_MRBN:case I_MRBV:*((*byte)++)=b0;*((*byte)++)=0xFC;return;
-		case I_MWBN:case I_MWBV:*((*byte)++)=b0;*((*byte)++)=0xFD;return;
-		case I_JJMP:*((*byte)++)=((unsigned)IS.arg.BBD.a_0&0xFu)|(((unsigned)IS.arg.BBD.a_1&0xFu)<<4);*((*byte)++)=0xFE;return;
-		case I_AJMP:*((*byte)++)=b0;*((*byte)++)=0xFE;return;
-		case I_RET_:*((*byte)++)=0;*((*byte)++)=0xFB;return;
-		case I_AND_:*((*byte)++)=b1;*((*byte)++)=0x40|b2;return;
-		case I_OR__:*((*byte)++)=b1;*((*byte)++)=0x50|b2;return;
-		case I_XOR_:*((*byte)++)=b1;*((*byte)++)=0x60|b2;return;
-		case I_SSUB:*((*byte)++)=b1;*((*byte)++)=0x70|b2;return;
-		case I_MRWN:case I_MRWV:*((*byte)++)=b1;*((*byte)++)=0x80|b2;return;
-		case I_MWWN:case I_MWWV:*((*byte)++)=b1;*((*byte)++)=0x90|b2;return;
-		case I_ADDN:*((*byte)++)=b1;*((*byte)++)=0xA0|b2;return;
-		case I_SUBN:*((*byte)++)=b1;*((*byte)++)=0xC0|b2;return;
-		case I_SUBC:*((*byte)++)=b1;*((*byte)++)=0xD0|b2;return;
-		case I_CJMP:*((*byte)++)=b1;*((*byte)++)=0xE0|b2;return;
+		case I_PU1_:case I_PUA1:word[0]=0xF000u |((unsigned)IS.arg.B1.a_0&0xFu);break;
+		case I_POP1:word[0]=0xF200u |((unsigned)IS.arg.B1.a_0&0xFu);break;
+		case I_PU2_:case I_PUA2:word[0]=0xF100u | (((unsigned)IS.arg.B2.a_1&0xFu)<<4) | ((unsigned)IS.arg.B2.a_0&0xFu);break;
+		case I_POP2:word[0]=0xF300u | (((unsigned)IS.arg.B2.a_1&0xFu)<<4) | ((unsigned)IS.arg.B2.a_0&0xFu);break;
+		case I_MOV_:word[0]=0xF400u | (((unsigned)IS.arg.B2.a_1&0xFu)<<4) | ((unsigned)IS.arg.B2.a_0&0xFu);break;
+		case I_BSWP:word[0]=0xF500u | (((unsigned)IS.arg.B2.a_1&0xFu)<<4) | ((unsigned)IS.arg.B2.a_0&0xFu);break;
+		case I_SHFT:word[0]=0xF600u | (((unsigned)IS.arg.B2.a_1&0xFu)<<4) | ((unsigned)IS.arg.B2.a_0&0xFu);break;
+		case I_MULS:word[0]=0xF700u | (((unsigned)IS.arg.B2.a_1&0xFu)<<4) | ((unsigned)IS.arg.B2.a_0&0xFu);break;
+		case I_MULL:word[0]=0xF800u | (((unsigned)IS.arg.B2.a_1&0xFu)<<4) | ((unsigned)IS.arg.B2.a_0&0xFu);break;
+		case I_DIVM:word[0]=0xF900u | (((unsigned)IS.arg.B2.a_1&0xFu)<<4) | ((unsigned)IS.arg.B2.a_0&0xFu);break;
+		case I_CALL:word[0]=0xFA00u | (((unsigned)IS.arg.B2.a_1&0xFu)<<4) | ((unsigned)IS.arg.B2.a_0&0xFu);break;
+		case I_MRBN:case I_MRBV:word[0]=0xFC00u | (((unsigned)IS.arg.B2.a_1&0xFu)<<4) | ((unsigned)IS.arg.B2.a_0&0xFu);break;
+		case I_MWBN:case I_MWBV:word[0]=0xFD00u | (((unsigned)IS.arg.B2.a_1&0xFu)<<4) | ((unsigned)IS.arg.B2.a_0&0xFu);break;
+		case I_JJMP:word[0]=0xFE00u | ((unsigned)IS.arg.BBD.a_0&0xFu) | (((unsigned)IS.arg.BBD.a_1&0xFu)<<4);break;
+		case I_AJMP:word[0]=0xFE00u | (((unsigned)IS.arg.B2.a_1&0xFu)<<4) | ((unsigned)IS.arg.B2.a_0&0xFu);break;
+		case I_RET_:word[0]=0xFB00u;break;
+		case I_AND_:word[0]=0x4000u | (((unsigned)IS.arg.B3.a_2&0xFu)<<8) | (((unsigned)IS.arg.B3.a_1&0xFu)<<4) | ((unsigned)IS.arg.B3.a_0&0xFu);break;
+		case I_OR__:word[0]=0x5000u | (((unsigned)IS.arg.B3.a_2&0xFu)<<8) | (((unsigned)IS.arg.B3.a_1&0xFu)<<4) | ((unsigned)IS.arg.B3.a_0&0xFu);break;
+		case I_XOR_:word[0]=0x6000u | (((unsigned)IS.arg.B3.a_2&0xFu)<<8) | (((unsigned)IS.arg.B3.a_1&0xFu)<<4) | ((unsigned)IS.arg.B3.a_0&0xFu);break;
+		case I_SSUB:word[0]=0x7000u | (((unsigned)IS.arg.B3.a_2&0xFu)<<8) | (((unsigned)IS.arg.B3.a_1&0xFu)<<4) | ((unsigned)IS.arg.B3.a_0&0xFu);break;
+		case I_MRWN:case I_MRWV:word[0]=0x8000u | (((unsigned)IS.arg.B3.a_2&0xFu)<<8) | (((unsigned)IS.arg.B3.a_1&0xFu)<<4) | ((unsigned)IS.arg.B3.a_0&0xFu);break;
+		case I_MWWN:case I_MWWV:word[0]=0x9000u | (((unsigned)IS.arg.B3.a_2&0xFu)<<8) | (((unsigned)IS.arg.B3.a_1&0xFu)<<4) | ((unsigned)IS.arg.B3.a_0&0xFu);break;
+		case I_ADDN:word[0]=0xA000u | (((unsigned)IS.arg.B3.a_2&0xFu)<<8) | (((unsigned)IS.arg.B3.a_1&0xFu)<<4) | ((unsigned)IS.arg.B3.a_0&0xFu);break;
+		case I_SUBN:word[0]=0xC000u | (((unsigned)IS.arg.B3.a_2&0xFu)<<8) | (((unsigned)IS.arg.B3.a_1&0xFu)<<4) | ((unsigned)IS.arg.B3.a_0&0xFu);break;
+		case I_SUBC:word[0]=0xD000u | (((unsigned)IS.arg.B3.a_2&0xFu)<<8) | (((unsigned)IS.arg.B3.a_1&0xFu)<<4) | ((unsigned)IS.arg.B3.a_0&0xFu);break;
+		case I_CJMP:word[0]=0xE000u | (((unsigned)IS.arg.B3.a_2&0xFu)<<8) | (((unsigned)IS.arg.B3.a_1&0xFu)<<4) | ((unsigned)IS.arg.B3.a_0&0xFu);break;
 		
-		case I_SYRB:*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|((unsigned)IS.arg.B1.a_0&0xFu);*((*byte)++)=(((unsigned)symVal>>4)&0xFu);return;
-		case I_BL1_:*((*byte)++)=(((unsigned)IS.arg.B2.a_1&0xFu)<<4)|((unsigned)IS.arg.B2.a_0&0xFu);*((*byte)++)=(((unsigned)IS.arg.B2.a_1>>4)&0xFu);return;
-		case I_STRN:case I_STRV:*((*byte)++)=(((unsigned)IS.arg.B2.a_1&0xFu)<<4)|((unsigned)IS.arg.B2.a_0&0xFu);*((*byte)++)=0x20u|(((unsigned)IS.arg.B2.a_1>>4)&0xFu);return;
-		case I_STWN:case I_STWV:*((*byte)++)=(((unsigned)IS.arg.B2.a_1&0xFu)<<4)|((unsigned)IS.arg.B2.a_0&0xFu);*((*byte)++)=0x30u|(((unsigned)IS.arg.B2.a_1>>4)&0xFu);return;
+		case I_SYRB:word[0]=((((unsigned)symVal)&0xFFu)<<4)|((unsigned)IS.arg.B1.a_0&0xFu);break;
+		case I_BL1_:word[0]=((((unsigned)IS.arg.B2.a_1)&0xFFu)<<4)|((unsigned)IS.arg.B2.a_0&0xFu);break;
+		case I_STRN:case I_STRV:word[0]=0x2000u |(((((unsigned)IS.arg.B2.a_1)&0xFFu))<<4)|((unsigned)IS.arg.B2.a_0&0xFu);break;
+		case I_STWN:case I_STWV:word[0]=0x3000u |(((((unsigned)IS.arg.B2.a_1)&0xFFu))<<4)|((unsigned)IS.arg.B2.a_0&0xFu);break;
 		
-		case I_SYDW:*((*byte)++)=symVal;*((*byte)++)=(unsigned)symVal>>8;return;
-		case I_WORD:*((*byte)++)=IS.arg.W.a_0;*((*byte)++)=(unsigned)IS.arg.W.a_0>>8;return;
+		case I_SYDW:word[0]=symVal;break;
+		case I_WORD:word[0]=IS.arg.W.a_0;break;
 		
 		case I_SYRW:
-		*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|((unsigned)IS.arg.B1.a_0&0xFu);*((*byte)++)=(((unsigned)symVal>>4)&0xFu);
-		*((*byte)++)=(((unsigned)symVal>>4)&0xF0u)|((unsigned)IS.arg.B1.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)symVal>>12)&0xFu);
-		return;
+		word[0]=        (((unsigned)symVal&0xFFu  )<<4)|((unsigned)IS.arg.B1.a_0&0xFu);
+		word[1]=0x1000u|(((unsigned)symVal&0xFF00u)>>4)|((unsigned)IS.arg.B1.a_0&0xFu);
+		size=2;
+		break;
 		case I_RL1_:
-		*((*byte)++)=(((unsigned)IS.arg.BW.a_1&0xFu)<<4)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xFu);
-		*((*byte)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xF0u)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)IS.arg.BW.a_1>>12)&0xFu);
-		return;
+		word[0]=        (((unsigned)IS.arg.BW.a_1&0xFFu  )<<4)|((unsigned)IS.arg.BW.a_0&0xFu);
+		word[1]=0x1000u|(((unsigned)IS.arg.BW.a_1&0xFF00u)>>4)|((unsigned)IS.arg.BW.a_0&0xFu);
+		size=2;
+		break;
 		case I_STPS:
 		w=func_stack_size-IS.arg.BW.a_1;
-		*((*byte)++)=(((unsigned)w&0xFu)<<4)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=(((unsigned)w>>4)&0xFu);
-		*((*byte)++)=(((unsigned)IS.arg.BW.a_0<<4)&0xF0u)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=0xA1;
-		return;
+		word[0]=         ((((unsigned)w)&0xFFu)<<4)|((unsigned)IS.arg.BW.a_0&0xFu);
+		word[1]=0xA100u |(((unsigned)IS.arg.BW.a_0<<4)&0xF0u)|((unsigned)IS.arg.BW.a_0&0xFu);
+		size=2;
+		break;
 		
-		case I_JTEN:case I_SYDD:*((*byte)++)=symVal;*((*byte)++)=(unsigned)symVal>>8;*((*byte)++)=symVal>>16;*((*byte)++)=symVal>>24;return;
-		case I_DWRD:*((*byte)++)=IS.arg.D.a_0;*((*byte)++)=(unsigned)IS.arg.D.a_0>>8;*((*byte)++)=IS.arg.D.a_0>>16;*((*byte)++)=IS.arg.D.a_0>>24;return;
-		return;
+		case I_JTEN:case I_SYDD:
+		word[0]=symVal;
+		word[1]=symVal >>16;
+		size=2;
+		break;
+		case I_DWRD:
+		word[0]=IS.arg.D.a_0;
+		word[1]=IS.arg.D.a_0 >>16;
+		size=2;
+		break;
 		case I_STPA:
-		w=func_stack_size-IS.arg.BW.a_1;
-		*((*byte)++)=(((unsigned)w&0xFu)<<4)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=(((unsigned)w>>4)&0xFu);
-		*((*byte)++)=(((unsigned)w>>4)&0xF0u)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)w>>12)&0xFu);
-		*((*byte)++)=(((unsigned)IS.arg.BW.a_0<<4)&0xF0u)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=0xA1;
-		return;
+		w=func_stack_size - IS.arg.BW.a_1;
+		word[0]=        ((((unsigned)w)&0xFFu  )<<4)|((unsigned)IS.arg.BW.a_0&0xFu);
+		word[1]=0x1000u|((((unsigned)w)&0xFF00u)>>4)|((unsigned)IS.arg.BW.a_0&0xFu);
+		word[2]=0xA100u |(((unsigned)IS.arg.BW.a_0<<4)&0xF0u)|((unsigned)IS.arg.BW.a_0&0xFu);
+		size=3;
+		break;
 		case I_ALOC:
-		w=func_stack_size-func_stack_initial;
-		*((*byte)++)=(((unsigned)w&0xFu)<<4)|1u;*((*byte)++)=(((unsigned)w>>4)&0xFu);
-		*((*byte)++)=(((unsigned)w>>4)&0xF0u)|1u;*((*byte)++)=0x10u|(((unsigned)w>>12)&0xFu);
-		*((*byte)++)=1;*((*byte)++)=0xFF;
-		return;
+		w=func_stack_size - func_stack_initial;
+		word[0]=        (((unsigned)w&0xFFu  )<<4)|1u;
+		word[1]=0x1000u|(((unsigned)w&0xFF00u)>>4)|1u;
+		word[2]=0xFF01;
+		size=3;
+		break;
 		case I_RL2_:
-		w=IS.arg.BBD.a_2>>16;
-		*((*byte)++)=(((unsigned)IS.arg.BBD.a_2&0xFu)<<4)|((unsigned)IS.arg.BBD.a_0&0xFu);*((*byte)++)=(((unsigned)IS.arg.BBD.a_2>>4)&0xFu);
-		*((*byte)++)=(((unsigned)w&0xFu)<<4)|((unsigned)IS.arg.BBD.a_1&0xFu);*((*byte)++)=(((unsigned)w>>4)&0xFu);
-		*((*byte)++)=(((unsigned)IS.arg.BBD.a_2>>4)&0xF0u)|((unsigned)IS.arg.BBD.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)IS.arg.BBD.a_2>>12)&0xFu);
-		*((*byte)++)=(((unsigned)w>>4)&0xF0u)|((unsigned)IS.arg.BBD.a_1&0xFu);*((*byte)++)=0x10u|(((unsigned)w>>12)&0xFu);
-		return;
+		word[0]=        (unsigned)((IS.arg.BBD.a_2&0xFFlu      )<< 4)|((unsigned)IS.arg.BW.a_0&0xFu);
+		word[1]=        (unsigned)((IS.arg.BBD.a_2&0xFF0000lu  )>>12)|((unsigned)IS.arg.BW.a_1&0xFu);
+		word[2]=0x1000u|(unsigned)((IS.arg.BBD.a_2&0xFF00lu    )>> 4)|((unsigned)IS.arg.BW.a_0&0xFu);
+		word[3]=0x1000u|(unsigned)((IS.arg.BBD.a_2&0xFF000000lu)>>20)|((unsigned)IS.arg.BW.a_1&0xFu);
+		size=4;
+		break;
 		case I_SYRD:
-		w=symVal>>16;
-		*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|((unsigned)IS.arg.B2.a_0&0xFu);*((*byte)++)=(((unsigned)symVal>>4)&0xFu);
-		*((*byte)++)=(((unsigned)w&0xFu)<<4)|((unsigned)IS.arg.B2.a_1&0xFu);*((*byte)++)=(((unsigned)w>>4)&0xFu);
-		*((*byte)++)=(((unsigned)symVal>>4)&0xF0u)|((unsigned)IS.arg.B2.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)symVal>>12)&0xFu);
-		*((*byte)++)=(((unsigned)w>>4)&0xF0u)|((unsigned)IS.arg.B2.a_1&0xFu);*((*byte)++)=0x10u|(((unsigned)w>>12)&0xFu);
-		return;
+		word[0]=        (unsigned)((symVal&0xFFlu      )<< 4)|((unsigned)IS.arg.B2.a_0&0xFu);
+		word[1]=        (unsigned)((symVal&0xFF0000lu  )>>12)|((unsigned)IS.arg.B2.a_1&0xFu);
+		word[2]=0x1000u|(unsigned)((symVal&0xFF00lu    )>> 4)|((unsigned)IS.arg.B2.a_0&0xFu);
+		word[3]=0x1000u|(unsigned)((symVal&0xFF000000lu)>>20)|((unsigned)IS.arg.B2.a_1&0xFu);
+		size=4;
+		break;
 		case I_D32U:
 		case I_R32U:
 		case I_D32S:
 		case I_R32S:
-		*((*byte)++)=0xA;*((*byte)++)=0;*((*byte)++)=0xA;*((*byte)++)=0xF0;
-		
-		*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|0xAu;*((*byte)++)=(((unsigned)symVal>>4)&0xFu);
-		*((*byte)++)=(((unsigned)symVal>>4)&0xF0u)|0xAu;*((*byte)++)=0x10u|(((unsigned)symVal>>12)&0xFu);
-		w=symVal>>16;
-		*((*byte)++)=(((unsigned)w&0xFu)<<4)|0xBu;*((*byte)++)=(((unsigned)w>>4)&0xFu);
-		*((*byte)++)=(((unsigned)w>>4)&0xF0u)|0xBu;*((*byte)++)=0x10u|(((unsigned)w>>12)&0xFu);
-		
-		*((*byte)++)=0xBA;*((*byte)++)=0xFA;
-		return;
+		word[0]=0x000Au;
+		word[1]=0xF00Au;
+		word[2]=0x000Au|(unsigned)((symVal&0xFFlu      )<< 4);
+		word[3]=0x000Bu|(unsigned)((symVal&0xFF0000lu  )>>12);
+		word[4]=0x100Au|(unsigned)((symVal&0xFF00lu    )>> 4);
+		word[5]=0x100Bu|(unsigned)((symVal&0xFF000000lu)>>20);
+		word[6]=0xFABAu;
+		size=7;
+		break;
 		case I_D64U:
 		case I_R64U:
 		case I_D64S:
@@ -646,259 +559,236 @@ void backendInstructionWrite(uint8_t** byte,uint32_t symVal,uint16_t func_stack_
 		case I_LLS7:
 		case I_LRS6:
 		case I_LRS7:
-		*((*byte)++)=0x2;*((*byte)++)=0;*((*byte)++)=0x2;*((*byte)++)=0xF0;
-		
-		*((*byte)++)=(((unsigned)symVal&0xFu)<<4)|0x2u;*((*byte)++)=(((unsigned)symVal>>4)&0xFu);
-		*((*byte)++)=(((unsigned)symVal>>4)&0xF0u)|0x2u;*((*byte)++)=0x10u|(((unsigned)symVal>>12)&0xFu);
-		w=symVal>>16;
-		*((*byte)++)=(((unsigned)w&0xFu)<<4)|0x3u;*((*byte)++)=(((unsigned)w>>4)&0xFu);
-		*((*byte)++)=(((unsigned)w>>4)&0xF0u)|0x3u;*((*byte)++)=0x10u|(((unsigned)w>>12)&0xFu);
-		
-		*((*byte)++)=0x32;*((*byte)++)=0xFA;
-		return;
+		word[0]=0x0002u;
+		word[1]=0xF002u;
+		word[2]=0x0002u|(unsigned)((symVal&0xFFlu      )<< 4);
+		word[3]=0x0003u|(unsigned)((symVal&0xFF0000lu  )>>12);
+		word[4]=0x1002u|(unsigned)((symVal&0xFF00lu    )>> 4);
+		word[5]=0x1003u|(unsigned)((symVal&0xFF000000lu)>>20);
+		word[6]=0xFA32u;
+		size=7;
+		break;
 		case I_ALCR:
-		*((*byte)++)=(((unsigned)IS.arg.BW.a_1&0xFu)<<4)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xFu);
+		word[0]=(((unsigned)IS.arg.BW.a_1&0xFFu)<<4)|((unsigned)IS.arg.BW.a_0&0xFu);
 		if ((((unsigned)IS.arg. BW.a_1&0xFF00u)!=0u)){
-			*((*byte)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xF0u)|((unsigned)IS.arg.BW.a_0&0xFu);*((*byte)++)=0x10u|(((unsigned)IS.arg.BW.a_1>>12)&0xFu);
+			word[1]=0x1000u|(((unsigned)IS.arg.BW.a_1&0xFF00u)>>4)|((unsigned)IS.arg.BW.a_0&0xFu);
+			word[2]=0xFF00u|((unsigned)IS.arg.BW.a_0&0xFu);
+			size=3;
+		} else {
+			word[1]=0xFF00u|((unsigned)IS.arg.BW.a_0&0xFu);
+			size=2;
 		}
-		*((*byte)++)=(unsigned)IS.arg.BW.a_0&0xFu;*((*byte)++)=0xFF;
-		return;
+		break;
 		case I_STOF:
-		*((*byte)++)=0xFu;*((*byte)++)=0;
-		*((*byte)++)=0xFu;*((*byte)++)=0xFF;
+		word[0]=0x000Fu;
+		word[1]=0xFF0Fu;
 		w=(unsigned)IS.arg.BW.a_0&0xFu;
-		*((*byte)++)=(((unsigned)IS.arg.BW.a_1&0xFu)<<4)|((unsigned)w);*((*byte)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xFu);
+		word[2]=(((unsigned)IS.arg.BW.a_1&0xFFu)<<4)|w;
 		if (((unsigned)IS.arg.BW.a_1&0xFF00u)!=0u){
-			*((*byte)++)=(((unsigned)IS.arg.BW.a_1>>4)&0xF0u)|((unsigned)w);*((*byte)++)=0x10u|(((unsigned)IS.arg.BW.a_1>>12)&0xFu);
+			word[3]=0x1000u|(((unsigned)IS.arg.BW.a_1&0xFF00u)>>4)|w;
+			word[4]=0xAF00u|(unsigned)w|((unsigned)w<<4);
+			size=5;
+		} else {
+			word[3]=0xAF00u|(unsigned)w|((unsigned)w<<4);
+			size=4;
 		}
-		*((*byte)++)=(unsigned)w|((unsigned)w<<4);*((*byte)++)=0xAFu;
-		return;
+		break;
 		case I_ZNXB:
-		for (uint32_t i=0;i<IS.arg.D.a_0;i++){
-			*((*byte)++)=0;
-		}
+		memset((*byte),0,IS.arg.D.a_0);
+		(*byte)+=IS.arg.D.a_0;
 		return;
 		case I_LAD0:
-		*((*byte)++)=0xFu;*((*byte)++)=0;
-		*((*byte)++)=(((unsigned)IS.arg.B6.a_2&0xFu)<<4)|((unsigned)IS.arg.B6.a_0&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B6.a_4&0xFu);
-		*((*byte)++)=(((unsigned)IS.arg.B6.a_3&0xFu)<<4)|((unsigned)IS.arg.B6.a_1&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B6.a_5&0xFu);
-		//Explanation: *((*byte)++)=(((unsigned) r1 &0xFu)<<4)|((unsigned) r0 &0xFu);*((*byte)++)=0xB0u|((unsigned) r2 &0xFu);
-		return;
+		word[0]=0x000Fu;
+		word[1]=0xB000u|(((unsigned)IS.arg.B6.a_4&0xFu)<<8)|(((unsigned)IS.arg.B6.a_2&0xFu)<<4)|((unsigned)IS.arg.B6.a_0&0xFu);
+		word[2]=0xB000u|(((unsigned)IS.arg.B6.a_5&0xFu)<<8)|(((unsigned)IS.arg.B6.a_3&0xFu)<<4)|((unsigned)IS.arg.B6.a_1&0xFu);
+		//Explanation: 0xB000u|(((unsigned) r2 &0xFu)<<8)|(((unsigned) r1 &0xFu)<<4)|((unsigned) r0 &0xFu);
+		size=3;
+		break;
 		case I_LAD1:
-		*((*byte)++)=0xFu;*((*byte)++)=0;
-		*((*byte)++)=(((unsigned)IS.arg.B5.a_2&0xFu)<<4)|((unsigned)IS.arg.B5.a_0&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B5.a_4&0xFu);
-		bh.id=I_ADDN;
-		bh.arg.B3.a_0=IS.arg.B5.a_1;
-		bh.arg.B3.a_1=IS.arg.B5.a_3;
-		bh.arg.B3.a_2=15;
-		backendInstructionWrite(byte,0,0,0,bh);
-		return;
+		word[0]=0x000Fu;
+		word[1]=0xB000u|(((unsigned)IS.arg.B5.a_4&0xFu)<<8)|(((unsigned)IS.arg.B5.a_2&0xFu)<<4)|((unsigned)IS.arg.B5.a_0&0xFu);
+		word[2]=0xAF00u|(((unsigned)IS.arg.B5.a_3&0xFu)<<4)|((unsigned)IS.arg.B5.a_1&0xFu);
+		size=3;
+		break;
 		case I_LAD2:
-		*((*byte)++)=0xFu;*((*byte)++)=0;
-		*((*byte)++)=(((unsigned)IS.arg.B4.a_2&0xFu)<<4)|((unsigned)IS.arg.B4.a_0&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B4.a_3&0xFu);
-		bh.id=I_MOV_;
-		bh.arg.B2.a_0=IS.arg.B4.a_1;
-		bh.arg.B2.a_1=15;
-		backendInstructionWrite(byte,0,0,0,bh);
-		return;
+		word[0]=0x000Fu;
+		word[1]=0xB000u|(((unsigned)IS.arg.B4.a_3&0xFu)<<8)|(((unsigned)IS.arg.B4.a_2&0xFu)<<4)|((unsigned)IS.arg.B4.a_0&0xFu);
+		word[2]=0xF4F0u|((unsigned)IS.arg.B4.a_1&0xFu);
+		size=3;
+		break;
 		case I_LSU0:
-		bh.id=I_BL1_;
-		bh.arg.B2.a_0=15;
-		bh.arg.B2.a_1=1;
-		backendInstructionWrite(byte,0,0,0,bh);
-		bh.id=I_SSUB;
-		bh.arg.B3.a_0=15;
-		bh.arg.B3.a_1=IS.arg.B4.a_0;
-		bh.arg.B3.a_2=IS.arg.B4.a_2;
-		backendInstructionWrite(byte,0,0,0,bh);
-		bh.id=I_SSUB;
-		bh.arg.B3.a_0=15;
-		bh.arg.B3.a_1=IS.arg.B4.a_1;
-		bh.arg.B3.a_2=IS.arg.B4.a_3;
-		backendInstructionWrite(byte,0,0,0,bh);
-		return;
+		word[0]=0x001Fu;
+		word[1]=0x700Fu|(((unsigned)IS.arg.B4.a_2&0xFu)<<8)|(((unsigned)IS.arg.B4.a_0&0xFu)<<4);
+		word[2]=0x700Fu|(((unsigned)IS.arg.B4.a_3&0xFu)<<8)|(((unsigned)IS.arg.B4.a_1&0xFu)<<4);
+		size=3;
+		break;
 		case I_LAD3:
-		*((*byte)++)=0xFu;*((*byte)++)=0;
-		*((*byte)++)=(((unsigned)IS.arg.B8.a_0&0xFu)<<4)|((unsigned)IS.arg.B8.a_0&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B8.a_4&0xFu);
-		*((*byte)++)=(((unsigned)IS.arg.B8.a_1&0xFu)<<4)|((unsigned)IS.arg.B8.a_1&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B8.a_5&0xFu);
-		*((*byte)++)=(((unsigned)IS.arg.B8.a_2&0xFu)<<4)|((unsigned)IS.arg.B8.a_2&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B8.a_6&0xFu);
-		*((*byte)++)=(((unsigned)IS.arg.B8.a_3&0xFu)<<4)|((unsigned)IS.arg.B8.a_3&0xFu);*((*byte)++)=0xB0u|((unsigned)IS.arg.B8.a_7&0xFu);
-		return;
+		word[0]=0x000Fu;
+		word[1]=0xB000u|(((unsigned)IS.arg.B8.a_4&0xFu)<<8)|(((unsigned)IS.arg.B8.a_0&0xFu)<<4)|((unsigned)IS.arg.B8.a_0&0xFu);
+		word[2]=0xB000u|(((unsigned)IS.arg.B8.a_5&0xFu)<<8)|(((unsigned)IS.arg.B8.a_1&0xFu)<<4)|((unsigned)IS.arg.B8.a_1&0xFu);
+		word[3]=0xB000u|(((unsigned)IS.arg.B8.a_6&0xFu)<<8)|(((unsigned)IS.arg.B8.a_2&0xFu)<<4)|((unsigned)IS.arg.B8.a_2&0xFu);
+		word[4]=0xB000u|(((unsigned)IS.arg.B8.a_7&0xFu)<<8)|(((unsigned)IS.arg.B8.a_3&0xFu)<<4)|((unsigned)IS.arg.B8.a_3&0xFu);
+		size=5;
+		break;
 		default:;
+		assert(false); // invalid operator id
+		exit(1);
 	}
-	assert(false); // invalid operator id
-	exit(1);
+	memcpy(*byte,word,size *2);
+	*byte+=size *2;
 }
 #endif //ifdef INCLUDE_BACKEND
 
+static uint8_t instruction_id_to_content_catagory[]={
+	[I_NOP_]=0,
+	[I_FCEN]=1,
+	[I_RET_]=1,
+	[I_ALOC]=1,
+	[I_D32U]=1,
+	[I_R32U]=1,
+	[I_D32S]=1,
+	[I_R32S]=1,
+	[I_D64U]=1,
+	[I_R64U]=1,
+	[I_D64S]=1,
+	[I_R64S]=1,
+	[I_LAD4]=1,
+	[I_LAD5]=1,
+	[I_LSU4]=1,
+	[I_LSU5]=1,
+	[I_LMU4]=1,
+	[I_LMU5]=1,
+	[I_LDI4]=1,
+	[I_LDI5]=1,
+	[I_LLS6]=1,
+	[I_LLS7]=1,
+	[I_LRS6]=1,
+	[I_LRS7]=1,
+	[I_JEND]=1,
+	[I_SYRE]=1,
+	[I_SYDB]=1,
+	[I_SYDW]=1,
+	[I_SYDD]=1,
+	[I_SYDQ]=1,
+	[I_SYDE]=1,
+	[I_SYW0]=1,
+	[I_SYW1]=1,
+	[I_SYW2]=1,
+	[I_SYW3]=1,
+	[I_SYW4]=1,
+	[I_SYW5]=1,
+	[I_SYW6]=1,
+	[I_SYW7]=1,
+	[I_SYW8]=1,
+	[I_SYW9]=1,
+	[I_SBLW]=1,
+	[I_SBRW]=1,
+	[I_SYD0]=1,
+	[I_SYD1]=1,
+	[I_SYD2]=1,
+	[I_SYD3]=1,
+	[I_SYD4]=1,
+	[I_SYD5]=1,
+	[I_SYD6]=1,
+	[I_SYD7]=1,
+	[I_SYD8]=1,
+	[I_SYD9]=1,
+	[I_SBLD]=1,
+	[I_SBRD]=1,
+	[I_SYQ0]=1,
+	[I_SYQ1]=1,
+	[I_SYQ2]=1,
+	[I_SYQ3]=1,
+	[I_SYQ4]=1,
+	[I_SYQ5]=1,
+	[I_SYQ6]=1,
+	[I_SYQ7]=1,
+	[I_SYQ8]=1,
+	[I_SYQ9]=1,
+	[I_SBLQ]=1,
+	[I_SBRQ]=1,
+	[I_SCBW]=1,
+	[I_SCWD]=1,
+	[I_SCZD]=1,
+	[I_SCDQ]=1,
+	[I_SCZQ]=1,
+	[I_SCQD]=1,
+	[I_SCDW]=1,
+	[I_SCWB]=1,
+	[I_SCDB]=1,
+	[I_SCQB]=1,
+	[I_PU1_]=2,
+	[I_PUA1]=2,
+	[I_POP1]=2,
+	[I_SYRB]=2,
+	[I_SYRW]=2,
+	[I_PHIS]=2,
+	[I_PHIE]=2,
+	[I_BYTE]=3,
+	[I_SYCB]=3,
+	[I_PU2_]=4,
+	[I_PUA2]=4,
+	[I_POP2]=4,
+	[I_CALL]=4,
+	[I_AJMP]=4,
+	[I_MULS]=4,
+	[I_MULL]=4,
+	[I_DIVM]=4,
+	[I_SHFT]=4,
+	[I_BSWP]=4,
+	[I_MWBN]=4,
+	[I_MRBN]=4,
+	[I_MWBV]=4,
+	[I_MRBV]=4,
+	[I_MOV_]=4,
+	[I_SYRD]=4,
+	[I_AND_]=5,
+	[I_OR__]=5,
+	[I_XOR_]=5,
+	[I_SSUB]=5,
+	[I_ADDN]=5,
+	[I_SUBN]=5,
+	[I_SUBC]=5,
+	[I_MWWN]=5,
+	[I_MRWN]=5,
+	[I_MWWV]=5,
+	[I_MRWV]=5,
+	[I_CJMP]=5,
+	[I_BL1_]=6,
+	[I_STWN]=6,
+	[I_STRN]=6,
+	[I_STWV]=6,
+	[I_STRV]=6,
+	[I_WORD]=7,
+	[I_SYCW]=7,
+	[I_RL1_]=8,
+	[I_ALCR]=8,
+	[I_STPA]=8,
+	[I_STPS]=8,
+	[I_STOF]=8,
+	[I_LABL]=9,
+	[I_JTEN]=9,
+	[I_SYCD]=9,
+	[I_SYCL]=9,
+	[I_DWRD]=9,
+	[I_NSNB]=9,
+	[I_ZNXB]=9,
+	[I_RL2_]=10,
+	[I_JJMP]=10,
+	[I_FCST]=11,
+	[I_LAD2]=12,
+	[I_SYRQ]=12,
+	[I_LSU0]=12,
+	[I_LAD1]=13,
+	[I_LAD0]=14,
+	[I_LAD3]=15,
+	[I_LSU3]=15,
+	[I_LMU3]=15
+};
 
 // for compressed instruction buffers
 uint8_t instructionContentCatagory(enum InstructionTypeID id){
-	switch (id){
-		case I_NOP_:
-		return 0;
-		case I_FCEN:
-		case I_RET_:
-		case I_ALOC:
-		case I_D32U:
-		case I_R32U:
-		case I_D32S:
-		case I_R32S:
-		case I_D64U:
-		case I_R64U:
-		case I_D64S:
-		case I_R64S:
-		case I_LAD4:
-		case I_LAD5:
-		case I_LSU4:
-		case I_LSU5:
-		case I_LMU4:
-		case I_LMU5:
-		case I_LDI4:
-		case I_LDI5:
-		case I_LLS6:
-		case I_LLS7:
-		case I_LRS6:
-		case I_LRS7:
-		case I_JEND:
-		case I_SYRE:
-		case I_SYDB:
-		case I_SYDW:
-		case I_SYDD:
-		case I_SYDQ:
-		case I_SYDE:
-		case I_SYW0:
-		case I_SYW1:
-		case I_SYW2:
-		case I_SYW3:
-		case I_SYW4:
-		case I_SYW5:
-		case I_SYW6:
-		case I_SYW7:
-		case I_SYW8:
-		case I_SYW9:
-		case I_SBLW:
-		case I_SBRW:
-		case I_SYD0:
-		case I_SYD1:
-		case I_SYD2:
-		case I_SYD3:
-		case I_SYD4:
-		case I_SYD5:
-		case I_SYD6:
-		case I_SYD7:
-		case I_SYD8:
-		case I_SYD9:
-		case I_SBLD:
-		case I_SBRD:
-		case I_SYQ0:
-		case I_SYQ1:
-		case I_SYQ2:
-		case I_SYQ3:
-		case I_SYQ4:
-		case I_SYQ5:
-		case I_SYQ6:
-		case I_SYQ7:
-		case I_SYQ8:
-		case I_SYQ9:
-		case I_SBLQ:
-		case I_SBRQ:
-		case I_SCBW:
-		case I_SCWD:
-		case I_SCZD:
-		case I_SCDQ:
-		case I_SCZQ:
-		case I_SCQD:
-		case I_SCDW:
-		case I_SCWB:
-		case I_SCDB:
-		case I_SCQB:
-		return 1;
-		case I_PU1_:
-		case I_PUA1:
-		case I_POP1:
-		case I_SYRB:
-		case I_SYRW:
-		case I_PHIS:
-		case I_PHIE:
-		return 2;
-		case I_BYTE:
-		case I_SYCB:
-		return 3;
-		case I_PU2_:
-		case I_PUA2:
-		case I_POP2:
-		case I_CALL:
-		case I_AJMP:
-		case I_MULS:
-		case I_MULL:
-		case I_DIVM:
-		case I_SHFT:
-		case I_BSWP:
-		case I_MWBN:
-		case I_MRBN:
-		case I_MWBV:
-		case I_MRBV:
-		case I_MOV_:
-		case I_SYRD:
-		return 4;
-		case I_AND_:
-		case I_OR__:
-		case I_XOR_:
-		case I_SSUB:
-		case I_ADDN:
-		case I_SUBN:
-		case I_SUBC:
-		case I_MWWN:
-		case I_MRWN:
-		case I_MWWV:
-		case I_MRWV:
-		case I_CJMP:
-		return 5;
-		case I_BL1_:
-		case I_STWN:
-		case I_STRN:
-		case I_STWV:
-		case I_STRV:
-		return 6;
-		case I_WORD:
-		case I_SYCW:
-		return 7;
-		case I_RL1_:
-		case I_ALCR:
-		case I_STPA:
-		case I_STPS:
-		case I_STOF:
-		return 8;
-		case I_LABL:
-		case I_JTEN:
-		case I_SYCD:
-		case I_SYCL:
-		case I_DWRD:
-		case I_NSNB:
-		case I_ZNXB:
-		return 9;
-		case I_RL2_:
-		case I_JJMP:
-		return 10;
-		case I_FCST:
-		return 11;
-		case I_LAD2:
-		case I_SYRQ:
-		case I_LSU0:
-		return 12;
-		case I_LAD1:
-		return 13;
-		case I_LAD0:
-		return 14;
-		case I_LAD3:
-		case I_LSU3:
-		case I_LMU3:
-		return 15;
-		default:;
-	}
-	assert(false); // invalid operator id
-	exit(1);
+	return instruction_id_to_content_catagory[id];
 }
 
 #ifndef IGNORE_NONBACKEND
