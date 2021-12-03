@@ -238,20 +238,24 @@ void doFunctionDefinitionCheck(){
 		struct GlobalFunctionEntry gfe=blockFrameArray.globalBlockFrame.globalFunctionEntries[i];
 		if (!gfe.usedExtern&!gfe.hasBeenDefined) countToCheck++;
 	}
-	if (countToCheck==0) return;
-	uint32_t* labelMarkoff=cosmic_malloc(countToCheck*sizeof(uint32_t));
-	uint32_t walkingIndex=0;
+	uint32_t* labelMarkoff=cosmic_malloc((countToCheck+5)*sizeof(uint32_t));
+	labelMarkoff[0]=0x00000015;
+	labelMarkoff[1]=0x00000016;
+	labelMarkoff[2]=0x00000017;
+	labelMarkoff[3]=0x00000018;
+	labelMarkoff[4]=0x00000019;
+	uint32_t walkingIndex=5;
 	for (uint32_t i=0;i<blockFrameArray.globalBlockFrame.numberOfValidGlobalFunctionEntrySlots;i++){
 		struct GlobalFunctionEntry gfe=blockFrameArray.globalBlockFrame.globalFunctionEntries[i];
 		if (!gfe.usedExtern&!gfe.hasBeenDefined) labelMarkoff[walkingIndex++]=gfe.labelID;
 	}
-	doLabelMarkoffInAllCompressedInstructionBuffers(labelMarkoff,countToCheck);
-	doLabelMarkoffInInstructionBuffer(&global_static_data,labelMarkoff,countToCheck);
+	doLabelMarkoffInAllCompressedInstructionBuffers(labelMarkoff,countToCheck+5);
+	doLabelMarkoffInInstructionBuffer(&global_static_data,labelMarkoff,countToCheck+5);
 	bool gaveError=false;
-	for (uint32_t i=0;i<countToCheck;i++){
+	for (uint32_t i=5;i<countToCheck;i++){
 		if (labelMarkoff[i]==0){
 			gaveError=true;
-			walkingIndex=0;
+			walkingIndex=5;
 			bool foundEntry=false;
 			for (uint32_t i2=0;i2<blockFrameArray.globalBlockFrame.numberOfValidGlobalFunctionEntrySlots;i2++){
 				struct GlobalFunctionEntry gfe=blockFrameArray.globalBlockFrame.globalFunctionEntries[i2];
@@ -264,6 +268,34 @@ void doFunctionDefinitionCheck(){
 				}
 			}
 			assert(foundEntry);
+		}
+	}
+	if (!gaveError){
+		InstructionBuffer ib;
+		if (labelMarkoff[0]==0){
+			initInstructionBuffer(&ib);
+			singleMergeIB(&ib,&ib_intrinsic_back_memmove_forward_unaligned);
+			addEntryToInstructionBuffersOfFunctions(&ib);
+		}
+		if (labelMarkoff[1]==0){
+			initInstructionBuffer(&ib);
+			singleMergeIB(&ib,&ib_intrinsic_back_memmove_backward_unaligned);
+			addEntryToInstructionBuffersOfFunctions(&ib);
+		}
+		if (labelMarkoff[2]==0){
+			initInstructionBuffer(&ib);
+			singleMergeIB(&ib,&ib_intrinsic_back_memcpy_aligned);
+			addEntryToInstructionBuffersOfFunctions(&ib);
+		}
+		if (labelMarkoff[3]==0){
+			initInstructionBuffer(&ib);
+			singleMergeIB(&ib,&ib_intrinsic_back_strlen);
+			addEntryToInstructionBuffersOfFunctions(&ib);
+		}
+		if (labelMarkoff[4]==0){
+			initInstructionBuffer(&ib);
+			singleMergeIB(&ib,&ib_intrinsic_back_memset);
+			addEntryToInstructionBuffersOfFunctions(&ib);
 		}
 	}
 	cosmic_free(labelMarkoff);

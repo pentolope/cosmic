@@ -492,6 +492,7 @@ FCEN - indicates the end of a function is here (the instruction above is the las
 
 
 -- large instruction op-codes
+-= NOTE: the following additional label number ranges (inclusive) are reserved for intrinsics for some standard library functions: 00000015 through 00000019 and 00000028 through 00000034
 
 
 D32U - performs a 32bit division operation for unsigned inputs.

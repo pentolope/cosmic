@@ -22,7 +22,7 @@ void runPreprocessCompile(const char* startFilePath, const char* outFilePath, bo
 
 void intrinsicBuild(){
 	compileSettings.optLevel=4;
-	globalLabelID = 0x2F;
+	globalLabelID = 0x3F;
 	runPreprocessCompile("TargetInstructions/ComplexIntrinsics/source.c","IntrinsicBuiltFiles/_intrinsics.bin",false);
 	if (globalLabelID>=0xFF) err_10_1_("Intrinsic build failed due to \'source.c\' having too many labels declared");
 	printf("Compilation of \'source.c\' finished, inserting smaller intrinsics...\n");

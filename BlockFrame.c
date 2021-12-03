@@ -88,6 +88,7 @@ struct BlockFrameArray{
 			struct FunctionTypeAnalysis functionTypeAnalysis; // this is the version without singular void parameter and 
 			uint32_t labelID; // number given when this entry is created that is able to identify the start location in assembly output
 			uint32_t indexOfDeclaration; // is one of the prototypes if !hasBeenDefined, otherwise it is the definition location
+			bool isIntrinsic;
 			bool usedStatic;
 			bool usedExtern;
 			bool usedInline;
@@ -357,8 +358,6 @@ uint16_t getReversedOffsetForLocalVariable(struct VariableReference* variableRef
 
 
 
-
-
 /*
 typeString should have types broken down and typedefs resolved prior to calling this function
 
@@ -452,12 +451,22 @@ return value description:
 */
 uint8_t addGlobalFunction(
 		const char* typeString,
-		uint32_t indexOfDeclaration,
+		uint32_t indexOfDeclaration, // when isIntrinsic, indexOfDeclaration is actually used as a labelID
+		bool isIntrinsic,
 		bool isDefinitionBeingGiven,
 		bool usedStatic,
 		bool usedExtern,
 		bool usedInline){
 	
+	uint32_t intrinsicLabelID;
+	if (isIntrinsic){
+		intrinsicLabelID=indexOfDeclaration;
+		indexOfDeclaration=0;
+		isDefinitionBeingGiven=1;
+		usedStatic=1;
+		usedExtern=0;
+		usedInline=0;
+	}
 	if (usedExtern&isDefinitionBeingGiven) return 5;
 	if (usedExtern&usedInline){
 		usedInline=false;
@@ -574,13 +583,18 @@ uint8_t addGlobalFunction(
 			destroyFunctionTypeAnalysis(&(globalFunctionEntryPtr->functionTypeAnalysis));
 		} else {
 			globalFunctionEntryPtr->typeString = copyStringToHeapString(typeString);
-			globalFunctionEntryPtr->labelID = ++globalLabelID;
 			globalFunctionEntryPtr->usesVaArgs = usesVaArgs;
+			if (isIntrinsic){
+				globalFunctionEntryPtr->labelID = intrinsicLabelID;
+			} else {
+				globalFunctionEntryPtr->labelID = ++globalLabelID;
+			}
 		}
 		globalFunctionEntryPtr->usedStatic=usedStatic;
 		globalFunctionEntryPtr->usedExtern=usedExtern;
 		globalFunctionEntryPtr->usedInline=usedInline;
 		globalFunctionEntryPtr->indexOfDeclaration=indexOfDeclaration;
+		globalFunctionEntryPtr->isIntrinsic=isIntrinsic;
 		analyseFunctionTypeString(&(globalFunctionEntryPtr->functionTypeAnalysis),typeString,true);
 	}
 	return 0; // function entry is valid
@@ -673,6 +687,13 @@ void addVariableToBlockFrame(
 }
 
 
+void initializeIntrinsicsInBlockFrame(){
+	addGlobalFunction("__intrinsic_memmove_forward_unaligned ( d * void, s * const void , n unsigned long ) void", 0x00000015,1,1,1,0,0);
+	addGlobalFunction("__intrinsic_memmove_backward_unaligned ( d * void, s * const void , n unsigned long ) void",0x00000016,1,1,1,0,0);
+	addGlobalFunction("__intrinsic_memcpy_aligned ( d * void, s * const void , n unsigned long ) void",            0x00000017,1,1,1,0,0);
+	addGlobalFunction("__intrinsic_strlen ( s * const char ) unsigned long",                                       0x00000018,1,1,1,0,0);
+	addGlobalFunction("__intrinsic_memset ( d * void , v int , n unsigned long ) void",                            0x00000019,1,1,1,0,0);
+}
 
 
 

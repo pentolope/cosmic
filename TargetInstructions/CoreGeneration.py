@@ -1920,6 +1920,349 @@ FCEN
 
 """,
 
+# IB_intrinsic_back_memmove_forward_unaligned CANNOT replace memcpy or memmove, it will be called by memcpy or memmove if it is appropriate
+"IB_intrinsic_back_memmove_forward_unaligned":"""
+
+FCST $16 #0016 :00000015
+ALOC
+STRN %9 $09
+STRN %A $0A
+STRN %5 $05
+STRN %6 $06
+STRN %7 $07
+STRN %8 $08
+BL1_ %2 $01
+RL1_ %E #FFFC
+LABL :00000028
+AND_ %E %E %9
+OR__ %E %E %A
+SYRD %B %C
+SYCL @00000029
+SYRE
+CJMP %B %C %E
+
+BL1_ %B $04
+BL1_ %C $00
+LSU0 %9 %A %B %C
+
+RL1_ %E #FFFC
+SYRD %B %C
+SYCL @00000028
+SYRE
+
+MOV_ %D %7
+MRBN %4 %8
+LAD1 %7 %8 %7 %8 %2
+MOV_ %D %5
+MWBN %4 %6
+LAD1 %5 %6 %5 %6 %2
+
+MOV_ %D %7
+MRBN %4 %8
+LAD1 %7 %8 %7 %8 %2
+MOV_ %D %5
+MWBN %4 %6
+LAD1 %5 %6 %5 %6 %2
+
+MOV_ %D %7
+MRBN %4 %8
+LAD1 %7 %8 %7 %8 %2
+MOV_ %D %5
+MWBN %4 %6
+LAD1 %5 %6 %5 %6 %2
+
+MOV_ %D %7
+MRBN %4 %8
+LAD1 %7 %8 %7 %8 %2
+MOV_ %D %5
+MWBN %4 %6
+LAD1 %5 %6 %5 %6 %2
+
+AJMP %B %C
+LABL :00000029
+SYRD %B %C
+SYCL @0000002A
+SYRE
+CJMP %B %C %9
+
+MOV_ %D %7
+MRBN %4 %8
+LAD1 %7 %8 %7 %8 %2
+MOV_ %D %5
+MWBN %4 %6
+LAD1 %5 %6 %5 %6 %2
+BL1_ %E $01
+XOR_ %E %E %9
+CJMP %B %C %E
+
+MOV_ %D %7
+MRBN %4 %8
+LAD1 %7 %8 %7 %8 %2
+MOV_ %D %5
+MWBN %4 %6
+LAD1 %5 %6 %5 %6 %2
+BL1_ %E $02
+XOR_ %E %E %9
+CJMP %B %C %E
+
+MOV_ %D %7
+MRBN %4 %8
+MOV_ %D %5
+MWBN %4 %6
+
+LABL :0000002A
+RET_
+FCEN
+
+""",
+
+# IB_intrinsic_back_memmove_backward_unaligned CANNOT replace memcpy or memmove, it will be called by memmove if it is appropriate
+"IB_intrinsic_back_memmove_backward_unaligned":"""
+
+FCST $16 #0016 :00000016
+ALOC
+STRN %9 $09
+STRN %A $0A
+STRN %5 $05
+STRN %6 $06
+STRN %7 $07
+STRN %8 $08
+BL1_ %2 $01
+BL1_ %3 $00
+LAD0 %5 %6 %5 %6 %9 %A
+LAD0 %7 %8 %7 %8 %9 %A
+LSU0 %5 %6 %2 %3
+LSU0 %7 %8 %2 %3
+RL1_ %E #FFFC
+LABL :0000002B
+AND_ %E %E %9
+OR__ %E %E %A
+SYRD %B %C
+SYCL @0000002C
+SYRE
+CJMP %B %C %E
+
+BL1_ %B $04
+BL1_ %C $00
+LSU0 %9 %A %B %C
+
+RL1_ %E #FFFC
+SYRD %B %C
+SYCL @0000002B
+SYRE
+
+MOV_ %D %7
+MRBN %4 %8
+LSU0 %7 %8 %2 %3
+MOV_ %D %5
+MWBN %4 %6
+LSU0 %5 %6 %2 %3
+
+MOV_ %D %7
+MRBN %4 %8
+LSU0 %7 %8 %2 %3
+MOV_ %D %5
+MWBN %4 %6
+LSU0 %5 %6 %2 %3
+
+MOV_ %D %7
+MRBN %4 %8
+LSU0 %7 %8 %2 %3
+MOV_ %D %5
+MWBN %4 %6
+LSU0 %5 %6 %2 %3
+
+MOV_ %D %7
+MRBN %4 %8
+LSU0 %7 %8 %2 %3
+MOV_ %D %5
+MWBN %4 %6
+LSU0 %5 %6 %2 %3
+
+AJMP %B %C
+LABL :0000002C
+SYRD %B %C
+SYCL @0000002D
+SYRE
+CJMP %B %C %9
+
+MOV_ %D %7
+MRBN %4 %8
+LSU0 %7 %8 %2 %3
+MOV_ %D %5
+MWBN %4 %6
+LSU0 %5 %6 %2 %3
+BL1_ %E $01
+XOR_ %E %E %9
+CJMP %B %C %E
+
+MOV_ %D %7
+MRBN %4 %8
+LSU0 %7 %8 %2 %3
+MOV_ %D %5
+MWBN %4 %6
+LSU0 %5 %6 %2 %3
+BL1_ %E $02
+XOR_ %E %E %9
+CJMP %B %C %E
+
+MOV_ %D %7
+MRBN %4 %8
+MOV_ %D %5
+MWBN %4 %6
+
+LABL :0000002D
+RET_
+FCEN
+
+""",
+
+# IB_intrinsic_back_memcpy_aligned CANNOT replace memcpy or memmove, it will be called by memcpy if it is appropriate (size need not be aligned, only pointers)
+"IB_intrinsic_back_memcpy_aligned":"""
+
+FCST $16 #0016 :00000017
+ALOC
+STRN %9 $09
+STRN %A $0A
+STRN %5 $05
+STRN %6 $06
+STRN %7 $07
+STRN %8 $08
+BL1_ %2 $02
+RL1_ %E #FFFC
+LABL :0000002E
+AND_ %E %E %9
+OR__ %E %E %A
+SYRD %B %C
+SYCL @0000002F
+SYRE
+CJMP %B %C %E
+
+MRWN %3 %7 %8
+LAD1 %7 %8 %7 %8 %2
+MRWN %4 %7 %8
+MWWN %3 %5 %6
+LAD1 %5 %6 %5 %6 %2
+MWWN %4 %5 %6
+
+SYRD %B %C
+SYCL @0000002E
+SYRE
+RL1_ %E #FFFC
+BL1_ %3 $04
+BL1_ %4 $00
+LSU0 %9 %A %3 %4
+
+LAD1 %7 %8 %7 %8 %2
+LAD1 %5 %6 %5 %6 %2
+
+AJMP %B %C
+LABL :0000002F
+SYRD %B %C
+SYCL @00000030
+SYRE
+CJMP %B %C %9
+BL1_ %2 $01
+
+MOV_ %D %7
+MRBN %4 %8
+LAD1 %7 %8 %7 %8 %2
+MOV_ %D %5
+MWBN %4 %6
+LAD1 %5 %6 %5 %6 %2
+BL1_ %E $01
+XOR_ %E %E %9
+CJMP %B %C %E
+
+MOV_ %D %7
+MRBN %4 %8
+LAD1 %7 %8 %7 %8 %2
+MOV_ %D %5
+MWBN %4 %6
+LAD1 %5 %6 %5 %6 %2
+BL1_ %E $02
+XOR_ %E %E %9
+CJMP %B %C %E
+
+MOV_ %D %7
+MRBN %4 %8
+MOV_ %D %5
+MWBN %4 %6
+
+LABL :00000030
+RET_
+FCEN
+
+""",
+
+# IB_intrinsic_back_strlen MAY be able to replace strlen, but for now it will be called by strlen
+"IB_intrinsic_back_strlen":"""
+
+FCST $10 #0010 :00000018
+ALOC
+STRN %D $06
+STRN %E $07
+STRN %5 $05
+BL1_ %2 $00
+BL1_ %3 $00
+BL1_ %7 $01
+BL1_ %8 $00
+SYRD %B %C
+SYCL @00000031
+SYRE
+SYRD %9 %A
+SYCL @00000032
+SYRE
+LABL :00000031
+MRBN %6 %E
+LAD1 %D %E %D %E %7
+LAD1 %2 %3 %2 %3 %7
+CJMP %9 %A %6
+AJMP %B %C
+LABL :00000032
+LSU0 %2 %3 %7 %8
+BL1_ %7 $02
+MWWN %2 %5 %8
+ADDN %5 %5 %7
+MWWN %3 %5 %8
+RET_
+FCEN
+
+""",
+
+# IB_intrinsic_back_memset CANNOT replace memset, it may be called by memset (length must not be zero)
+"IB_intrinsic_back_memset":"""
+
+FCST $14 #0014 :00000019
+ALOC
+STRN %6 $07
+STRN %D $05
+STRN %E $06
+STRN %2 $08
+STRN %3 $09
+SYRD %B %C
+SYCL @00000033
+SYRE
+SYRD %9 %A
+SYCL @00000034
+SYRE
+BL1_ %7 $FF
+AND_ %6 %6 %7
+BL1_ %7 $01
+BL1_ %8 $00
+LABL :00000033
+LSU0 %2 %3 %7 %8
+MWBN %6 %E
+OR__ %4 %2 %3
+LAD1 %D %E %D %E %7
+CJMP %9 %A %4
+AJMP %B %C
+LABL :00000034
+RET_
+FCEN
+
+""",
+
 }
 
 
@@ -1947,7 +2290,7 @@ for k in dictionaryOfInitializationContents.keys():
     splitInstructions = splitInstructionString(dictionaryOfInitializationContents[k])
     
     if len(splitInstructions)==0:
-        print "Warning: block '"+k+"' has zero length"
+        print("Warning: block '"+k+"' has zero length")
         namesToSkipBecauseZero.append(k)
 
 namesToUse = filter(lambda e:e not in namesToSkipBecauseZero,dictionaryOfInitializationContents.keys())
@@ -1980,9 +2323,9 @@ def genInitializerForArguments(index,instrList):
 def genInitializerForSplitInstructions(tpl):
     index=tpl[0]
     instrList=tpl[1].split(' ')
-    instrStrWithPrefix = ' '.join([instrList[0]]+map(lambda x:x[0],instrList[1:]))
+    instrStrWithPrefix = ' '.join([instrList[0]]+list(map(lambda x:x[0],instrList[1:])))
     if not (instrStrWithPrefix in instructionListWithPrefix):
-        print 'instruction "'+instrStrWithPrefix+'" does not exist with those prefixes'
+        print('instruction "'+instrStrWithPrefix+'" does not exist with those prefixes')
         assert False
     if instrList[0]=='INSR':return ''
     return ','.join(filter(lambda x:len(x)!=0,['['+str(index)+'].id=I_'+instrList[0],genInitializerForArguments(index,instrList[1:])]))
@@ -1994,7 +2337,7 @@ def genFullInitization(k):
     numberOfInstructionsAsString = str(len(splitInstructions))
     s='static const InstructionSingle '+altName2+'['+numberOfInstructionsAsString+']={'+','.join(filter(lambda x:len(x)!=0,map(genInitializerForSplitInstructions,list(enumerate(splitInstructions)))))+'};\nstatic const InstructionBuffer '+altName1+'={(InstructionSingle*)'+altName2+','+numberOfInstructionsAsString+','+numberOfInstructionsAsString+'};\n\n'
     while s!=s.replace('=0x00','=0x0'):s=s.replace('=0x00','=0x0')
-    for letter in map(str,range(10))+['A','B','C','D','E','F']:s=s.replace('=0x0'+letter,'=0x'+letter)
+    for letter in list(map(str,range(10)))+['A','B','C','D','E','F']:s=s.replace('=0x0'+letter,'=0x'+letter)
     return s
 
 
@@ -2056,13 +2399,13 @@ for k in namesToUse:
 
 
 if 2!=len(splitInstructionString(dictionaryOfInitializationContents['IB_load_byte'])):
-    print "Warning: 'IB_load_byte' does not have two instructions in it. Make sure to change the LiteralLoadsAndCall.c file to respect this."
+    print("Warning: 'IB_load_byte' does not have two instructions in it. Make sure to change the LiteralLoadsAndCall.c file to respect this.")
 if 2!=len(splitInstructionString(dictionaryOfInitializationContents['IB_load_word'])):
-    print "Warning: 'IB_load_word' does not have two instructions in it. Make sure to change the LiteralLoadsAndCall.c file to respect this."
+    print("Warning: 'IB_load_word' does not have two instructions in it. Make sure to change the LiteralLoadsAndCall.c file to respect this.")
 if 2!=len(splitInstructionString(dictionaryOfInitializationContents['IB_load_dword'])):
-    print "Warning: 'IB_load_dword' does not have two instructions in it. Make sure to change the LiteralLoadsAndCall.c file to respect this."
+    print("Warning: 'IB_load_dword' does not have two instructions in it. Make sure to change the LiteralLoadsAndCall.c file to respect this.")
 if 3!=len(splitInstructionString(dictionaryOfInitializationContents['IB_STPA'])):
-    print "Warning: 'IB_STPA' does not have three instructions in it. Make sure to change the LiteralLoadsAndCall.c file to respect this."
+    print("Warning: 'IB_STPA' does not have three instructions in it. Make sure to change the LiteralLoadsAndCall.c file to respect this.")
 
 f.write('\n')
 f.close()

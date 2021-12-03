@@ -694,6 +694,7 @@ void fileScopeStatementsWalk(){
 	int32_t walkingIndex = 0;
 	char firstCharacter;
 	initInstructionBuffer(&global_static_data);
+	initializeIntrinsicsInBlockFrame();
 	while ((firstCharacter=sourceContainer.string[walkingIndex])){
 		if (firstCharacter==' ' | firstCharacter=='\n'){
 			walkingIndex++;
@@ -790,7 +791,7 @@ void fileScopeStatementsWalk(){
 							exit(1);
 						}
 						applyToTypeStringArrayDecayToSelf(typeString);
-						uint8_t retValForAddingFunction = addGlobalFunction(typeString,gotoFailIndex,isDefinitionBeingGiven,hasStatic,hasExtern,hasInline);
+						uint8_t retValForAddingFunction = addGlobalFunction(typeString,gotoFailIndex,0,isDefinitionBeingGiven,hasStatic,hasExtern,hasInline);
 						if (retValForAddingFunction!=0){
 							if (retValForAddingFunction==1){
 								err_1101_("function declaration has type conflicts with previous declaration",gotoFailIndex);

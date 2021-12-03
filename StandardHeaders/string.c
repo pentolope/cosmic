@@ -3,33 +3,38 @@
 
 
 unsigned long strlen(const char* str){
-	unsigned long l=0;
-	while (str[l++]){}
-	return l-1;
+	return __intrinsic_strlen(str);
 }
 
 void* memset(void* dest, int v, unsigned long n){
-	for (unsigned long i=0;i<n;i++){((char*)dest)[i]=v;}
+	if (n!=0u){
+		__intrinsic_memset(dest,v,n);
+	}
 	return dest;
 }
 
 void* memmove(void* dest, const void* src, unsigned long n){
-	unsigned long i;
-	if (dest!=src){
+	if (dest!=src & n!=0u){
 		if (dest<src){
-			for (i=0;i!=n;i++){((char*)dest)[i]=((char*)src)[i];}
+			__intrinsic_memmove_forward_unaligned(dest,src,n);
 		} else {
-			for (i=n-1;i!=-1;i--){((char*)dest)[i]=((char*)src)[i];}
+			__intrinsic_memmove_backward_unaligned(dest,src,n);
 		}
 	}
 	return dest;
 }
 
 void* memcpy(void* dest, const void* src, unsigned long n){
-	for (unsigned long i=0;i<n;i++){((char*)dest)[i]=((char*)src)[i];}
+	if (n!=0u){
+		if (((unsigned long)dest&1u)==0u & ((unsigned long)src&1u)==0u){
+			__intrinsic_memcpy_aligned(dest,src,n);
+		} else {
+			__intrinsic_memmove_forward_unaligned(dest,src,n);
+		}
+	}
 	return dest;
 }
-	
+
 char* strcpy(char* dest, const char* src){
 	char* o_dest=dest;
 	while (*(dest++)=*(src++)){}
