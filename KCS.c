@@ -14,8 +14,7 @@ static struct {
 #include "_Loader_Base.c"
 
 void makeColor(char type, char color){
-	printf("%c%c%c%c%c",        // printf() doesn't always work as intended when these are printed with %s format
-		27,'[',type,color,'m');
+	printf("%c%c%c%c%c",27,'[',type,color,'m');
 }
 
 void resetColor(){
