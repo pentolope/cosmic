@@ -271,7 +271,9 @@ int32_t functionStatementsWalk(
 			initInstructionBuffer(&instructionBufferLocalTemp_2);
 			initInstructionBuffer(&instructionBufferLocalTemp_3);
 			addBlockFrame();
-			if (sourceContainer.string[walkingIndex]!=';'){
+			if (sourceContainer.string[walkingIndex]==')'){
+				err_1101_("Expected \';\' or expression",walkingIndex);
+			} else if (sourceContainer.string[walkingIndex]!=';'){
 				endOfToken = getEndOfToken(walkingIndex);
 				if (isSegmentOfStringTypeLike(sourceContainer.string,walkingIndex,endOfToken)){
 					// then the first statement is a declaration
@@ -312,21 +314,18 @@ int32_t functionStatementsWalk(
 					expressionToAssemblyWithCast(&instructionBufferLocalTemp_0,"void",walkingIndex,endingSemicolon);
 					walkingIndex=endingSemicolon;
 				}
-				walkingIndex++;
-			} else if (sourceContainer.string[walkingIndex]==')'){
-				err_1101_("Expected \';\' or expression",walkingIndex);
-			} else {
-				walkingIndex++;
 			}
-			walkingIndex=emptyIndexAdvance(walkingIndex);
-			if (sourceContainer.string[walkingIndex]!=';'){
+			walkingIndex=emptyIndexAdvance(walkingIndex+1);
+			if (sourceContainer.string[walkingIndex]==')'){
+				err_1101_("Expected \';\' or expression",walkingIndex);
+			} else if (sourceContainer.string[walkingIndex]!=';'){
 				int32_t endingSemicolon = findIndexOfTypicalStatementEnd(walkingIndex);
 				expressionToAssemblyWithCast(&instructionBufferLocalTemp_1,"_Bool",walkingIndex,endingSemicolon);
 				walkingIndex=endingSemicolon+1;
-			} else if (sourceContainer.string[walkingIndex]==')'){
-				err_1101_("Expected \';\' or expression",walkingIndex);
 			} else {
-				err_1101_("An expression is required here",walkingIndex);
+				insert_IB_load_byte(&instructionBufferLocalTemp_1,1);
+				err_010_0("Expression absent, assuming value is true",walkingIndex);
+				walkingIndex++;
 			}
 			walkingIndex=emptyIndexAdvance(walkingIndex);
 			if (sourceContainer.string[walkingIndex]!=')'){
